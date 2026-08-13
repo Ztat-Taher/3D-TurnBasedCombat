@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bc07xmjlpe8y1"
-path="res://.godot/imported/Placeholder.png-30ac785a3c5b1e5af09dc50b4f4296ca.ctex"
+uid="uid://bffijv7tqt01m"
+path="res://.godot/imported/IconMash.webp-6fa9b94e3e076d619325f591b3d8106e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Placeholder.png"
-dest_files=["res://.godot/imported/Placeholder.png-30ac785a3c5b1e5af09dc50b4f4296ca.ctex"]
+source_file="res://addons/QuickTimeEvent/MashQTE/IconMash.webp"
+dest_files=["res://.godot/imported/IconMash.webp-6fa9b94e3e076d619325f591b3d8106e.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bc07xmjlpe8y1"
-path="res://.godot/imported/Placeholder.png-30ac785a3c5b1e5af09dc50b4f4296ca.ctex"
+uid="uid://d1knyuhl4x0ou"
+path="res://.godot/imported/Circle.webp-f6f5aa0144cd4608724d5930e2939b9f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Placeholder.png"
-dest_files=["res://.godot/imported/Placeholder.png-30ac785a3c5b1e5af09dc50b4f4296ca.ctex"]
+source_file="res://addons/QuickTimeEvent/Circle.webp"
+dest_files=["res://.godot/imported/Circle.webp-f6f5aa0144cd4608724d5930e2939b9f.ctex"]
 
 [params]
 
