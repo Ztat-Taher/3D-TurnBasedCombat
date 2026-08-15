@@ -9,133 +9,138 @@ class_name BattleAflictions
 static func format_damage_text(
 	attacker: Battler,
 	target: Battler,
-	skill: Skill,
+	card: CardData,
 	damage: int,
 	is_critical: bool = false,
 	is_weakness: bool = false
 ) -> String:
-	
+
 	var text = ""
-	
-	# Attacker name and skill name
+
+	# Attacker name and card name
 	if attacker:
 		text += "[b]%s[/b]" % attacker.character_name
-	
-	if skill:
-		text += " used [i]%s[/i]" % skill.skill_name
+
+	if card:
+		text += " used [i]%s[/i]" % card.name
 	else:
 		text += " attacked"
-	
+
 	text += "!\n"
-	
+
 	# Target and damage/healing
 	if target:
 		text += "[b]%s[/b]" % target.character_name
-	
+
 	# Determine text color based on effect and element
-	var color = get_element_color(skill.element if skill else 0)
+	var element_id = 0
+	if card and card.metadata.has("element"):
+		var element_str = card.metadata["element"]
+		element_id = get_element_id_from_string(element_str)
+
+	var color = get_element_color(element_id)
 	var damage_type = "took"
-	
+
 	if damage < 0:
 		damage_type = "recovered"
 		damage = abs(damage)
 		color = Color.GREEN
-	
+
 	text += " %s [color=#%s]%d[/color] damage" % [
 		damage_type,
 		color.to_html(),
 		damage
 	]
-	
+
 	# Critical indicator
 	if is_critical:
 		text += " [i][color=#FFD700](CRITICAL!)[/color][/i]"
-	
+
 	# Weakness indicator
 	if is_weakness:
 		text += " [i][color=#FF69B4](weakness!)[/color][/i]"
-	
+
 	text += "!"
-	
+
 	return text
 
 ## Format healing text
 static func format_heal_text(
 	user: Battler,
 	target: Battler,
-	skill: Skill,
+	card: CardData,
 	healing: int
 ) -> String:
-	
+
 	var text = ""
-	
+
 	if user:
 		text += "[b]%s[/b]" % user.character_name
-	
-	if skill:
-		text += " used [i]%s[/i]" % skill.skill_name
+
+	if card:
+		text += " used [i]%s[/i]" % card.name
 	else:
 		text += " used an item"
-	
+
 	text += "!\n"
-	
+
 	if target:
 		text += "[b]%s[/b]" % target.character_name
-	
+
 	text += " [color=#00FF00]recovered %d HP[/color]!" % healing
-	
+
 	return text
 
 ## Format miss text
 static func format_miss_text(
 	attacker: Battler,
 	target: Battler,
-	skill: Skill
+	card: CardData
 ) -> String:
-	
+
 	var text = ""
-	
+
 	if attacker:
 		text += "[b]%s[/b]" % attacker.character_name
-	
-	if skill:
-		text += " used [i]%s[/i]" % skill.skill_name
+
+	if card:
+		text += " used [i]%s[/i]" % card.name
 	else:
 		text += " attacked"
-	
+
 	text += "!\n"
-	
+
 	if target:
 		text += "[b]%s[/b]" % target.character_name
-	
+
 	text += " [color=#808080](MISS!)[/color]"
-	
+
 	return text
 
 ## Format revive text
 static func format_revive_text(
 	user: Battler,
 	target: Battler,
-	skill: Skill
+	card: CardData
 ) -> String:
-	
+
 	var text = ""
-	
+
 	if user:
 		text += "[b]%s[/b]" % user.character_name
-	
-	if skill:
-		text += " used [i]%s[/i]" % skill.skill_name
+
+	if card:
+		text += " used [i]%s[/i]" % card.name
 	else:
 		text += " used a revival item"
-	
+
 	text += "!\n"
-	
+
 	if target:
 		text += "[b]%s[/b]" % target.character_name
-	
+
 	text += " [color=#FF69B4]was revived![/color]"
-	
+
 	return text
 
 ## Format status effect application text
@@ -158,6 +163,24 @@ static func format_state_text(
 	text += "!"
 	
 	return text
+
+## Convert element string to element ID
+static func get_element_id_from_string(element_str: String) -> int:
+	match element_str.to_lower():
+		"physical":
+			return GlobalBattleSettings.Elements.Physical
+		"earth":
+			return GlobalBattleSettings.Elements.EARTH
+		"air":
+			return GlobalBattleSettings.Elements.AIR
+		"fire":
+			return GlobalBattleSettings.Elements.FIRE
+		"water":
+			return GlobalBattleSettings.Elements.WATER
+		"magic", "holy":
+			return GlobalBattleSettings.Elements.MAGIC
+		_:
+			return GlobalBattleSettings.Elements.Physical
 
 ## Get color for element (BBCode hex format)
 static func get_element_color(element_id: int) -> Color:

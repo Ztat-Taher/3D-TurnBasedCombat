@@ -87,7 +87,7 @@ static func try_play_animation(battler: Battler, anim_name: String) -> bool:
 
 ## Apply fallback damage if animation callback didn't fire.
 ## Only applies if the action hasn't been processed yet.
-static func apply_fallback_damage(attacker: Battler, target: Battler, skill: Skill = null) -> void:
+static func apply_fallback_damage(attacker: Battler, target: Battler) -> void:
 	var battle_manager = get_battle_manager()
 	if not battle_manager:
 		return
@@ -103,11 +103,7 @@ static func apply_fallback_damage(attacker: Battler, target: Battler, skill: Ski
 	
 	print("[Fallback] Animation didn't trigger damage, applying fallback for ", attacker.character_name)
 	
-	var damage = 0
-	if skill:
-		damage = Formulas.calculate_damage(attacker, target, skill)
-	else:
-		damage = attacker.get_attack_damage(target)
+	var damage = attacker.get_attack_damage(target)
 	
 	if damage > 0:
 		battle_manager.damage_calculation(attacker, target, damage)

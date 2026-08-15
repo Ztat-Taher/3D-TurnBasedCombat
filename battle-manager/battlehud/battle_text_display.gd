@@ -15,7 +15,7 @@ func _get_afflictions():
 
 ## Export controls for text display options
 @export var show_damage_dealt: bool = true
-@export var show_skill_name: bool = true
+@export var show_card_name: bool = true
 @export var show_weakness_indicator: bool = true
 @export var use_color_formatting: bool = true
 
@@ -69,7 +69,7 @@ func display_battle_text(formatted_text: String) -> void:
 func show_damage(
 	attacker: Battler,
 	target: Battler,
-	skill: Skill,
+	card: CardData,
 	damage: int,
 	is_critical: bool = false,
 	is_weakness: bool = false
@@ -78,7 +78,7 @@ func show_damage(
 	var formatted = afflictions.format_damage_text(
 		attacker,
 		target,
-		skill,
+		card,
 		damage,
 		is_critical,
 		is_weakness
@@ -89,31 +89,31 @@ func show_damage(
 func show_healing(
 	user: Battler,
 	target: Battler,
-	skill: Skill,
+	card: CardData,
 	healing: int
 ) -> void:
 	var afflictions = _get_afflictions()
-	var formatted = afflictions.format_heal_text(user, target, skill, healing)
+	var formatted = afflictions.format_heal_text(user, target, card, healing)
 	display_battle_text(formatted)
 
 ## Display miss text
 func show_miss(
 	attacker: Battler,
 	target: Battler,
-	skill: Skill
+	card: CardData
 ) -> void:
 	var afflictions = _get_afflictions()
-	var formatted = afflictions.format_miss_text(attacker, target, skill)
+	var formatted = afflictions.format_miss_text(attacker, target, card)
 	display_battle_text(formatted)
 
 ## Display revive text
 func show_revive(
 	user: Battler,
 	target: Battler,
-	skill: Skill
+	card: CardData
 ) -> void:
 	var afflictions = _get_afflictions()
-	var formatted = afflictions.format_revive_text(user, target, skill)
+	var formatted = afflictions.format_revive_text(user, target, card)
 	display_battle_text(formatted)
 
 ## Display state application text

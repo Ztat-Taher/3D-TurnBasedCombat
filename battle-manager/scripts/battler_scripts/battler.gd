@@ -28,8 +28,6 @@ var defense: int
 var agility: int
 
 var current_health: int
-var current_sp: int = 100  # Add SP variables
-var max_sp: int = 100      # Add max SP
 var is_defending: bool = false
 var current_target = null
 var is_counter_stunned: bool = false  # Stunned by being hit with a counter attack
@@ -196,10 +194,6 @@ func _ready():
 		
 		# Apply level-focused progression (calculates stats based on level)
 		apply_level_progression()
-		
-		# SP stats
-		max_sp = max_sp  # Already set by apply_level_progression
-		current_sp = max_sp
 	else:
 		push_error("BattlerStats resource not set!")
 	
@@ -779,7 +773,7 @@ func _on_anim_damage():
 func on_save_game(save_data):
 	var new_data = BattlerData.new()
 	new_data.current_health = current_health  # Using consistent property name
-	new_data.current_sp = current_sp
+
 	new_data.current_exp = get_exp_stat().get_total_exp()
 	new_data.current_level = get_exp_stat().get_current_level()
 	
@@ -792,20 +786,9 @@ func on_load_game(load_data):
 		return
 	
 	current_health = save_data.current_health  # Using consistent property name
-	current_sp = save_data.current_sp
+
 	get_exp_stat().exp_total = save_data.current_exp
 	get_exp_stat().char_level = save_data.current_level
-
-func regenerate_sp():
-	if stats and current_sp < max_sp:
-		var regen_amount = 5
-		if stats.has_method("get") and stats.get("sp_regen") != null:
-			regen_amount = stats.sp_regen
-		# Add randomness to SP gains (±30% variation)
-		var randomness = randf_range(0.7, 1.3)
-		regen_amount = int(float(regen_amount) * randomness)
-		current_sp = min(current_sp + regen_amount, max_sp)
-		print("%s recovered %d SP. SP: %d/%d" % [character_name, regen_amount, current_sp, max_sp])
 
 var active_states: Dictionary = {}  # {state_name: State}
 
@@ -913,7 +896,6 @@ func apply_level_progression() -> void:
 	# Calculate stats based on level and multipliers
 	var base_stats = {
 		"max_health": stats.max_health,
-		"max_sp": stats.max_sp,
 		"attack": stats.attack,
 		"defense": stats.defense,
 		"agility": stats.agility
@@ -921,7 +903,6 @@ func apply_level_progression() -> void:
 	
 	var stat_multipliers = {
 		"max_health": stats.health_multiplier,
-		"max_sp": stats.sp_multiplier,
 		"attack": stats.attack_multiplier,
 		"defense": stats.defense_multiplier,
 		"agility": stats.agility_multiplier
@@ -932,13 +913,10 @@ func apply_level_progression() -> void:
 	
 	# Apply to battler
 	max_health = calculated["max_health"]
-	max_sp = calculated["max_sp"]
 	attack = calculated["attack"]
 	defense = calculated["defense"]
 	agility = calculated["agility"]
 	
-	# Set current health/sp to max if first time initialization
+	# Set current health to max if first time initialization
 	if current_health == 0:
 		current_health = max_health
-	if current_sp == 0:
-		current_sp = max_sp

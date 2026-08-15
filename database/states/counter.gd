@@ -1,10 +1,9 @@
 ## CounterState
 ## Handles counter attacks for battlers with the Counter state.
 ## This state triggers automatically when the afflicted battler takes damage from a non-ally.
-## 
+##
 ## Usage:
 ## - Apply this state to a battler to enable counter attacks
-## - Configure counter_skill to define what attack is used for counters
 ## - Set interrupt_attacker to true for dramatic immediate counters (Like a Dragon style)
 ## - Set interrupt_attacker to false to let attacker return first before counter (safer, less code)
 
@@ -12,7 +11,6 @@ class_name CounterState
 extends State
 
 @export var counter_damage_multiplier: float = 1.5
-@export var counter_skill: Skill
 @export var interrupt_attacker: bool = true  ## If true, counter fires while attacker is close. If false, wait for return.
 @export var max_counters_per_turn: int = 2  ## Limit how many times counter can trigger per turn
 
@@ -31,7 +29,7 @@ func reset_turn_usage() -> void:
 	counters_used_this_turn = 0
 
 ## Called when this battler is attacked while having Counter state
-## Only triggers against non-allies (damage skills hitting enemies)
+## Only triggers against non-allies
 func perform_counter(defender: Battler, attacker: Battler) -> void:
 	# Only trigger if counter is still active
 	if not defender.active_states.has(state_name):
@@ -65,45 +63,19 @@ func perform_counter(defender: Battler, attacker: Battler) -> void:
 
 ## Execute the actual counter attack
 func _execute_counter_attack(defender: Battler, attacker: Battler) -> void:
-	# Get battle manager to set up state for damage callback
-	var battle_manager = defender.get_tree().get_first_node_in_group("battle_manager")
-	
-	if counter_skill:
-		print("[COUNTER] Using skill: ", counter_skill.skill_name)
-		
-		# SET ATTACKER AS STUNNED - will pause before they return to position
-		attacker.is_counter_stunned = true
-		
-		# Set up battle manager state so damage callback knows this is a counter
-		if battle_manager:
-			battle_manager.current_character = defender
-			battle_manager.current_target = attacker
-			battle_manager.queued_action = "counter"  # Mark as counter action
-			battle_manager.queued_skill = counter_skill
-			battle_manager.current_skill_effect_type = counter_skill.effect_type
-			# Reset damage flag so this action can process damage
-			battle_manager.damage_processed_this_turn = false
-		
-		# AWAIT the counter skill to complete before returning
-		await defender.use_skill(counter_skill, attacker)
-		
-		# Clear the queued action after counter completes
-		if battle_manager:
-			battle_manager.queued_action = ""
-	else:
-		# Default counter attack (basic attack with multiplier)
-		print("[COUNTER] Using default counter attack")
-		attacker.is_counter_stunned = true  # Stun attacker
-		
-		defender._try_animation("basic_attacks/attack")
-		await defender.get_tree().create_timer(0.5).timeout
-		
-		var counter_damage = Formulas.physical_damage(
-			defender, 
-			attacker, 
-			int(defender.attack * counter_damage_multiplier)
-		)
-		attacker.take_damage(counter_damage, defender)
+	# Default counter attack (basic attack with multiplier)
+	print("[COUNTER] Using default counter attack")
+	attacker.is_counter_stunned = true  # Stun attacker
+
+	defender._try_animation("basic_attacks/attack")
+	await defender.get_tree().create_timer(0.5).timeout
+
+	var counter_damage = Formulas.physical_damage(
+		defender,
+		attacker,
+		int(defender.attack * counter_damage_multiplier)
+	)
+	attacker.take_damage(counter_damage, defender)
 
 ## Wait for attacker to return to original position before counter
 func _wait_for_attacker_return(attacker: Battler) -> void:

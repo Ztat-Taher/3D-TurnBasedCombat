@@ -16,12 +16,12 @@ class_name LevelProgression
 
 ## Static dictionary for base stats at level 1 (used by all characters of a class)
 static var class_base_stats = {
-	# Format: "class_name": { "max_health": 100, "max_sp": 50, "attack": 10, "defense": 5, "agility": 8 }
+	# Format: "class_name": { "max_health": 100, "attack": 10, "defense": 5, "agility": 8 }
 }
 
 ## Static dictionary for stat multipliers per level (used by all characters of a class)
 static var class_stat_multipliers = {
-	# Format: "class_name": { "max_health": 15, "max_sp": 5, "attack": 2, "defense": 1, "agility": 1 }
+	# Format: "class_name": { "max_health": 15, "attack": 2, "defense": 1, "agility": 1 }
 }
 
 ## Calculate a single stat at given level
@@ -58,7 +58,6 @@ static func apply_level_stats(battler: Battler, level: int = -1) -> void:
 	# Get base stats from BattlerStats exports
 	var base_stats = {
 		"max_health": battler.stats.max_health,
-		"max_sp": battler.stats.max_sp,
 		"attack": battler.stats.attack,
 		"defense": battler.stats.defense,
 		"agility": battler.stats.agility
@@ -67,7 +66,6 @@ static func apply_level_stats(battler: Battler, level: int = -1) -> void:
 	# Get stat multipliers from BattlerStats exports
 	var stat_multipliers = {
 		"max_health": battler.stats.health_multiplier,
-		"max_sp": battler.stats.sp_multiplier,
 		"attack": battler.stats.attack_multiplier,
 		"defense": battler.stats.defense_multiplier,
 		"agility": battler.stats.agility_multiplier
@@ -78,14 +76,12 @@ static func apply_level_stats(battler: Battler, level: int = -1) -> void:
 	
 	# Apply to battler
 	battler.max_health = calculated_stats.get("max_health", 100)
-	battler.max_sp = calculated_stats.get("max_sp", 100)
 	battler.attack = calculated_stats.get("attack", 10)
 	battler.defense = calculated_stats.get("defense", 5)
 	battler.agility = calculated_stats.get("agility", 5)
 	
-	# Update current health/sp to not exceed max
+	# Update current health to not exceed max
 	battler.current_health = min(battler.current_health, battler.max_health)
-	battler.current_sp = min(battler.current_sp, battler.max_sp)
 
 ## Handle level up - recalculate stats and apply bonuses
 static func level_up(battler: Battler) -> void:
@@ -97,10 +93,9 @@ static func level_up(battler: Battler) -> void:
 	
 	print("%s leveled up to %d!" % [battler.character_name, battler.stats.level])
 	
-	# Restore full HP/SP on level up (optional, can be toggled)
+	# Restore full HP on level up (optional, can be toggled)
 	if battler.stats.has_meta("restore_on_level_up") and battler.stats.get_meta("restore_on_level_up"):
 		battler.current_health = battler.max_health
-		battler.current_sp = battler.max_sp
 
 ## Get experience needed for next level (scaling formula)
 ## Base exp requirement scales exponentially

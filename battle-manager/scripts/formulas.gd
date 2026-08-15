@@ -70,18 +70,7 @@ static func element_wheel(attack_element, defend_element) -> float:
 ## [color=orange]!All listed formulas have their value multiplied by the type[br]
 ## effectiveness value returned by [method element_wheel].[br]
 ## [color=red]!!Minimum value that can be returned by all formulas is [b]1[/b].[/color][br]
-static func calculate_damage(attacker:Battler, target:Battler, skill:Skill) -> int:
-	var atk:float = float(attacker.stats.attack)
-	var def:float = float(target.stats.defense)
-	var damage:int = 1
-	match GlobalBattleSettings.Global_Damage_Calc_Type:
-		GlobalBattleSettings.Damage_Calc_Type.PKMN:
-			damage = max(1, int((((((2.0 * attacker.exp_node.char_level) / 5.0 + 2) * skill.base_power * (atk / def)) / 50.0) + 2) * element_wheel(skill.element, target.stats.element)))
-		GlobalBattleSettings.Damage_Calc_Type.DRGNQST:
-			damage = max(1, int(((atk - (def / 2.0) + (((atk - (def/2.0) + 1.0) * randf_range(0, 255)) / 256.0)) / 4) * (skill.base_power / 50.0) * element_wheel(skill.element, target.stats.element)))
-		_:
-			damage = max(1, int((atk-def) * (skill.base_power/50.0) * element_wheel(skill.element, target.stats.element)))
-	return damage
+
 
 ## Check if a target can be revived
 ## Returns true if target is defeated (current_health <= 0)
@@ -110,15 +99,7 @@ static func apply_revive(target: Battler, hp_percent: int = 50) -> int:
 	
 	return hp_restored
 
-## Calculate damage with difficulty scaling applied
-static func calculate_damage_with_difficulty(attacker:Battler, target:Battler, skill:Skill, is_enemy_attacker: bool = false) -> int:
-	var base_damage = calculate_damage(attacker, target, skill)
-	
-	# Apply difficulty multiplier based on whether it's player or enemy attacking
-	if is_enemy_attacker:
-		return DifficultyManager.apply_difficulty_to_damage(base_damage, "enemy_damage")
-	else:
-		return DifficultyManager.apply_difficulty_to_damage(base_damage, "player_damage")
+
 
 ## Apply difficulty scaling to defense
 static func get_defense_with_difficulty(target: Battler, is_enemy_target: bool = false) -> float:

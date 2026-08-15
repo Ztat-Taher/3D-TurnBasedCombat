@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bmu11p8vvo71p"]
 
-[ext_resource type="PackedScene" uid="uid://b8ggpluijlogu" path="res://battle-manager/allies/y_bot-ally.scn" id="1_yb6qq"]
+[ext_resource type="PackedScene" uid="uid://wxuxctidimwu" path="res://battle-manager/allies/y_bot-ally.tscn" id="1_yb6qq"]
 [ext_resource type="Script" uid="uid://d2mintfjxyqei" path="res://battle-manager/scripts/BattlerStats.gd" id="2_abxtc"]
 [ext_resource type="Script" uid="uid://xut8pvgqpe8u" path="res://database/items/enemy_drop.gd" id="2_gsxiq"]
 [ext_resource type="Resource" uid="uid://orange" path="res://database/items/orange.tres" id="3_11jry"]

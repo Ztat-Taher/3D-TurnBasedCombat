@@ -83,9 +83,6 @@ text = "Test"
 [node name="EnemyHealthBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats" unique_id=1972268872]
 layout_mode = 2
 
-[node name="EnemySPBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats" unique_id=1443543778]
-layout_mode = 2
-
 [node name="EnemyStats2" type="VBoxContainer" parent="Control/Enemies/AllEnemies" unique_id=834907052]
 visible = false
 layout_mode = 2
@@ -96,9 +93,6 @@ layout_mode = 2
 text = "Test"
 
 [node name="EnemyHealthBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats2" unique_id=151162531]
-layout_mode = 2
-
-[node name="EnemySPBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats2" unique_id=423628430]
 layout_mode = 2
 
 [node name="EnemyStats3" type="VBoxContainer" parent="Control/Enemies/AllEnemies" unique_id=1413065645]
@@ -113,9 +107,6 @@ text = "Test"
 [node name="EnemyHealthBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats3" unique_id=1906703926]
 layout_mode = 2
 
-[node name="EnemySPBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats3" unique_id=549061840]
-layout_mode = 2
-
 [node name="EnemyStats4" type="VBoxContainer" parent="Control/Enemies/AllEnemies" unique_id=38448121]
 visible = false
 layout_mode = 2
@@ -126,9 +117,6 @@ layout_mode = 2
 text = "Test"
 
 [node name="EnemyHealthBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats4" unique_id=922601932]
-layout_mode = 2
-
-[node name="EnemySPBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats4" unique_id=1016770029]
 layout_mode = 2
 
 [node name="TurnQueueUI" type="Control" parent="Control" unique_id=999999994]
