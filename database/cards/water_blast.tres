@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3 uid="uid://water_blast_card"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "water_blast"
+name = "Water Blast"
+cost = 2
+attack = 35
+health = 0
+play_kind = 0
+metadata = {
+"card_type": "attack",
+"description": "Unleash a water blast hitting all enemies for 35 water damage",
+"element": "water",
+"qte_difficulty": 0.35,
+"target_type": "aoe",
+"aoe_targets": "all_enemies"
+}

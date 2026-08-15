@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3 uid="uid://thunder_strike_card"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "thunder_strike"
+name = "Thunder Strike"
+cost = 2
+attack = 55
+health = 0
+play_kind = 0
+metadata = {
+"card_type": "attack",
+"description": "Summon a lightning bolt dealing 55 air damage",
+"element": "air",
+"qte_difficulty": 0.45,
+"accuracy_bonus": 0.2
+}

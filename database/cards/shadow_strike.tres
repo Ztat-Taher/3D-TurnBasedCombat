@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3 uid="uid://shadow_strike_card"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "shadow_strike"
+name = "Shadow Strike"
+cost = 2
+attack = 60
+health = 0
+play_kind = 0
+metadata = {
+"card_type": "attack",
+"description": "Strike from the shadows dealing 60 dark damage with high critical chance",
+"element": "dark",
+"qte_difficulty": 0.3,
+"critical_bonus": 0.3
+}

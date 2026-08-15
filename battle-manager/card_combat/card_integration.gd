@@ -9,7 +9,7 @@ var battle_manager: BattleManager
 var card_database: CardDatabase
 
 # Sample deck composition (which cards to include in deck)
-var deck_card_ids: Array[String] = ["strike", "strike", "heavy_strike", "heal", "defend"]
+var deck_card_ids: Array[String] = ["strike", "fireball", "ice_shard", "thunder_strike", "heal", "poison", "berserk_rage"]
 
 func _ready():
 	print("CardIntegration _ready() called")

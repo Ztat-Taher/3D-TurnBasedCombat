@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3 uid="uid://holy_light_card"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "holy_light"
+name = "Holy Light"
+cost = 2
+attack = 0
+health = 45
+play_kind = 0
+metadata = {
+"card_type": "heal",
+"description": "Channel divine light to heal 45 HP and cleanse debuffs",
+"element": "holy",
+"cleanses_debuffs": true
+}

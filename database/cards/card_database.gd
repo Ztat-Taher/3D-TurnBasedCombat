@@ -39,6 +39,13 @@ func get_card(card_id: String) -> CardData:
 func get_all_cards() -> Array[CardData]:
 	return cards.values()
 
+func get_cards_by_element(element: String) -> Array[CardData]:
+	var result: Array[CardData] = []
+	for card in cards.values():
+		if card.metadata.get("element", "") == element:
+			result.append(card)
+	return result
+
 func get_cards_by_type(card_type: String) -> Array[CardData]:
 	var result: Array[CardData] = []
 	for card in cards.values():

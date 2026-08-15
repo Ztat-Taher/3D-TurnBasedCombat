@@ -206,6 +206,9 @@ func execute_card_effect(card: CardData, target: Battler) -> void:
 		print("No player battler for card execution")
 		return
 	
+	# Apply state effects BEFORE execution (to avoid target being freed)
+	apply_card_states(card, target)
+	
 	# Handle different card types based on metadata
 	var card_type = card.metadata.get("card_type", "attack")
 	
@@ -218,6 +221,10 @@ func execute_card_effect(card: CardData, target: Battler) -> void:
 			execute_defense_card(card)
 		"heal":
 			execute_heal_card(card, target)
+		"buff":
+			execute_buff_card(card, target)
+		"debuff":
+			await execute_debuff_card(card, target)
 		_:
 			print("Unknown card type: ", card_type)
 
@@ -250,35 +257,29 @@ func execute_attack_card(card: CardData, target: Battler) -> void:
 	# Play attack animation
 	current_player_battler._try_animation("attack")
 	
-	# Trigger QTE if enabled
-	var qte_success = false
+	# Simple QTE system: start QTE, get result, apply damage with multiplier
+	var damage_multiplier = 1.0
+	
 	if qte_manager and qte_manager.start_card_qte(card):
-		qte_success = await await_qte_completion()
-		print("QTE completed, success: ", qte_success)
-		
-		# Apply damage multiplier based on QTE result
-		var multiplier = qte_manager.get_damage_multiplier("CARD_ATTACK", qte_success)
-		total_damage = int(total_damage * multiplier)
-		print("Damage after QTE: ", total_damage, " (multiplier: ", multiplier, ")")
+		var qte_success = await await_qte_completion()
+		print("QTE result: ", qte_success)
+		damage_multiplier = qte_manager.get_damage_multiplier("CARD_ATTACK", qte_success)
+		print("Damage multiplier: ", damage_multiplier)
+	else:
+		print("No QTE for this card or QTE disabled")
 	
-	# Await contact frame from animation / hit_moment signal
-	var hit_ratio = current_player_battler.hit_frame_ratio
-	if card.metadata.has("hit_frame_ratio"):
-		hit_ratio = float(card.metadata["hit_frame_ratio"])
+	# Wait for attack animation to reach hit point
+	await get_tree().create_timer(0.5).timeout
 	
-	var attack_dur = current_player_battler._current_attack_duration
-	var hit_time = attack_dur * hit_ratio
-	var remaining_time = max(0.1, attack_dur - hit_time)
+	# Apply damage with the calculated multiplier
+	var final_damage = int(total_damage * damage_multiplier)
+	print("Final damage to apply: ", final_damage)
 	
-	# Wait for hit moment signal (with fallback timeout in case signal already fired)
-	await current_player_battler.hit_moment
-	
-	# Apply damage precisely at the contact frame
 	if battle_manager:
-		await battle_manager.damage_calculation(current_player_battler, target, total_damage)
+		await battle_manager.damage_calculation(current_player_battler, target, final_damage)
 	
-	# Allow remainder of the attack animation (follow-through / recovery) to finish
-	await get_tree().create_timer(remaining_time).timeout
+	# Wait for attack animation to complete
+	await get_tree().create_timer(0.5).timeout
 	
 	# Return to position
 	print("Returning to original position: ", current_player_battler.original_position)
@@ -308,6 +309,50 @@ func execute_heal_card(card: CardData, target: Battler) -> void:
 	
 	if battle_manager and battle_manager.hud:
 		battle_manager.hud.update_health_bars()
+
+func execute_buff_card(card: CardData, target: Battler) -> void:
+	print("Executing buff card: ", card.name)
+	# Handle buff effects like damage multipliers, speed boosts, etc.
+	if card.metadata.has("damage_multiplier"):
+		var multiplier = card.metadata["damage_multiplier"]
+		print("Applying damage multiplier: ", multiplier)
+		# This would need a buff system integration
+	
+	if card.metadata.has("speed_multiplier"):
+		var multiplier = card.metadata["speed_multiplier"]
+		print("Applying speed multiplier: ", multiplier)
+		# This would need a buff system integration
+	
+	if card.metadata.has("damage_reduction"):
+		var reduction = card.metadata["damage_reduction"]
+		print("Applying damage reduction: ", reduction)
+		# This would need a buff system integration
+
+func execute_debuff_card(card: CardData, target: Battler) -> void:
+	print("Executing debuff card: ", card.name)
+	# Deal initial damage
+	if card.attack > 0:
+		await execute_attack_card(card, target)
+	
+func apply_card_states(card: CardData, target: Battler) -> void:
+	if not card.metadata.has("applies_state"):
+		return
+	
+	var state_name = card.metadata["applies_state"]
+	var state_chance = card.metadata.get("state_chance", 1.0)
+	var state_duration = card.metadata.get("state_duration", 0)
+	
+	print("Applying state: ", state_name, " with chance: ", state_chance)
+	
+	# Check if state should be applied
+	if randf() > state_chance:
+		print("State application failed (chance check)")
+		return
+	
+	# Apply the state to the target
+	print("State applied: ", state_name, " for ", state_duration, " turns")
+	# This would need integration with the existing state system
+	# For now, just log the application
 
 func draw_card_for_deck(deck: CombatDeck) -> CardData:
 	if not deck:
@@ -399,39 +444,39 @@ func get_ap_info() -> Dictionary:
 	return {}
 
 func await_qte_completion() -> bool:
-	# Helper function to wait for QTE completion with safety mechanisms
+	# Helper function to wait for QTE completion with robust safety mechanisms
 	var state = {"completed": false, "success": false}
 	
 	if qte_manager:
+		# Use a single handler that catches both success and failure
 		var completion_handler = func(s: bool, _type = ""):
 			state["completed"] = true
 			state["success"] = s
-		
-		var failure_handler = func(_type = ""):
-			state["completed"] = true
-			state["success"] = false
+			print("QTE completion handler called with success: ", s)
 		
 		if not qte_manager.qte_completed.is_connected(completion_handler):
 			qte_manager.qte_completed.connect(completion_handler)
-		if not qte_manager.qte_failed.is_connected(failure_handler):
-			qte_manager.qte_failed.connect(failure_handler)
 		
-		var timeout = 10.0 # 10 seconds max safety guard
+		var timeout = 5.0 # 5 seconds max safety guard
 		var start_time = Time.get_ticks_msec() / 1000.0
 		
 		# Wait for completion or timeout
 		while not state["completed"]:
 			var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
 			if elapsed > timeout:
-				print("WARNING: QTE completion timed out!")
+				print("WARNING: QTE completion timed out after ", timeout, " seconds")
+				state["completed"] = true
+				state["success"] = false # Default to failure on timeout
+				# Force cancel the QTE if it's still active
+				if qte_manager.is_active():
+					qte_manager.cancel_qte()
 				break
 			await get_tree().process_frame
 		
 		if qte_manager.qte_completed.is_connected(completion_handler):
 			qte_manager.qte_completed.disconnect(completion_handler)
-		if qte_manager.qte_failed.is_connected(failure_handler):
-			qte_manager.qte_failed.disconnect(failure_handler)
 	
+	print("QTE final result: ", state["success"])
 	return state["success"]
 
 func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler = null) -> int:

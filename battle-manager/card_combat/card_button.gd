@@ -52,6 +52,20 @@ func setup(card: CardData) -> void:
 		if card.health > 0:
 			description += "Health: " + str(card.health) + "\n"
 		
+		# Add element information
+		if card.metadata.has("element"):
+			var element = card.metadata["element"]
+			description += "Element: " + element.capitalize() + "\n"
+		
+		# Add state information
+		if card.metadata.has("applies_state"):
+			var state = card.metadata["applies_state"]
+			var duration = card.metadata.get("state_duration", 0)
+			description += "Applies: " + state.capitalize()
+			if duration > 0:
+				description += " (" + str(duration) + " turns)"
+			description += "\n"
+		
 		# Add custom description from metadata
 		if card.metadata.has("description"):
 			description += card.metadata["description"]
