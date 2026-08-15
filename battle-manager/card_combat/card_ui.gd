@@ -7,7 +7,6 @@ signal card_selected(card: CardData)
 signal end_turn_pressed()
 
 @onready var card_container: HBoxContainer = $CardContainer
-@onready var ap_label: Label = $APLabel
 
 var card_battle_manager: CardBattleManager
 var card_button_scene: PackedScene
@@ -130,24 +129,7 @@ func create_card_button(card: CardData) -> Control:
 	return card_button
 
 func update_ap_display():
-	if not card_battle_manager or not ap_label:
-		return
-	
-	var ap_info = card_battle_manager.get_ap_info()
-	var current_ap = ap_info.get("current_ap", 0)
-	var max_ap = ap_info.get("max_ap", 3)
-	
-	# Animate AP change
-	var old_text = ap_label.text
-	ap_label.text = "AP: %d/%d" % [current_ap, max_ap]
-	
-	if old_text != ap_label.text:
-		# Pop animation for AP change
-		var tween = create_tween()
-		tween.set_ease(Tween.EaseType.EASE_OUT)
-		tween.set_trans(Tween.TransitionType.TRANS_BACK)
-		tween.tween_property(ap_label, "scale", Vector2(1.3, 1.3), 0.1)
-		tween.tween_property(ap_label, "scale", Vector2.ONE, 0.2).set_delay(0.1)
+	pass
 
 func _on_card_button_pressed(card: CardData):
 	if card_battle_manager:

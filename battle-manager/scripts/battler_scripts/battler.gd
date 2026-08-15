@@ -2,6 +2,7 @@ class_name Battler
 extends CharacterBody3D
 
 signal anim_damage()
+signal health_changed(current_health: int, max_health: int)
 enum TEAM {ALLY, ENEMY}
 
 @export var stats: BattlerStats
@@ -189,13 +190,9 @@ func _ready():
 	if stats:
 		# Basic stats
 		character_name = stats.character_name
-		%BattlerNameLabel.text = character_name
 		
 		# Apply level-focused progression (calculates stats based on level)
 		apply_level_progression()
-		
-		%BattlerHealthBar.max_value = max_health
-		%BattlerHealthBar.value = current_health
 		
 		# SP stats
 		max_sp = max_sp  # Already set by apply_level_progression
@@ -341,10 +338,10 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 	damage_num.value = damage_taken
 	damage_indicator_subviewport.add_child(damage_num)
 	current_health -= damage_taken
-	%BattlerHealthBar.value = current_health
 	if current_health < 0:
 		current_health = 0
 	
+	health_changed.emit(current_health, max_health)
 	print("%s took %d damage. Health: %d/%d" % [character_name, damage_taken, current_health, max_health])
 	
 	# Turn to face attacker after being hit (for visual feedback)
@@ -384,7 +381,7 @@ func take_healing(amount: int):
 	var healing = min(amount, max_health - current_health)
 
 	current_health += healing
-	%BattlerHealthBar.value = current_health
+	health_changed.emit(current_health, max_health)
 	print("%s received %d healing. Health: %d/%d" % [character_name, healing, current_health, max_health])
 	return healing
 
@@ -819,7 +816,6 @@ func process_states() -> void:
 				damage_num.value = actual_damage
 				damage_indicator_subviewport.add_child(damage_num)
 				current_health -= actual_damage
-				%BattlerHealthBar.value = current_health
 				if current_health < 0:
 					current_health = 0
 				print("[STATE] %s takes %d damage from %s (base: %d, power: %.2f, defense_mult: %.2f)" % [character_name, actual_damage, state_name, state.damage_per_turn, state.power_multiplier, defense_multiplier])
@@ -827,7 +823,6 @@ func process_states() -> void:
 				# Healing state (negative damage)
 				var healing = abs(actual_damage)
 				current_health = min(current_health + healing, max_health)
-				%BattlerHealthBar.value = current_health
 				print("[STATE] %s recovers %d health from %s" % [character_name, healing, state_name])
 		
 		# Handle duration

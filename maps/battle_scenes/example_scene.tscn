@@ -28,6 +28,7 @@ albedo_color = Color(0.192279, 0.227401, 0.23218, 1)
 
 [sub_resource type="Resource" id="Resource_yxp8s"]
 script = ExtResource("4_xecl5")
+is_boss = null
 metadata/_custom_type_script = "uid://d2mintfjxyqei"
 
 [sub_resource type="Resource" id="Resource_daget"]
@@ -52,12 +53,11 @@ SubResource("Resource_fa7uu"): 3
 })
 metadata/_custom_type_script = "uid://c2j4t3rigq4gk"
 
-[node name="Battle-Manager" unique_id=241725287 instance=ExtResource("1_t14x8")]
-mouse_input_toggle = false
+[node name="Battle-Manager" unique_id=241725287 node_paths=PackedStringArray("enemy_markers") instance=ExtResource("1_t14x8")]
 speed_key = "Tab"
 speed_increase_amount = 2.0
-speed_is_toggle = true
 active_troop = ExtResource("3_yxp8s")
+enemy_markers = NodePath("FRONTROW")
 
 [node name="PlayerSPBar" type="ProgressBar" parent="BattleHUD" parent_id_path=PackedInt32Array(1325232602) index="1" unique_id=1891800953]
 offset_right = 4.0

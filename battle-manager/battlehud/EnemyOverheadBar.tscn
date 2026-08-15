@@ -1,0 +1,56 @@
+[gd_scene load_steps=3 format=3 uid="uid://enemy_overhead_bar"]
+
+[ext_resource type="Script" path="res://battle-manager/battlehud/enemy_overhead_bar.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.05, 0.05, 0.1, 0.82)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+content_margin_left = 6.0
+content_margin_right = 6.0
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+
+[node name="EnemyOverheadBar" type="Control"]
+custom_minimum_size = Vector2(160, 44)
+script = ExtResource("1_script")
+
+[node name="BG" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="VBox" type="VBoxContainer" parent="BG"]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="NameLabel" type="Label" parent="BG/VBox"]
+layout_mode = 2
+text = "Enemy"
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1.0, 0.75, 0.75, 1.0)
+horizontal_alignment = 1
+
+[node name="HPBarRow" type="HBoxContainer" parent="BG/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HPBar" type="ProgressBar" parent="BG/VBox/HPBarRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 8)
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="HPLabel" type="Label" parent="BG/VBox/HPBarRow"]
+layout_mode = 2
+text = "100 / 100"
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1.0)

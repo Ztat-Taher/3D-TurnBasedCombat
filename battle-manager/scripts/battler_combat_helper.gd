@@ -140,14 +140,14 @@ static func tick_states(battler: Battler) -> void:
 				damage_num.value = actual_damage
 				battler.damage_indicator_subviewport.add_child(damage_num)
 				battler.current_health -= actual_damage
-				battler.get_node("%BattlerHealthBar").value = battler.current_health
 				if battler.current_health < 0:
 					battler.current_health = 0
+				battler.health_changed.emit(battler.current_health, battler.max_health)
 				print("[State] %s takes %d damage from %s" % [battler.character_name, actual_damage, state_name])
 			else:
 				var healing = abs(actual_damage)
 				battler.current_health = min(battler.current_health + healing, battler.max_health)
-				battler.get_node("%BattlerHealthBar").value = battler.current_health
+				battler.health_changed.emit(battler.current_health, battler.max_health)
 				print("[State] %s recovers %d health from %s" % [battler.character_name, healing, state_name])
 		
 		# Handle duration

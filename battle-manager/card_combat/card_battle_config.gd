@@ -29,7 +29,7 @@ extends Resource
 
 @export_group("Reactive Defense")
 ## Whether reactive dodge/parry QTEs are enabled when attacked
-@export var reactive_defense_enabled: bool = true
+@export var reactive_defense_enabled: bool = false
 ## QTE difficulty for reactive dodge
 @export_range(0.0, 1.0, 0.1) var dodge_qte_difficulty: float = 0.6
 ## QTE difficulty for reactive parry

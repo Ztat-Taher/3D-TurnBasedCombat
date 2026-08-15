@@ -147,6 +147,10 @@ func start_targeting_mode(card: CardData):
 	
 	battle_manager.set_meta("pending_card", card)
 	
+	# Update HUD: hide cards & action buttons, show cancel target button
+	if battle_manager.hud and battle_manager.hud.has_method("set_targeting_mode"):
+		battle_manager.hud.set_targeting_mode(true)
+	
 	print("Targeting mode started for card: ", card.name)
 	print("Valid targets: ", battle_manager.valid_targets.size())
 	print("Mouse input enabled: ", battle_manager.mouse_input_toggle)

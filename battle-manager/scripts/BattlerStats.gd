@@ -4,6 +4,7 @@ extends Resource
 
 @export var character_name: String = "Player" ## Fill in this variable as soon as possible, This will be used when mentioning the character
 @export var thumbnail: Texture2D = preload("res://Placeholder.svg") ## Portrait shown in battle results UI.
+@export var is_boss: bool = false ## If true, this battler uses the cinematic top-center boss health bar instead of a regular overhead bar.
 
 @export_group("Battle Rewards")
 @export var exp_reward: int = 100 ## EXP granted when this battler is defeated.

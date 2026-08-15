@@ -147,16 +147,16 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 	print("Target: ", target.character_name if target else "None")
 	print("Battle manager enemies before play: ", battle_manager.enemies.size() if battle_manager else "No battle manager")
 	
-	# Spend AP immediately
-	ap_system.spend_ap(card.cost)
-	
 	# Camera choreography: wider view for player attack cards only
 	var card_type = card.metadata.get("card_type", "attack")
 	if (card_type == "attack" or card_type == "skill") and battle_manager and battle_manager.battle_camera:
 		battle_manager.battle_camera.set_default_camera()
 	
-	# Execute card effect immediately instead of queuing
+	# Execute card effect first (attack animation, damage, heal, defense)
 	await execute_card_effect(card, target)
+	
+	# Spend AP and discard card systematically only AFTER effect resolves
+	ap_system.spend_ap(card.cost)
 	
 	# Remove from hand (move to graveyard through deck system without mana restriction)
 	var deck = _get_current_deck()
@@ -171,6 +171,8 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 	if battle_manager:
 		battle_manager.is_animating = false
 		if battle_manager.hud and is_instance_valid(current_player_battler):
+			if battle_manager.hud.card_ui:
+				battle_manager.hud.card_ui.visible = true
 			battle_manager.hud.show_action_buttons(current_player_battler)
 	
 	print("Card executed: ", card.name, " targeting: ", target.character_name if target else "None")
@@ -333,12 +335,20 @@ func start_player_turn() -> void:
 	# Clear queued cards from previous turn
 	queued_cards.clear()
 	
-	# Update CardUI display for the new hand
+	# Update CardUI display for the new hand and notify HUD
 	if battle_manager and battle_manager.hud:
 		var card_ui = battle_manager.hud.get_node_or_null("Control/CardUI")
-		if card_ui and card_ui.has_method("update_hand_display"):
-			card_ui.update_hand_display()
-			card_ui.update_ap_display()
+		if card_ui:
+			card_ui.visible = true
+			if card_ui.has_method("update_hand_display"):
+				card_ui.update_hand_display()
+		if battle_manager.hud.has_method("update_party_status"):
+			var ap_info = get_ap_info()
+			battle_manager.hud.last_ap_by_battler[current_player_battler] = {
+				"current": ap_info.get("current_ap", 3),
+				"max": ap_info.get("max_ap", 3)
+			}
+			battle_manager.hud.set_activebattler(current_player_battler)
 
 func end_player_turn() -> void:
 	print("Ending player turn")

@@ -1,0 +1,97 @@
+[gd_scene load_steps=6 format=3 uid="uid://boss_bar"]
+
+[ext_resource type="Script" path="res://battle-manager/battlehud/boss_bar.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.04, 0.04, 0.09, 0.92)
+corner_radius_top_left = 0
+corner_radius_top_right = 0
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hpfill"]
+bg_color = Color(0.85, 0.15, 0.15, 1.0)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hpbg"]
+bg_color = Color(0.18, 0.06, 0.06, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_separator"]
+bg_color = Color(0.9, 0.15, 0.15, 0.6)
+
+[node name="BossBar" type="Control"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_right = 300.0
+offset_bottom = 80.0
+grow_horizontal = 2
+script = ExtResource("1_script")
+
+[node name="BG" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="VBox" type="VBoxContainer" parent="BG"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HeaderRow" type="HBoxContainer" parent="BG/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BossNameLabel" type="Label" parent="BG/VBox/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "BOSS"
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(1.0, 0.88, 0.75, 1.0)
+
+[node name="PhaseLabel" type="Label" parent="BG/VBox/HeaderRow"]
+layout_mode = 2
+text = "Phase I"
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.9, 0.85, 0.5, 1.0)
+
+[node name="Separator" type="Panel" parent="BG/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 2)
+theme_override_styles/panel = SubResource("StyleBoxFlat_separator")
+
+[node name="HPBarContainer" type="HBoxContainer" parent="BG/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HPBar" type="ProgressBar" parent="BG/VBox/HPBarContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 14)
+max_value = 100.0
+value = 100.0
+show_percentage = false
+theme_override_styles/fill = SubResource("StyleBoxFlat_hpfill")
+theme_override_styles/background = SubResource("StyleBoxFlat_hpbg")
+
+[node name="HPLabel" type="Label" parent="BG/VBox/HPBarContainer"]
+layout_mode = 2
+text = "100 / 100"
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1.0)

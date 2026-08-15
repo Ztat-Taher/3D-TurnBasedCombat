@@ -158,25 +158,4 @@ func _animate_hover(hover: bool):
 
 func _on_gui_input(event: InputEvent):
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_play_card()
-
-func _play_card():
-	# Squash and stretch animation
-	var tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(self, "scale", Vector2(1.3, 0.7), 0.1)
-	tween.tween_property(self, "rotation_degrees", rotation_degrees + 10, 0.1)
-	
-	tween.tween_interval(0.05)
-	
-	tween.tween_property(self, "scale", Vector2(0.8, 1.2), 0.1)
-	tween.tween_property(self, "rotation_degrees", rotation_degrees - 10, 0.1)
-	
-	tween.tween_interval(0.05)
-	
-	tween.tween_property(self, "scale", Vector2.ZERO, 0.15)
-	
-	await tween.finished
-	
-	card_played.emit(card_data)
-	queue_free()
+		card_played.emit(card_data)

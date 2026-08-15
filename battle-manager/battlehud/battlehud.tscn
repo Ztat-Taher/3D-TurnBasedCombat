@@ -1,11 +1,12 @@
 [gd_scene format=3 uid="uid://cyjcaceen0235"]
 
 [ext_resource type="Script" uid="uid://835wmi7qej15" path="res://battle-manager/battlehud/battlehud.gd" id="1_0qukq"]
-[ext_resource type="Script" uid="uid://dbbsrqrispnmb" path="res://battle-manager/battlehud/battler_info.gd" id="2_64dmw"]
 [ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_uiugx"]
 [ext_resource type="Script" uid="uid://gl487spddx3j" path="res://battle-manager/battlehud/battle_text_display.gd" id="3_btt"]
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://battle-manager/battlehud/battleresults.tscn" id="6_g4nh0"]
 [ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="7_cardui"]
+[ext_resource type="PackedScene" path="res://battle-manager/battlehud/BossBar.tscn" id="8_bossbar"]
+[ext_resource type="PackedScene" path="res://battle-manager/battlehud/EnemyOverheadBar.tscn" id="9_overheadbar"]
 
 [sub_resource type="GDScript" id="GDScript_mbt63"]
 resource_name = "EnemyStats"
@@ -37,17 +38,6 @@ script/source = "extends VBoxContainer
 
 func add_character(_character: Node):
 	pass
-
-#func update_enemy_stats(character: Node):
-	## Update enemy-specific UI elements
-	#$EnemyNameLabel.text = character.character_name
-	#$EnemyHealthBar.max_value = character.max_health
-	#$EnemyHealthBar.value = character.current_health
-
-#func update_enemy_info(enemy: Node):
-	#$EnemyNameLabel.text = enemy.character_name
-	#$EnemyHealthBar.max_value = enemy.max_health
-	#$EnemyHealthBar.value = enemy.current_health
 "
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
@@ -141,78 +131,6 @@ layout_mode = 2
 [node name="EnemySPBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats4" unique_id=1016770029]
 layout_mode = 2
 
-[node name="Players" type="Control" parent="Control" unique_id=1887976994]
-visible = false
-layout_mode = 1
-anchors_preset = 0
-offset_right = 183.0
-offset_bottom = 170.0
-
-[node name="AllAllies" type="BoxContainer" parent="Control/Players" unique_id=1769589390]
-layout_mode = 0
-offset_right = 183.0
-offset_bottom = 228.0
-vertical = true
-
-[node name="AllyStats" type="VBoxContainer" parent="Control/Players/AllAllies" unique_id=1171218621]
-layout_mode = 2
-script = ExtResource("2_64dmw")
-
-[node name="PlayerNameLabel" type="Label" parent="Control/Players/AllAllies/AllyStats" unique_id=1689654184]
-layout_mode = 2
-text = "Test"
-
-[node name="PlayerHealthBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats" unique_id=1624951378]
-layout_mode = 2
-
-[node name="PlayerSPBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats" unique_id=1790835562]
-layout_mode = 2
-
-[node name="AllyStats2" type="VBoxContainer" parent="Control/Players/AllAllies" unique_id=219571184]
-visible = false
-layout_mode = 2
-script = ExtResource("2_64dmw")
-
-[node name="PlayerNameLabel" type="Label" parent="Control/Players/AllAllies/AllyStats2" unique_id=1532537613]
-layout_mode = 2
-text = "Test"
-
-[node name="PlayerHealthBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats2" unique_id=2052366553]
-layout_mode = 2
-
-[node name="PlayerSPBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats2" unique_id=999999989]
-layout_mode = 2
-
-[node name="AllyStats3" type="VBoxContainer" parent="Control/Players/AllAllies" unique_id=1278126176]
-visible = false
-layout_mode = 2
-script = ExtResource("2_64dmw")
-
-[node name="PlayerNameLabel" type="Label" parent="Control/Players/AllAllies/AllyStats3" unique_id=667835542]
-layout_mode = 2
-text = "Test"
-
-[node name="PlayerHealthBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats3" unique_id=1445137427]
-layout_mode = 2
-
-[node name="PlayerSPBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats3" unique_id=999999988]
-layout_mode = 2
-
-[node name="AllyStats4" type="VBoxContainer" parent="Control/Players/AllAllies" unique_id=186362741]
-visible = false
-layout_mode = 2
-script = ExtResource("2_64dmw")
-
-[node name="PlayerNameLabel" type="Label" parent="Control/Players/AllAllies/AllyStats4" unique_id=463208403]
-layout_mode = 2
-text = "Test"
-
-[node name="PlayerHealthBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats4" unique_id=1417407708]
-layout_mode = 2
-
-[node name="PlayerSPBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats4" unique_id=999999987]
-layout_mode = 2
-
 [node name="TurnQueueUI" type="Control" parent="Control" unique_id=999999994]
 layout_mode = 1
 anchors_preset = 0
@@ -290,7 +208,6 @@ anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -80.0
 offset_top = -35.0
-offset_right = 0.0
 offset_bottom = -5.0
 grow_horizontal = 0
 text = "◄ Back"
@@ -337,34 +254,15 @@ grow_vertical = 0
 theme_override_constants/separation = -20
 alignment = 1
 
-[node name="APLabel" type="Label" parent="Control/CardUI" unique_id=999999997]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -180.0
-offset_right = 150.0
-offset_bottom = -160.0
-grow_vertical = 0
-text = "AP: 3/3"
-
-
 [node name="ActionButtons" type="BoxContainer" parent="Control" unique_id=1087849572]
+visible = false
 layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -180.0
-offset_top = -200.0
-grow_horizontal = 0
-grow_vertical = 0
+offset_right = 160.0
+offset_bottom = 120.0
 size_flags_horizontal = 0
-size_flags_vertical = 4
+size_flags_vertical = 0
 theme = ExtResource("2_uiugx")
-alignment = 2
+alignment = 1
 vertical = true
 
 [node name="Items" type="Button" parent="Control/ActionButtons" unique_id=150334854]
@@ -382,7 +280,59 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "End Turn"
 
+[node name="PartyStatusPanel" type="HBoxContainer" parent="Control" unique_id=2080000001]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -520.0
+offset_top = -130.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 12
+
+[node name="TargetBackButton" type="Button" parent="Control" unique_id=2080000002]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -80.0
+offset_top = -80.0
+offset_right = 80.0
+offset_bottom = -35.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 14
+text = "◄ Cancel Target"
+
+[node name="BossBar" parent="Control" instance=ExtResource("8_bossbar")]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_right = 300.0
+offset_bottom = 80.0
+grow_horizontal = 2
+
+[node name="EnemyOverheadBarsContainer" type="Control" parent="Control" unique_id=2090000001]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [connection signal="pressed" from="Control/Items/BackButton" to="." method="_on_item_back_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Items" to="." method="_on_items_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Run" to="." method="_on_run_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/EndTurnButton" to="." method="_on_end_turn_button_pressed"]
+[connection signal="pressed" from="Control/TargetBackButton" to="." method="_on_target_back_button_pressed"]

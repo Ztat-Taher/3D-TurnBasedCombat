@@ -485,22 +485,31 @@ func target_selected(target: Battler) -> void:
 	var pending_card = get_meta("pending_card")
 	if pending_card:
 		print("Card combat targeting: playing card ", pending_card.name, " on ", target.character_name)
-		if battle_camera:
-			battle_camera.set_target_focus(target)
+		set_meta("pending_card", null)
+		in_target_selection = false
+		mouse_input_toggle = false
 		
-		# Get card battle manager
+		# Clean up target highlights
+		for battler in valid_targets:
+			if battler is Battler:
+				battler.is_valid_target = false
+				battler.is_selectable = false
+				battler.deselect_as_target()
+		valid_targets.clear()
+		
+		# Hide targeting UI and ensure action buttons and cards remain hidden during action execution
+		if hud:
+			if hud.target_back_button:
+				hud.target_back_button.visible = false
+			hud.hide_action_buttons()
+			if hud.card_ui:
+				hud.card_ui.visible = false
+		
 		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 		if card_battle_manager:
-			# Call async card play without await (fire and forget)
 			_execute_card_async(card_battle_manager, pending_card, target)
 		else:
 			print("ERROR: CardBattleManager not found!")
-		
-		# Clear pending card
-		set_meta("pending_card", null)
-		
-		# Exit targeting mode
-		exit_targeting_mode()
 		return
 		
 	# Clear ALL targets' selection states first - only ONE highlight allowed
@@ -594,6 +603,10 @@ func start_next_turn():
 		return
 	else:
 		print("Enemy's turn")
+		if hud:
+			hud.hide_action_buttons()
+			if hud.card_ui:
+				hud.card_ui.visible = false
 		if battle_camera:
 			battle_camera.set_target_focus(current_character)
 		# MUST await so the enemy's entire action resolves before update_hud/next turn
@@ -847,13 +860,24 @@ func _use_action_on_target() -> void:
 	var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
 	if pending_card:
 		print("Card pending - routing to card play on: ", current_target.character_name)
-		if battle_camera:
-			battle_camera.set_target_focus(current_target)
+		set_meta("pending_card", null)
+		in_target_selection = false
+		mouse_input_toggle = false
+		for battler in valid_targets:
+			if battler is Battler:
+				battler.is_valid_target = false
+				battler.is_selectable = false
+				battler.deselect_as_target()
+		valid_targets.clear()
+		if hud:
+			if hud.target_back_button:
+				hud.target_back_button.visible = false
+			hud.hide_action_buttons()
+			if hud.card_ui:
+				hud.card_ui.visible = false
 		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 		if card_battle_manager:
 			_execute_card_async(card_battle_manager, pending_card, current_target)
-		set_meta("pending_card", null)
-		exit_targeting_mode()
 		return
 	
 	if !queued_item:
@@ -1178,6 +1202,14 @@ func exit_targeting_mode():
 	
 	# Disable mouse input when done targeting
 	mouse_input_toggle = false
+	
+	# Update HUD: hide cancel target button, show cards and action buttons
+	if hud and hud.has_method("set_targeting_mode"):
+		hud.set_targeting_mode(false)
+	
+	# Restore OTS camera on current character if player turn
+	if battle_camera and current_character in players:
+		battle_camera.set_over_the_shoulder(current_character)
 	
 	print("Targeting mode exited")
 
