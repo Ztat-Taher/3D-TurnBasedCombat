@@ -31,9 +31,19 @@ func aggressive_action(character:Battler, players: Array, battle_manager:BattleM
 	if target:
 		battle_manager.current_target = target
 		battle_manager.current_character = character
-		battle_manager.queued_action = "attack"  # SET THIS!
 		battle_manager.battler_attacking = true
+		
+		# Camera choreography: transition to attacked ally's OTS camera
+		if battle_manager.battle_camera and target in players:
+			battle_manager.battle_camera.set_over_the_shoulder(target)
+			
 		await character.attack_anim(target)
+		
+		# Apply damage through battle_manager so QTE reactive defense and health bars update
+		var atk_damage = character.attack if character.attack > 0 else 15
+		await battle_manager.damage_calculation(character, target, atk_damage)
+	else:
+		print("AI has no valid targets")
 
 func defensive_action(character:Battler, players: Array, battle_manager:BattleManager) -> void:
 	var health_percent = float(character.current_health) / character.max_health
@@ -45,17 +55,12 @@ func defensive_action(character:Battler, players: Array, battle_manager:BattleMa
 			print("AI %s using healing item: %s" % [character.character_name, healing_item.item_name])
 			battle_manager.current_target = character
 			battle_manager.current_character = character
-			battle_manager.queued_action = "item"
-			battle_manager.queued_item = healing_item
 			battle_manager.battler_attacking = true
 			await character.battle_item(healing_item, character)
 			return
 	
-	# Default to defending or attacking
-	if health_percent < 0.3:
-		character.defend()
-	else:
-		await aggressive_action(character, players, battle_manager)
+	# Default to attacking
+	await aggressive_action(character, players, battle_manager)
 
 func choose_target(character:Battler, targets: Array) -> Node:
 	print("=== AI TARGET SELECTION ===")

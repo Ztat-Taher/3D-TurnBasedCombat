@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://bncsp2gc6myfu"]
+
+[node name="EnemyOverviewCamera" type="Camera3D" unique_id=297133958]
+transform = Transform3D(-1, 1.5180808e-08, -8.609463e-08, 0, 0.98480785, 0.1736482, 8.742278e-08, 0.1736482, -0.98480785, 0, 2, -2)
+current = true

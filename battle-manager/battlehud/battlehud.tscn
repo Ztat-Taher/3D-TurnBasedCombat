@@ -4,8 +4,8 @@
 [ext_resource type="Script" uid="uid://dbbsrqrispnmb" path="res://battle-manager/battlehud/battler_info.gd" id="2_64dmw"]
 [ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_uiugx"]
 [ext_resource type="Script" uid="uid://gl487spddx3j" path="res://battle-manager/battlehud/battle_text_display.gd" id="3_btt"]
-[ext_resource type="PackedScene" uid="uid://xtvr2wp8ojvb" path="res://battle-manager/battlehud/skill-button-preset.tscn" id="4_t5sg5"]
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://battle-manager/battlehud/battleresults.tscn" id="6_g4nh0"]
+[ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="7_cardui"]
 
 [sub_resource type="GDScript" id="GDScript_mbt63"]
 resource_name = "EnemyStats"
@@ -63,47 +63,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_uiugx")
-
-[node name="ActionButtons" type="BoxContainer" parent="Control" unique_id=1087849572]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_top = -226.0
-offset_right = 238.0
-grow_vertical = 0
-size_flags_horizontal = 0
-size_flags_vertical = 4
-theme = ExtResource("2_uiugx")
-alignment = 2
-vertical = true
-
-[node name="Attack" type="Button" parent="Control/ActionButtons" unique_id=253112515]
-layout_mode = 2
-size_flags_horizontal = 0
-size_flags_vertical = 8
-text = "Attack
-"
-
-[node name="Skills" type="Button" parent="Control/ActionButtons" unique_id=1944018683]
-layout_mode = 2
-size_flags_horizontal = 0
-text = "Skills"
-
-[node name="Items" type="Button" parent="Control/ActionButtons" unique_id=150334854]
-layout_mode = 2
-size_flags_horizontal = 0
-text = "Items"
-
-[node name="Defend" type="Button" parent="Control/ActionButtons" unique_id=2109921689]
-layout_mode = 2
-size_flags_horizontal = 0
-text = "Defend"
-
-[node name="Run" type="Button" parent="Control/ActionButtons" unique_id=1887464156]
-layout_mode = 2
-size_flags_horizontal = 0
-text = "Run"
 
 [node name="Enemies" type="Control" parent="Control" unique_id=163295688]
 layout_mode = 1
@@ -183,6 +142,8 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="Players" type="Control" parent="Control" unique_id=1887976994]
+visible = false
+layout_mode = 1
 anchors_preset = 0
 offset_right = 183.0
 offset_bottom = 170.0
@@ -219,6 +180,9 @@ text = "Test"
 [node name="PlayerHealthBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats2" unique_id=2052366553]
 layout_mode = 2
 
+[node name="PlayerSPBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats2" unique_id=999999989]
+layout_mode = 2
+
 [node name="AllyStats3" type="VBoxContainer" parent="Control/Players/AllAllies" unique_id=1278126176]
 visible = false
 layout_mode = 2
@@ -229,6 +193,9 @@ layout_mode = 2
 text = "Test"
 
 [node name="PlayerHealthBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats3" unique_id=1445137427]
+layout_mode = 2
+
+[node name="PlayerSPBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats3" unique_id=999999988]
 layout_mode = 2
 
 [node name="AllyStats4" type="VBoxContainer" parent="Control/Players/AllAllies" unique_id=186362741]
@@ -242,6 +209,26 @@ text = "Test"
 
 [node name="PlayerHealthBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats4" unique_id=1417407708]
 layout_mode = 2
+
+[node name="PlayerSPBar" type="ProgressBar" parent="Control/Players/AllAllies/AllyStats4" unique_id=999999987]
+layout_mode = 2
+
+[node name="TurnQueueUI" type="Control" parent="Control" unique_id=999999994]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 500.0
+offset_bottom = 110.0
+
+[node name="QueueContainer" type="HBoxContainer" parent="Control/TurnQueueUI" unique_id=999999993]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
 
 [node name="BattleTextDisplay" type="Control" parent="Control" unique_id=-389943844]
 anchors_preset = 0
@@ -263,45 +250,6 @@ grow_horizontal = 2
 grow_vertical = 2
 bbcode_enabled = true
 script = ExtResource("3_btt")
-
-[node name="Skills" type="Control" parent="Control" unique_id=1762699737]
-visible = false
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -250.0
-offset_top = -164.0
-offset_right = 201.0
-grow_horizontal = 2
-grow_vertical = 0
-
-[node name="ScrollContainer" type="ScrollContainer" parent="Control/Skills" unique_id=1865623431]
-clip_contents = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_7jqjx")
-horizontal_scroll_mode = 0
-vertical_scroll_mode = 2
-metadata/_edit_use_anchors_ = true
-
-[node name="BoxContainer" type="BoxContainer" parent="Control/Skills/ScrollContainer" unique_id=1992857015]
-layout_mode = 2
-size_flags_horizontal = 3
-vertical = true
-
-[node name="SkillRow" parent="Control/Skills/ScrollContainer/BoxContainer" unique_id=169852852 instance=ExtResource("4_t5sg5")]
-layout_mode = 2
-size_flags_vertical = 4
-
-[node name="SkillRow2" parent="Control/Skills/ScrollContainer/BoxContainer" unique_id=693951847 instance=ExtResource("4_t5sg5")]
-layout_mode = 2
 
 [node name="Items" type="Control" parent="Control" unique_id=2067696712]
 visible = false
@@ -335,19 +283,106 @@ layout_mode = 2
 size_flags_horizontal = 3
 vertical = true
 
-[node name="SkillRow" parent="Control/Items/ScrollContainer/BoxContainer" unique_id=1032705261 instance=ExtResource("4_t5sg5")]
-layout_mode = 2
-size_flags_vertical = 4
+[node name="BackButton" type="Button" parent="Control/Items" unique_id=2074786862]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -80.0
+offset_top = -35.0
+offset_right = 0.0
+offset_bottom = -5.0
+grow_horizontal = 0
+text = "◄ Back"
 
-[node name="SkillRow2" parent="Control/Items/ScrollContainer/BoxContainer" unique_id=599803946 instance=ExtResource("4_t5sg5")]
-layout_mode = 2
+[node name="QTEContainer" type="Control" parent="Control" unique_id=999999995]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = -70.0
+offset_right = 140.0
+offset_bottom = 70.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="Results" parent="Control" unique_id=1064251967 instance=ExtResource("6_g4nh0")]
 visible = false
 layout_mode = 1
 
-[connection signal="pressed" from="Control/ActionButtons/Attack" to="." method="_on_attack_pressed"]
-[connection signal="pressed" from="Control/ActionButtons/Skills" to="." method="_on_skills_pressed"]
+[node name="CardUI" type="Control" parent="Control" unique_id=999999999]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+mouse_behavior_recursive = 2
+script = ExtResource("7_cardui")
+
+[node name="CardContainer" type="HBoxContainer" parent="Control/CardUI" unique_id=999999998]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -250.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = -20
+alignment = 1
+
+[node name="APLabel" type="Label" parent="Control/CardUI" unique_id=999999997]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -180.0
+offset_right = 150.0
+offset_bottom = -160.0
+grow_vertical = 0
+text = "AP: 3/3"
+
+
+[node name="ActionButtons" type="BoxContainer" parent="Control" unique_id=1087849572]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -180.0
+offset_top = -200.0
+grow_horizontal = 0
+grow_vertical = 0
+size_flags_horizontal = 0
+size_flags_vertical = 4
+theme = ExtResource("2_uiugx")
+alignment = 2
+vertical = true
+
+[node name="Items" type="Button" parent="Control/ActionButtons" unique_id=150334854]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Items"
+
+[node name="Run" type="Button" parent="Control/ActionButtons" unique_id=1887464156]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Run"
+
+[node name="EndTurnButton" type="Button" parent="Control/ActionButtons" unique_id=999999996]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "End Turn"
+
+[connection signal="pressed" from="Control/Items/BackButton" to="." method="_on_item_back_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Items" to="." method="_on_items_pressed"]
-[connection signal="pressed" from="Control/ActionButtons/Defend" to="." method="_on_defend_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Run" to="." method="_on_run_pressed"]
+[connection signal="pressed" from="Control/ActionButtons/EndTurnButton" to="." method="_on_end_turn_button_pressed"]

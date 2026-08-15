@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3 uid="uid://fireball_card"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "fireball"
+name = "Fireball"
+cost = 2
+attack = 15
+health = 0
+play_kind = 0
+metadata = {
+"card_type": "attack",
+"description": "A blazing fireball dealing 15 damage",
+"qte_difficulty": 0.6
+}

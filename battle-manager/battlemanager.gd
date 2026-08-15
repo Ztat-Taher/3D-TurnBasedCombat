@@ -21,30 +21,27 @@ var players: Array[Battler] = []
 var enemies: Array[Battler] = []
 var turn_order: Array[Battler] = []
 var current_turn: int = 0
+var is_first_turn: bool = true
 
 var current_character:Battler
 var current_target:Battler
 var in_target_selection:bool = false
 var in_menu_selection:bool = false
-var damage_processed_this_turn: bool = false
 
-@onready var ActionButtons = find_child("ActionButtons")
+# ActionButtons is now in BattleHUD, not BattleManager
+# We'll access it through the HUD
 # For referencing and setting variables in the battle settings.
 @onready var battle_settings = GlobalBattleSettings
 
 var current_battler
 # Defualt animation should check for weapon's later down the road, And adapt to using them with unique animations.
 @export var default_animation = "Locomotion-Library/idle2" # Unused, But i reccomend gettomg the stats and animation from the database.
-@export var default_attack:Skill
 # Added by repo owner, Fame. To test compatibility with returning after a battle.
 @export var game_map = "res://replace/regular_map/backtogame.tscn"
 @onready var hud: BattleHud = $BattleHUD
 
 # Toggles For Battles
 @export_group("Toggle Buttons")
-@export var attack_toggle: bool = true
-@export var skills_toggle: bool = true
-@export var defend_toggle: bool = true
 @export var item_toggle: bool = true
 @export var run_toggle: bool = true
 @export var mouse_input_toggle: bool = true
@@ -194,7 +191,8 @@ func spawn_troop(troop: Troops, parent_node: Node3D = self) -> void:
 		# Rotate 180 degrees on Y axis to face toward players
 		enemy.rotation.y = PI
 		
-		# Add to enemies array and turn order
+		# Add to enemies array, group, and turn order
+		enemy.add_to_group("enemies")
 		enemies.append(enemy)
 		turn_order.append(enemy)
 		
@@ -295,32 +293,43 @@ func cleanup_defeated_enemies():
 		enemy.queue_free()
 
 var is_animating: bool = false
+var card_integration: CardIntegration
+var battle_camera: BattleCamera
 
 func _ready():
 	add_to_group("battle_manager")
 	SignalBus.select_target.connect(target_selected)
 	
-	if not hud:
-		push_error("BattleHUD node not found. Please make sure it's added to the scene.")
-		return
-	hud.action_selected.connect(_on_action_selected)
-	hud.menu_opened.connect(_do_menu_selection)
+	print("BattleManager _ready() called")
+	print("HUD found: ", hud != null)
 	
-	# Spawn troop if active_troop is set
-	if active_troop:
-		print("Active troop detected: ", active_troop.troop_name)
-		spawn_troop(active_troop, self)
+	# Instantiate dynamic combat camera controller
+	battle_camera = BattleCamera.new()
+	battle_camera.name = "BattleCameraController"
+	add_child(battle_camera)
 	
-	for player in players:
-		if not player.anim_damage.is_connected(_on_anim_damage):
-			player.anim_damage.connect(_on_anim_damage)
+	# Initialize card integration
+	initialize_card_integration()
+	
+	# Initialize battle
 	initialize_battle()
-	# Checking Toggles!
-	ActionButtons.get_node("Attack").disabled = not attack_toggle
-	ActionButtons.get_node("Skills").disabled = not skills_toggle
-	ActionButtons.get_node("Defend").disabled = not defend_toggle
-	ActionButtons.get_node("Items").disabled = not item_toggle
-	ActionButtons.get_node("Run").disabled = not run_toggle
+
+func initialize_card_integration():
+	# Create card integration node
+	card_integration = CardIntegration.new()
+	add_child(card_integration)
+	
+	# Don't initialize immediately - wait for battle to be set up first
+	# This will be called in initialize_battle() instead
+
+func initialize_cards_for_players():
+	if not card_integration:
+		return
+	
+	# Initialize card combat for each player
+	for player in players:
+		if player is Battler:
+			card_integration.initialize_for_player(player)
 
 func _input(event: InputEvent) -> void:
 	# Handle speed key
@@ -352,15 +361,15 @@ func _input(event: InputEvent) -> void:
 			_cancel_menu_selection()
 	# Confirm is currently bound to Enter key
 	elif event.is_action_pressed("Confirm") and in_target_selection and current_target:
-		if !queued_action.is_empty() and (queued_skill or queued_item):
+		if queued_item:
 			_use_action_on_target()
 		else:
-			printerr("MANAGER: Action and/or Skill/Item not queued!")
-			print("Action: ", queued_action)
-			print("Skill: ", queued_skill)
+			printerr("MANAGER: No item queued!")
 			print("Item: ", queued_item)
 
 func initialize_battle():
+	print("=== INITIALIZE BATTLE START ===")
+	
 	# Get all nodes and convert to Battler arrays
 	players = []
 	enemies = []
@@ -373,8 +382,25 @@ func initialize_battle():
 		if node is Battler:
 			enemies.append(node as Battler)
 	
+	print("Players found: ", players.size())
+	print("Enemies found: ", enemies.size())
+	
+	# Assign enumerated display labels for queue identification
+	for i in range(players.size()):
+		var p = players[i]
+		if p.character_name.is_empty() or p.character_name == "Player":
+			p.character_name = "Ally %d" % (i + 1)
+		elif not str(i + 1) in p.character_name:
+			p.character_name = p.character_name + " %d" % (i + 1)
+	
+	for i in range(enemies.size()):
+		var e = enemies[i]
+		if e.character_name.is_empty() or e.character_name == "Enemy":
+			e.character_name = "Enemy %d" % (i + 1)
+		elif not str(i + 1) in e.character_name:
+			e.character_name = e.character_name + " %d" % (i + 1)
+	
 	for player in players:
-		print("Have players: ", players)
 		hud.on_add_character(player)
 		player.battle_idle()
 		if not player.anim_damage.is_connected(_on_anim_damage):
@@ -382,15 +408,62 @@ func initialize_battle():
 	
 	# Ensure players are at the start of the turn order
 	turn_order = players + enemies
-	print("Current turn order: ", turn_order)
+	print("Current turn order: ", turn_order.map(func(b): return b.character_name))
 	
 	for enemy in enemies:
 		hud.on_start_combat(enemy)
 		enemy.battle_idle()
 		if not enemy.anim_damage.is_connected(_on_anim_damage):
 			enemy.anim_damage.connect(_on_anim_damage)
-
+	
+	# Initialize card integration now that battle is set up
+	initialize_cards_for_players()
+	
+	# Initialize HUD connections
+	if not hud:
+		push_error("BattleHUD node not found. Please make sure it's added to the scene.")
+		return
+	hud.action_selected.connect(_on_action_selected)
+	hud.menu_opened.connect(_do_menu_selection)
+	
+	# Check for ActionButtons and set toggle states
+	var action_buttons = hud.get_node_or_null("Control/ActionButtons")
+	print("ActionButtons found: ", action_buttons != null)
+	if action_buttons:
+		var items_button = action_buttons.get_node_or_null("Items")
+		if items_button:
+			items_button.disabled = not item_toggle
+		var run_button = action_buttons.get_node_or_null("Run")
+		if run_button:
+			run_button.disabled = not run_toggle
+	
+	# Spawn troop if active_troop is set — await so enemies are ready before first turn
+	if active_troop:
+		print("Active troop detected: ", active_troop.troop_name)
+		await spawn_troop(active_troop, self)
+		# Re-gather enemies after troop spawn
+		enemies = []
+		for node in get_tree().get_nodes_in_group("enemies"):
+			if node is Battler:
+				enemies.append(node as Battler)
+		# Assign enumeration to newly spawned enemies
+		for i in range(enemies.size()):
+			var e = enemies[i]
+			if e.character_name.is_empty() or e.character_name == "Enemy":
+				e.character_name = "Enemy %d" % (i + 1)
+			elif not str(i + 1) in e.character_name:
+				e.character_name = e.character_name + " %d" % (i + 1)
+		# Rebuild turn_order with spawned enemies
+		turn_order = players + enemies
+		for enemy in enemies:
+			hud.on_start_combat(enemy)
+			enemy.battle_idle()
+			if not enemy.anim_damage.is_connected(_on_anim_damage):
+				enemy.anim_damage.connect(_on_anim_damage)
+	
+	print("=== INITIALIZE BATTLE END ===")
 	start_next_turn()
+
 
 func count_allies():
 	# For now, Should be one.
@@ -402,9 +475,32 @@ func target_selected(target: Battler) -> void:
 	print("Received target: ", target.character_name)
 	print("In target selection: ", in_target_selection)
 	print("Target is selectable: ", target.is_selectable)
+	print("Has pending card: ", has_meta("pending_card"))
 	
 	if !in_target_selection or !target.is_selectable:
 		print("Target selection rejected - not in selection or not selectable")
+		return
+	
+	# Check if there's a pending card from card combat
+	var pending_card = get_meta("pending_card")
+	if pending_card:
+		print("Card combat targeting: playing card ", pending_card.name, " on ", target.character_name)
+		if battle_camera:
+			battle_camera.set_target_focus(target)
+		
+		# Get card battle manager
+		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+		if card_battle_manager:
+			# Call async card play without await (fire and forget)
+			_execute_card_async(card_battle_manager, pending_card, target)
+		else:
+			print("ERROR: CardBattleManager not found!")
+		
+		# Clear pending card
+		set_meta("pending_card", null)
+		
+		# Exit targeting mode
+		exit_targeting_mode()
 		return
 		
 	# Clear ALL targets' selection states first - only ONE highlight allowed
@@ -452,9 +548,17 @@ func start_next_turn():
 		end_battle()
 		return
 
+	# If it's the very first turn of the battle, do a cinematic intro with default camera
+	if is_first_turn:
+		is_first_turn = false
+		if battle_camera:
+			battle_camera.set_default_camera()
+		# Pause for a dramatic moment
+		await get_tree().create_timer(1.5 / speed_multiplier).timeout
+
 	# Reset turn-based flags
-	damage_processed_this_turn = false
 	current_turn_timeout_timer = 0.0
+	is_turn_transitioning = false
 
 	current_character = turn_order[current_turn]
 	current_battler = current_character
@@ -472,54 +576,62 @@ func start_next_turn():
 		start_next_turn()
 		return
 	
+	if hud and hud.has_method("update_turn_queue"):
+		hud.update_turn_queue(turn_order, current_turn)
+	
 	if current_character in players:
 		print("Player's turn")
 		player_turn(current_character)
+		if battle_camera:
+			battle_camera.set_over_the_shoulder(current_character)
+		# Start card combat turn for player
+		if card_integration:
+			var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+			if card_battle_manager:
+				card_battle_manager.start_player_turn()
+		# Player turn is driven by input — don't await, return here.
+		update_hud()
+		return
 	else:
 		print("Enemy's turn")
-		enemy_turn(current_character)
+		if battle_camera:
+			battle_camera.set_target_focus(current_character)
+		# MUST await so the enemy's entire action resolves before update_hud/next turn
+		await enemy_turn(current_character)
 	
 	update_hud()
 
 func update_hud():
+	if not hud:
+		return
 	hud.update_character_info()
+	# Guard against out-of-bounds access if turn_order changed mid-turn
+	if turn_order.is_empty() or current_turn >= turn_order.size():
+		hud.hide_action_buttons()
+		return
+	# Don't show action buttons for players (they use cards now)
+	# Only show for items/run if needed
 	if turn_order[current_turn] in players and not is_animating:
 		hud.show_action_buttons(turn_order[current_turn])
 	else:
 		hud.hide_action_buttons()
 
-var queued_action:String
-var queued_skill:Skill
 var queued_item:Item
-var current_skill_effect_type: int = 0  # Store skill type to check in damage callback
-func _on_action_selected(action: String, usable:Resource = current_character.default_attack):
+func _on_action_selected(action: String, usable:Item = null):
 	print("=== ACTION SELECTED ===")
 	print("Action: ", action)
 	print("Usable: ", usable)
 	print("Current character: ", current_character.character_name)
 	
 	match action:
-		"defend":
-			current_character.defend()
-			end_turn()
-			return
 		"run":
 			escape_battle()
 			return
-	
-	queued_action = action
-	if action == "attack":
-		if current_character.default_attack:
-			queued_skill = current_character.default_attack
-		else:
-			queued_skill = default_attack
-	if usable is Skill:
-		queued_skill = usable
-		current_skill_effect_type = queued_skill.effect_type  # Store effect type
-		print("Set queued_skill to: ", queued_skill.skill_name)
-	elif usable is Item:
-		queued_item = usable
-	_do_target_selection()
+		"item":
+			if usable is Item:
+				queued_item = usable
+				_do_item_target_selection()
+			return
 
 var current_controller_target: Battler = null
 var valid_targets: Array = []  # Array of Battler objects
@@ -527,11 +639,10 @@ var current_default_selector: Battler = null  # Track who has the default select
 var last_selected_target: Battler = null  # Remember last target for next selection
 var keyboard_target_index: int = 0  # Track keyboard navigation position
 
-## Populates [member valid_targets] based on the queued skill's target type and highlights the default.
-## For multi-target skills (MULTIPLE_ENEMIES, MULTIPLE_ALLIES, ALL_TARGETS), skips manual selection
-## and calls [method _auto_select_multiple_targets] immediately.
-## Cancels back to the action menu if the skill can't be used or no valid targets exist.
-func _do_target_selection() -> void:
+## Populates [member valid_targets] based on the queued item's target type and highlights the default.
+## For multi-target items, skips manual selection and targets all valid targets immediately.
+## Cancels back to the action menu if the item can't be used or no valid targets exist.
+func _do_item_target_selection() -> void:
 	print("\n=== Starting Target Selection ===")
 	print("DEBUG: enemies array before target selection: ", enemies)
 	print("DEBUG: players array before target selection: ", players)
@@ -558,66 +669,23 @@ func _do_target_selection() -> void:
 		if node is Battler:
 			current_players.append(node as Battler)
 	
-	# Set valid targets based on skill type with proper validation
-	if queued_skill:
-		print("=== SKILL TARGETING ===")
-		print("Skill name: ", queued_skill.skill_name)
-		print("Skill target type: ", queued_skill.target_type)
+	# Set valid targets based on item type
+	if queued_item:
+		print("=== ITEM TARGETING ===")
+		print("Item name: ", queued_item.item_name)
 		print("Current character in players: ", current_character in current_players)
-		print("Current enemies: ", current_enemies)
-		print("Current players: ", current_players)
 		
-		# Check if skill can be used at all
-		print("Checking if skill can be used...")
-		print("Current character SP: ", current_character.current_sp)
-		print("Current character HP: ", current_character.current_health)
-		print("Skill SP cost: ", queued_skill.sp_cost)
-		print("Skill HP cost: ", queued_skill.hp_cost)
-		
-		if !queued_skill.can_use(current_character):
-			print("Cannot use skill - insufficient SP/HP!")
-			_cancel_action_target_selection()
-			return
-		
-		print("Skill can be used! Proceeding with targeting...")
-		
-		match queued_skill.target_type:
-			Skill.TARGETS_TYPES.SELF_TARGET:
-				valid_targets = [current_character]
-			Skill.TARGETS_TYPES.SINGLE_ENEMY:
-				valid_targets = current_enemies if current_character in current_players else current_players
-			Skill.TARGETS_TYPES.MULTIPLE_ENEMIES:
-				valid_targets = current_enemies if current_character in current_players else current_players
-				_auto_select_multiple_targets()
-				return
-			Skill.TARGETS_TYPES.SINGLE_ALLY:
-				valid_targets = current_players if current_character in current_players else current_enemies
-				if current_character in valid_targets:  # Remove self from valid targets
-					valid_targets.erase(current_character)
-			Skill.TARGETS_TYPES.MULTIPLE_ALLIES:
-				valid_targets = current_players if current_character in current_players else current_enemies
-				_auto_select_multiple_targets()
-				return
-			Skill.TARGETS_TYPES.ALL_TARGETS:
-				valid_targets = current_players + current_enemies
-				_auto_select_multiple_targets()
-				return
-		
-		# Filter valid targets based on skill requirements
-		print("Filtering valid targets based on skill requirements...")
-		var filtered_targets: Array = []
-		for target in valid_targets:
-			if target is Battler:
-				var can_target = current_character.can_target_with_skill(queued_skill, target)
-				print("Can target ", target.character_name, ": ", can_target)
-				if can_target:
-					filtered_targets.append(target)
-		print("Filtered targets count: ", filtered_targets.size())
-		valid_targets = filtered_targets
+		# Simple targeting: items target enemies for damage, allies for healing
+		if queued_item.damage_amount > 0:
+			valid_targets = current_enemies if current_character in current_players else current_players
+		elif queued_item.heal_amount > 0:
+			valid_targets = current_players if current_character in current_players else current_enemies
+		else:
+			valid_targets = [current_character]  # Default to self for other items
 
 	# Check if we have any valid targets
 	if valid_targets.is_empty():
-		print("No valid targets found for this skill!")
+		print("No valid targets found for this item!")
 		_cancel_action_target_selection()
 		return
 	
@@ -677,9 +745,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("ui_accept"):
 		if current_controller_target:
 			current_target = current_controller_target
-			_use_action_on_target()
+			# Check pending card first (card combat system)
+			var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
+			if pending_card:
+				print("Keyboard confirm: playing card ", pending_card.name, " on ", current_target.character_name)
+				if battle_camera:
+					battle_camera.set_target_focus(current_target)
+				var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+				if card_battle_manager:
+					_execute_card_async(card_battle_manager, pending_card, current_target)
+				set_meta("pending_card", null)
+				exit_targeting_mode()
+			else:
+				_use_action_on_target()
 	elif event.is_action_pressed("ui_cancel"):
 		_cancel_action_target_selection()
+		if in_target_selection:
+			exit_targeting_mode()
 
 func _cycle_controller_target(direction: int) -> void:
 	# Clear ALL targets' selection states first - only ONE highlight allowed
@@ -700,22 +782,24 @@ func _cycle_controller_target(direction: int) -> void:
 		current_default_selector = current_controller_target
 		current_controller_target.set_as_keyboard_target()
 		
+		# Move camera to show the newly highlighted enemy
+		if battle_camera:
+			battle_camera.set_target_focus(current_controller_target)
+		
 		print("Keyboard navigation: Selected ", current_controller_target.character_name)
 		print("Current keyboard index: ", keyboard_target_index)
 		print("Valid targets size: ", valid_targets.size())
 
 func _cancel_action_target_selection() -> void:
 	print("Cancelling target selection")
-	in_target_selection = false
+	exit_targeting_mode()
 	current_target = null
 	current_controller_target = null
 	current_default_selector = null
 	keyboard_target_index = 0
 	valid_targets.clear()
 	
-	# Clear queued action variables
-	queued_action = ""
-	queued_skill = null
+	# Clear queued item
 	queued_item = null
 	
 	# Clear all targeting states for all battlers
@@ -735,7 +819,11 @@ func _cancel_action_target_selection() -> void:
 func _cancel_menu_selection() -> void:
 	in_menu_selection = false
 	hud.item_select.hide()
-	hud.skill_select.hide()
+	var skill_select = hud.get("skill_select")
+	if skill_select:
+		skill_select.hide()
+	if hud.card_ui:
+		hud.card_ui.visible = true
 	hud.show_action_buttons(current_character)
 
 func _do_menu_selection() -> void:
@@ -748,8 +836,6 @@ func _do_menu_selection() -> void:
 func _use_action_on_target() -> void:
 	print("=== USING ACTION ON TARGET ===")
 	print("Current target: ", current_target.character_name if current_target else "NULL")
-	print("Queued action: ", queued_action)
-	print("Queued skill: ", queued_skill.skill_name if queued_skill else "NULL")
 	print("Queued item: ", queued_item.item_name if queued_item else "NULL")
 	
 	if !current_target:
@@ -757,72 +843,41 @@ func _use_action_on_target() -> void:
 		_cancel_action_target_selection()
 		return
 	
-	in_target_selection = false
+	# Card combat pending_card takes priority over queued_item
+	var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
+	if pending_card:
+		print("Card pending - routing to card play on: ", current_target.character_name)
+		if battle_camera:
+			battle_camera.set_target_focus(current_target)
+		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+		if card_battle_manager:
+			_execute_card_async(card_battle_manager, pending_card, current_target)
+		set_meta("pending_card", null)
+		exit_targeting_mode()
+		return
+	
+	if !queued_item:
+		print("ERROR: No item queued and no pending card!")
+		_cancel_action_target_selection()
+		return
+	
+	exit_targeting_mode()
 	in_menu_selection = false
 	is_animating = true
 	hud.hide_action_buttons()
 	
-	match queued_action:
-		"skill":
-			if queued_skill:
-				# Skills handle their own animation waiting via use_skill()
-				# Don't set battler_attacking since we're fully awaiting
-				print("Using skill on target: ", current_target.character_name)
-				await current_character.use_skill(queued_skill, current_target)
-				queued_action = ""  # Clear after skill completes
-		"attack":
-			# Attacks also go through use_skill or attack_anim, both handle return movement
-			print("Performing attack on target: ", current_target.character_name)
-			if current_character.default_attack:
-				await current_character.use_skill(current_character.default_attack, current_target)
-			else:
-				await current_character.attack_anim(current_target)
-			queued_action = ""  # Clear after attack completes
-		"item":
-			print("Using item on target: ", current_target.character_name)
-			current_character.battle_item(queued_item, current_target)
-			queued_action = ""  # Clear early for items
+	print("Using item on target: ", current_target.character_name)
+	current_character.battle_item(queued_item, current_target)
 	
-	# Don't clear queued_action yet for damage skills - let _on_anim_damage use it
-	queued_skill = null
 	queued_item = null
 	SignalBus.allow_select_target.emit(false)
 	end_turn()
 
 func _on_anim_damage():
-	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	if not battle_manager:
-		print("ERROR: Could not find BattleManager!")
-		return
-	
-	# PREVENT DOUBLE PROCESSING - only process once per action
-	if damage_processed_this_turn:
-		print("Damage already processed this turn, skipping duplicate call")
-		return
-	
-	print("=== ANIMATION DAMAGE DEBUG ===")
-	print("Current character: ", battle_manager.current_character.character_name if battle_manager.current_character else "NULL")
-	print("Current target: ", battle_manager.current_target.character_name if battle_manager.current_target else "NULL")
-	print("Queued action: ", battle_manager.queued_action)
-	print("Current skill effect type: ", battle_manager.current_skill_effect_type)
-	print("MANAGER: Processing animation damage")
-	
-	# ONLY process damage for DAMAGE type skills, attacks, and counters
-	# Don't process for BUFF (2) or HEAL (1) skills
-	if battle_manager.current_character and battle_manager.current_target and battle_manager.queued_action in ["attack", "skill", "counter"]:
-		# Skip if this is a BUFF or HEAL skill (but not counter - counters always do damage)
-		if battle_manager.queued_action == "skill" and battle_manager.current_skill_effect_type != 0:  # 0 = DAMAGE
-			print("Skipping damage for non-damage skill (type: %d)" % battle_manager.current_skill_effect_type)
-			return
-		
-		var damage = battle_manager.current_character.get_attack_damage(battle_manager.current_target)
-		print("Calculated damage: ", damage, " for target: ", battle_manager.current_target.character_name)
-		# AWAIT damage calculation so counters complete
-		await battle_manager.damage_calculation(battle_manager.current_character, battle_manager.current_target, damage)
-		# Mark as processed to prevent duplicate calls
-		damage_processed_this_turn = true
-	else:
-		print("Skipping damage - queued_action is: ", battle_manager.queued_action)
+	# This function will be replaced by the card combat system
+	# For now, keeping it for compatibility with existing animations
+	print("Animation damage callback - will be handled by card system")
+	pass
 
 func damage_calculation(attacker, target, damage) -> void:
 	# Safety check - if damage is 0, don't process
@@ -843,12 +898,18 @@ func damage_calculation(attacker, target, damage) -> void:
 	if roll > hit_chance:
 		print("%s's attack misses! (rolled %.1f vs hit chance %.1f)" % [attacker.character_name, roll, hit_chance])
 		# Display miss text
-		if hud and hud.battle_text_display and queued_skill:
-			hud.battle_text_display.show_miss(attacker, target, queued_skill)
+		if hud and hud.battle_text_display:
+			hud.battle_text_display.show_miss(attacker, target, null)
 		return  # Miss - no damage applied
 	
 	damage = Formulas.physical_damage(attacker, target, damage)
 	print("%s attacks %s for %d damage! (hit: %.1f/%.1f)" % [attacker.character_name, target.character_name, damage, hit_chance, 100.0])
+	
+	# Check for reactive defense QTE if target is player
+	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+	if card_battle_manager and target in players:
+		damage = await card_battle_manager.trigger_reactive_defense(attacker, damage)
+		print("Damage after reactive defense: ", damage)
 	
 	# Only apply if damage is still positive after calculation
 	if damage > 0:
@@ -858,8 +919,8 @@ func damage_calculation(attacker, target, damage) -> void:
 		update_hud()
 		
 		# Display damage text with BattleAflictions
-		if hud and hud.battle_text_display and queued_skill:
-			hud.battle_text_display.show_damage(attacker, target, queued_skill, damage, false, false)
+		if hud and hud.battle_text_display:
+			hud.battle_text_display.show_damage(attacker, target, null, damage, false, false)
 	else:
 		print("Final damage after calculation is 0 or negative, not applying")
 
@@ -870,8 +931,8 @@ func heal_calculation(user, target, amount):
 	update_hud()
 	
 	# Display healing text with BattleAflictions
-	if hud and hud.battle_text_display and queued_skill:
-		hud.battle_text_display.show_healing(user, target, queued_skill, healing)
+	if hud and hud.battle_text_display:
+		hud.battle_text_display.show_healing(user, target, null, healing)
 
 func enemy_turn(character:Battler) -> void:
 	print("=== ENEMY TURN ===")
@@ -911,26 +972,33 @@ func enemy_turn(character:Battler) -> void:
 ## then calls [method start_next_turn] after a short speed-scaled delay.
 ## If [member skip_turn] is true (e.g. after a failed escape), state processing is skipped
 ## and the turn advances immediately.
+var is_turn_transitioning: bool = false
 var battler_attacking:bool = false
 func end_turn():
+	if is_turn_transitioning:
+		print("[Turn Guard] Turn transition already in progress, skipping duplicate call")
+		return
+	is_turn_transitioning = true
+	
 	if skip_turn:
 		skip_turn = false
-		current_turn = (current_turn + 1) % turn_order.size()
+		current_turn = (current_turn + 1) % max(turn_order.size(), 1)
 		is_animating = false
-		queued_action = ""
-		damage_processed_this_turn = false  # RESET THIS
 		start_next_turn()
 	else:
-		# All animations are now handled in _use_action_on_target with await,
-		# so we don't need to wait here
-		
 		# Process states before SP regen
 		if current_battler:
 			current_battler.process_states()
 			current_battler.regenerate_sp()
 		
-		# Clean up defeated enemies
-		cleanup_defeated_enemies()
+		# ADVANCE the turn index FIRST, before cleanup removes entries
+		# This ensures we always move forward in the queue
+		if not turn_order.is_empty():
+			current_turn = (current_turn + 1) % turn_order.size()
+		
+		# Remove defeated battlers from turn_order and arrays.
+		# Must happen AFTER advancing, so cleanup adjusts correctly.
+		_cleanup_defeated_from_turn_order()
 		
 		# Clear targeting states
 		for battler in get_tree().get_nodes_in_group("players") + get_tree().get_nodes_in_group("enemies"):
@@ -939,20 +1007,42 @@ func end_turn():
 				battler.is_valid_target = false
 				battler.is_selectable = false
 		
-		current_turn = (current_turn + 1) % turn_order.size()
+		# Guard: if turn_order is now empty, end battle
+		if turn_order.is_empty():
+			end_battle()
+			return
+		
+		# Re-clamp current_turn in case cleanup shrank the array
+		current_turn = current_turn % turn_order.size()
 		is_animating = false
-		queued_action = ""
-		damage_processed_this_turn = false  # RESET THIS
 		
 		# Add small delay that respects speed multiplier
 		await get_tree().create_timer(0.2 / speed_multiplier).timeout
 		start_next_turn()
 
+## Remove any defeated battlers from turn_order, players, and enemies arrays.
+## Called AFTER current_turn has already been incremented in end_turn.
+## So we only need to shift the index back for entries strictly BEFORE current_turn.
+func _cleanup_defeated_from_turn_order() -> void:
+	var to_remove: Array[Battler] = []
+	for battler in turn_order:
+		if not is_instance_valid(battler) or battler.is_defeated():
+			to_remove.append(battler)
+	
+	for battler in to_remove:
+		var idx = turn_order.find(battler)
+		# Only shift current_turn back if the removed entry was strictly before it.
+		# If it's at or after current_turn, the index stays correct.
+		if idx >= 0 and idx < current_turn:
+			current_turn -= 1
+		turn_order.erase(battler)
+		players.erase(battler)
+		enemies.erase(battler)
+
 ## Force turn to advance immediately (safety mechanism for stuck turns)
 func force_turn_advance() -> void:
 	print("[FORCE ADVANCE] Forcing turn to end due to timeout")
 	battler_attacking = false
-	queued_action = ""
 	end_turn()
 
 ## Start the turn timeout timer to prevent soft locks
@@ -962,9 +1052,9 @@ func _start_turn_timeout() -> void:
 	
 	await get_tree().create_timer(turn_timeout_seconds / speed_multiplier).timeout
 	
-	# Check if we're still waiting for damage
-	if current_character and not damage_processed_this_turn:
-		print("[Turn Timeout] WARNING: Turn exceeded %.1fs without processing damage!" % turn_timeout_seconds)
+	# Check if turn has exceeded timeout
+	if current_character:
+		print("[Turn Timeout] WARNING: Turn exceeded %.1fs!" % turn_timeout_seconds)
 		force_turn_advance()
 
 func player_turn(character):
@@ -1058,65 +1148,42 @@ func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
 			hud.hide_action_buttons()
 
 func update_button_states():
-	ActionButtons.get_node("Attack").disabled = not attack_toggle
-	ActionButtons.get_node("Skills").disabled = not skills_toggle
-	ActionButtons.get_node("Defend").disabled = not defend_toggle
-	ActionButtons.get_node("Items").disabled = not item_toggle
-	ActionButtons.get_node("Skills").disabled = not run_toggle
+	# ActionButtons are now in BattleHUD, we can access them through HUD
+	var action_buttons = hud.get_node_or_null("Control/ActionButtons")
+	if action_buttons:
+		var items_button = action_buttons.get_node_or_null("Items")
+		if items_button:
+			items_button.disabled = not item_toggle
+		var run_button = action_buttons.get_node_or_null("Run")
+		if run_button:
+			run_button.disabled = not run_toggle
 
-func _apply_action_effects(target: Battler) -> void:
-	match queued_action:
-		"attack":
-			if current_character.default_attack:
-				current_character.use_skill(current_character.default_attack, target)
-			else:
-				current_character.attack_anim(target)
-		"skill":
-			if queued_skill:
-				# Check if this is a revive skill
-				if queued_skill.effect_type == Skill.EFFECT_TYPE.HEAL and queued_skill.skill_name.to_lower().contains("revive"):
-					_apply_revive_action(current_character, target, queued_skill)
-				else:
-					current_character.use_skill(queued_skill, target)
-		"item":
-			if queued_item:
-				# Check if this is a revive item
-				if queued_item.effect_type == "Revive":
-					_apply_revive_action(current_character, target, queued_item)
-				else:
-					current_character.battle_item(queued_item, target)
+func exit_targeting_mode():
+	print("=== EXIT TARGETING MODE ===")
+	in_target_selection = false
+	current_target = null
+	
+	# Disable all valid targets
+	for battler in valid_targets:
+		if battler is Battler:
+			battler.is_valid_target = false
+			battler.is_selectable = false
+			battler.deselect_as_target()
+	
+	valid_targets.clear()
+	
+	# Clear pending card if exists
+	if has_meta("pending_card"):
+		set_meta("pending_card", null)
+	
+	# Disable mouse input when done targeting
+	mouse_input_toggle = false
+	
+	print("Targeting mode exited")
 
-## Helper function to apply revive action (skill or item)
-func _apply_revive_action(user: Battler, target: Battler, action: Resource) -> void:
-	# Check if target can be revived (is defeated)
-	if not Formulas.can_revive(target):
-		print("Target %s is not defeated, cannot revive" % target.character_name)
-		if hud and hud.battle_text_display:
-			hud.battle_text_display.text = "%s is not affected!" % target.character_name
-		return
-	
-	# Apply revive (restore to 50% health or item base_power %)
-	var hp_percent = 50
-	if action is Item:
-		hp_percent = action.base_power
-	
-	var _hp_restored = Formulas.apply_revive(target, hp_percent)
-	
-	# Update UI
-	hud.update_health_bars()
-	update_hud()
-	
-	# Update turn order if revived mid-battle
-	if not target.is_defeated() and target in turn_order:
-		print("Revived %s, turn order updated" % target.character_name)
-	
-	# Display revive text
-	if hud and hud.battle_text_display and action is Skill:
-		hud.battle_text_display.show_revive(user, target, action as Skill)
-	elif hud and hud.battle_text_display:
-		# For items, create a simple text display
-		var text = "%s revived %s!" % [user.character_name, target.character_name]
-		hud.battle_text_display.text = text
+func _execute_card_async(card_battle_manager: CardBattleManager, card: CardData, target: Battler):
+	# Helper function to execute card asynchronously
+	await card_battle_manager.play_card(card, target)
 
 ## Display and populate battle results screen
 ## Shows victory/defeat results and waits for player input to continue

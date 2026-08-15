@@ -1,0 +1,443 @@
+class_name CardBattleManager
+extends Node
+## Bridges the 3D battle system with the card combat addon
+## Manages card-based combat for the player while enemies use AI attacks
+
+signal card_played(card: CardData, target: Variant)
+signal turn_ended()
+signal ap_changed(current_ap: int, max_ap: int)
+signal player_attacked(attacker: Battler, damage: int)
+
+## Per-battler sessions and decks (keyed by Battler object)
+var sessions_by_battler: Dictionary = {}  # Battler -> CombatSession
+var decks_by_battler: Dictionary = {}     # Battler -> CombatDeck
+
+var ap_system: APSystem
+
+var battle_manager: BattleManager
+var current_player_battler: Battler
+var card_config: CardBattleConfig
+var qte_manager: QTEManager
+
+# Cards played this turn (to be executed when turn ends)
+var queued_cards: Array = []
+
+func _ready():
+	# Add to group for easy access
+	add_to_group("card_battle_manager")
+	print("CardBattleManager added to group card_battle_manager")
+	
+	# Find the battle manager
+	battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if not battle_manager:
+		push_error("CardBattleManager: Could not find BattleManager")
+		return
+	else:
+		print("CardBattleManager found BattleManager")
+	
+	# Create AP system
+	ap_system = APSystem.new()
+	add_child(ap_system)
+	
+	# Create QTE manager
+	qte_manager = QTEManager.new()
+	add_child(qte_manager)
+	
+	# Load configuration
+	card_config = load_card_config()
+	if card_config:
+		ap_system.setup(card_config.ap_per_turn, card_config.max_ap)
+		ap_system.ap_changed.connect(_on_ap_changed)
+
+func load_card_config() -> CardBattleConfig:
+	# Try to load from project settings or create default
+	var config_path = "res://battle-manager/card_combat/card_battle_config.tres"
+	if ResourceLoader.exists(config_path):
+		return load(config_path)
+	
+	# Create default config if none exists
+	var default_config = CardBattleConfig.new()
+	return default_config
+
+## Sets up an independent CombatSession and CombatDeck for one ally battler.
+## Call this once per ally during battle initialisation.
+func setup_card_combat(player_battler: Battler, card_data_resources: Array[CardData]) -> void:
+	if not player_battler:
+		return
+	
+	# Create combat session with player as side 0
+	var player_combatant = Combatant.new()
+	player_combatant.max_health = player_battler.max_health
+	player_combatant.current_health = player_battler.current_health
+	
+	# Create a dummy enemy combatant for side 1 (enemies use AI, not cards)
+	var enemy_combatant = Combatant.new()
+	enemy_combatant.max_health = 100
+	enemy_combatant.current_health = 100
+	
+	var session = CombatSession.new()
+	session.config = create_combat_config()
+	session.setup_sides([
+		{"hero": player_combatant, "cards": card_data_resources},
+		{"hero": enemy_combatant, "cards": []}
+	], [0, 1])
+	
+	# Store by battler reference
+	sessions_by_battler[player_battler] = session
+	var deck = session.decks[0]
+	decks_by_battler[player_battler] = deck
+	
+	# Connect deck signals
+	if not deck.card_played.is_connected(_on_card_played):
+		deck.card_played.connect(_on_card_played)
+	if not deck.mana_changed.is_connected(_on_mana_changed):
+		deck.mana_changed.connect(_on_mana_changed)
+	
+	print("Card combat setup complete for player: ", player_battler.character_name)
+
+func create_combat_config() -> CombatConfig:
+	var config = CombatConfig.new()
+	if card_config:
+		config.initial_hand_size = card_config.initial_hand_size
+		config.max_hand_size = card_config.max_hand_size
+		config.max_board_size = card_config.max_board_size
+	return config
+
+## Returns the current player's active deck. Null if not set up.
+func _get_current_deck() -> CombatDeck:
+	if current_player_battler and decks_by_battler.has(current_player_battler):
+		return decks_by_battler[current_player_battler]
+	return null
+
+func get_hand() -> Array[CardData]:
+	var deck = _get_current_deck()
+	if deck:
+		return deck.get_hand()
+	return []
+
+func can_play_card(card: CardData) -> bool:
+	if not _get_current_deck():
+		print("Cannot play card: No player deck")
+		return false
+	
+	# Use our own AP system for cost validation
+	var ap_can_spend = ap_system.can_spend_ap(card.cost)
+	print("AP can spend: ", ap_can_spend, " (card cost: ", card.cost, ")")
+	
+	var ap_info = get_ap_info()
+	print("Current AP: ", ap_info.get("current_ap", 0), " / ", ap_info.get("max_ap", 0))
+	
+	return ap_can_spend
+
+var is_executing_card: bool = false
+
+func play_card(card: CardData, target: Battler = null) -> bool:
+	if is_executing_card or not can_play_card(card):
+		print("Cannot play card: ", card.name, " (is_executing: ", is_executing_card, ")")
+		return false
+	
+	is_executing_card = true
+	if battle_manager:
+		battle_manager.is_animating = true
+		if battle_manager.hud:
+			battle_manager.hud.hide_action_buttons()
+	
+	print("=== PLAYING CARD ===")
+	print("Card: ", card.name)
+	print("Target: ", target.character_name if target else "None")
+	print("Battle manager enemies before play: ", battle_manager.enemies.size() if battle_manager else "No battle manager")
+	
+	# Spend AP immediately
+	ap_system.spend_ap(card.cost)
+	
+	# Camera choreography: wider view for player attack cards only
+	var card_type = card.metadata.get("card_type", "attack")
+	if (card_type == "attack" or card_type == "skill") and battle_manager and battle_manager.battle_camera:
+		battle_manager.battle_camera.set_default_camera()
+	
+	# Execute card effect immediately instead of queuing
+	await execute_card_effect(card, target)
+	
+	# Remove from hand (move to graveyard through deck system without mana restriction)
+	var deck = _get_current_deck()
+	if deck:
+		deck.discard_card(card)
+	
+	# Restore over-the-shoulder camera on the acting player after attack finishes
+	if (card_type == "attack" or card_type == "skill") and battle_manager and battle_manager.battle_camera and is_instance_valid(current_player_battler):
+		battle_manager.battle_camera.set_over_the_shoulder(current_player_battler)
+	
+	is_executing_card = false
+	if battle_manager:
+		battle_manager.is_animating = false
+		if battle_manager.hud and is_instance_valid(current_player_battler):
+			battle_manager.hud.show_action_buttons(current_player_battler)
+	
+	print("Card executed: ", card.name, " targeting: ", target.character_name if target else "None")
+	print("Battle manager enemies after play: ", battle_manager.enemies.size() if battle_manager else "No battle manager")
+	card_played.emit(card, target)
+	
+	return true
+
+func execute_queued_cards() -> void:
+	print("Executing ", queued_cards.size(), " queued cards")
+	
+	for card_action in queued_cards:
+		var card: CardData = card_action["card"]
+		var target: Battler = card_action["target"]
+		await execute_card_effect(card, target)
+	
+	# Clear queued cards
+	queued_cards.clear()
+	
+	# End turn
+	turn_ended.emit()
+
+func execute_card_effect(card: CardData, target: Battler) -> void:
+	print("Executing card effect: ", card.name)
+	
+	if not target:
+		print("No target for card: ", card.name)
+		return
+	
+	if not current_player_battler:
+		print("No player battler for card execution")
+		return
+	
+	# Handle different card types based on metadata
+	var card_type = card.metadata.get("card_type", "attack")
+	
+	match card_type:
+		"attack":
+			await execute_attack_card(card, target)
+		"skill":
+			await execute_skill_card(card, target)
+		"defense":
+			execute_defense_card(card)
+		"heal":
+			execute_heal_card(card, target)
+		_:
+			print("Unknown card type: ", card_type)
+
+func execute_attack_card(card: CardData, target: Battler) -> void:
+	print("Executing attack card: ", card.name)
+	
+	if not current_player_battler or not target:
+		print("Missing player battler or target for attack card")
+		return
+	
+	# Calculate damage based on card stats and battler stats
+	var base_damage = card.attack
+	var attacker_stat = current_player_battler.attack if current_player_battler else 0
+	var total_damage = base_damage + attacker_stat
+	
+	# Apply config multiplier if available
+	if card_config:
+		total_damage = int(total_damage * card_config.attack_damage_multiplier)
+	
+	# Move to target and attack
+	await current_player_battler.turn_to_face_target(target)
+	
+	if current_player_battler.advance_to_target(target):
+		current_player_battler._try_animation("walk")
+		while current_player_battler.is_advancing:
+			await get_tree().create_timer(0.016).timeout
+	
+	await current_player_battler.turn_to_face_target(target)
+	
+	# Play attack animation
+	current_player_battler._try_animation("attack")
+	
+	# Trigger QTE if enabled
+	var qte_success = false
+	if qte_manager and qte_manager.start_card_qte(card):
+		qte_success = await await_qte_completion()
+		print("QTE completed, success: ", qte_success)
+		
+		# Apply damage multiplier based on QTE result
+		var multiplier = qte_manager.get_damage_multiplier("CARD_ATTACK", qte_success)
+		total_damage = int(total_damage * multiplier)
+		print("Damage after QTE: ", total_damage, " (multiplier: ", multiplier, ")")
+	
+	await get_tree().create_timer(1.0).timeout
+	
+	# Apply damage
+	if battle_manager:
+		await battle_manager.damage_calculation(current_player_battler, target, total_damage)
+	
+	# Return to position
+	print("Returning to original position: ", current_player_battler.original_position)
+	current_player_battler.return_to_original_position()
+	if current_player_battler.is_advancing:
+		while current_player_battler.is_advancing:
+			await get_tree().create_timer(0.1).timeout
+	
+	current_player_battler.battle_idle()
+	print("Attack execution complete")
+
+func execute_skill_card(card: CardData, target: Battler) -> void:
+	print("Executing skill card: ", card.name)
+	await execute_attack_card(card, target)
+
+func execute_defense_card(card: CardData) -> void:
+	print("Executing defense card: ", card.name)
+	current_player_battler.defend()
+	if card.metadata.has("defense_boost"):
+		var boost = card.metadata["defense_boost"]
+		print("Defense boost: ", boost)
+
+func execute_heal_card(card: CardData, target: Battler) -> void:
+	print("Executing heal card: ", card.name)
+	var heal_amount = card.health
+	target.take_healing(heal_amount)
+	
+	if battle_manager and battle_manager.hud:
+		battle_manager.hud.update_health_bars()
+
+func draw_card_for_deck(deck: CombatDeck) -> CardData:
+	if not deck:
+		return null
+	# If draw pile is empty, recycle graveyard back into draw pile and shuffle
+	if deck._draw_pile.is_empty() and not deck._graveyard.is_empty():
+		deck._draw_pile.append_array(deck._graveyard)
+		deck._graveyard.clear()
+		deck.shuffle()
+	return deck.draw_card()
+
+func start_player_turn() -> void:
+	print("Starting player turn")
+	
+	# Always sync to the currently acting player from battle_manager
+	if battle_manager and is_instance_valid(battle_manager.current_character):
+		current_player_battler = battle_manager.current_character
+		print("Player turn for: ", current_player_battler.character_name)
+	
+	# Refresh AP
+	ap_system.regen_ap()
+	
+	# Refresh hand: discard remaining cards, draw a fresh hand
+	var deck = _get_current_deck()
+	if deck:
+		# Discard whatever is left in hand from the previous turn
+		var old_hand = deck.get_hand().duplicate()
+		for card in old_hand:
+			deck.discard_card(card)
+		
+		# Draw a fresh hand up to initial_hand_size
+		var hand_size = card_config.initial_hand_size if card_config else 3
+		for i in range(hand_size):
+			draw_card_for_deck(deck)
+		
+		print("Hand refreshed for ", current_player_battler.character_name, ": ", deck.get_hand().size(), " cards")
+	
+	# Clear queued cards from previous turn
+	queued_cards.clear()
+	
+	# Update CardUI display for the new hand
+	if battle_manager and battle_manager.hud:
+		var card_ui = battle_manager.hud.get_node_or_null("Control/CardUI")
+		if card_ui and card_ui.has_method("update_hand_display"):
+			card_ui.update_hand_display()
+			card_ui.update_ap_display()
+
+func end_player_turn() -> void:
+	print("Ending player turn")
+	# If a card is currently playing out, wait for it to finish first
+	while is_executing_card:
+		await get_tree().process_frame
+	
+	# Execute all queued cards
+	if not queued_cards.is_empty():
+		await execute_queued_cards()
+	
+	turn_ended.emit()
+	if battle_manager:
+		battle_manager.end_turn()
+
+func _on_card_played(_card_instance: CardInstance) -> void:
+	print("Card played in deck system")
+	# Card is already handled in play_card()
+
+func _on_mana_changed(new_mana: int) -> void:
+	# Mana in card system maps to our AP system
+	print("Deck mana changed: ", new_mana)
+
+func _on_ap_changed(current_ap: int, max_ap: int) -> void:
+	# Forward AP changes to UI
+	ap_changed.emit(current_ap, max_ap)
+
+func get_ap_info() -> Dictionary:
+	if ap_system:
+		return {
+			"current_ap": ap_system.get_current_ap(),
+			"max_ap": ap_system.get_max_ap(),
+			"ap_percentage": ap_system.get_ap_percentage()
+		}
+	return {}
+
+func await_qte_completion() -> bool:
+	# Helper function to wait for QTE completion with safety mechanisms
+	var state = {"completed": false, "success": false}
+	
+	if qte_manager:
+		var completion_handler = func(s: bool, _type = ""):
+			state["completed"] = true
+			state["success"] = s
+		
+		var failure_handler = func(_type = ""):
+			state["completed"] = true
+			state["success"] = false
+		
+		if not qte_manager.qte_completed.is_connected(completion_handler):
+			qte_manager.qte_completed.connect(completion_handler)
+		if not qte_manager.qte_failed.is_connected(failure_handler):
+			qte_manager.qte_failed.connect(failure_handler)
+		
+		var timeout = 10.0 # 10 seconds max safety guard
+		var start_time = Time.get_ticks_msec() / 1000.0
+		
+		# Wait for completion or timeout
+		while not state["completed"]:
+			var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
+			if elapsed > timeout:
+				print("WARNING: QTE completion timed out!")
+				break
+			await get_tree().process_frame
+		
+		if qte_manager.qte_completed.is_connected(completion_handler):
+			qte_manager.qte_completed.disconnect(completion_handler)
+		if qte_manager.qte_failed.is_connected(failure_handler):
+			qte_manager.qte_failed.disconnect(failure_handler)
+	
+	return state["success"]
+
+func trigger_reactive_defense(attacker: Battler, damage: int) -> int:
+	# Called when player is attacked, gives chance to dodge/parry
+	if not current_player_battler or not qte_manager or not card_config:
+		return damage
+	
+	if not card_config.reactive_defense_enabled:
+		return damage
+	
+	print("Triggering reactive defense QTE")
+	player_attacked.emit(attacker, damage)
+	
+	# Try dodge first (easier, complete avoidance)
+	if qte_manager.start_reactive_dodge():
+		var dodge_success = await await_qte_completion()
+		if dodge_success:
+			print("Dodge successful! No damage taken.")
+			return 0  # Complete damage avoidance
+	
+	# If dodge failed, try parry (harder, partial damage reduction)
+	if qte_manager.start_reactive_parry():
+		var parry_success = await await_qte_completion()
+		if parry_success:
+			var reduction = card_config.parry_damage_reduction
+			var reduced_damage = int(damage * (1.0 - reduction))
+			print("Parry successful! Damage reduced from ", damage, " to ", reduced_damage)
+			return reduced_damage
+	
+	# Both failed, take full damage
+	print("Reactive defense failed. Taking full damage: ", damage)
+	return damage

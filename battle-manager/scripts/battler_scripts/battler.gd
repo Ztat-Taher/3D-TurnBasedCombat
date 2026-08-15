@@ -6,7 +6,6 @@ enum TEAM {ALLY, ENEMY}
 
 @export var stats: BattlerStats
 @export var inventory: Inventory
-@export var default_attack:Skill # Basic attack as a skill
 @export_group("Team and AI Controls")
 ## Define the battler's Team - Allies are Player-controlled
 @export var team: TEAM # This will default to ALLY
@@ -63,15 +62,28 @@ var original_position: Vector3
 
 
 
-# Targeting controls
-@onready var material:Material = %Alpha_Surface.material_override
+var material: Material = null
+
+func _ensure_material() -> void:
+	if not material:
+		var mesh = get_node_or_null("%Alpha_Surface")
+		if not mesh:
+			mesh = find_child("Alpha_Surface", true, false)
+		if not mesh:
+			mesh = find_child("*Mesh*", true, false)
+		if mesh and "material_override" in mesh:
+			if not mesh.material_override:
+				mesh.material_override = StandardMaterial3D.new()
+			material = mesh.material_override
+
 @onready var select_outline:Shader = preload("res://assets/shaders/battler_select_shader.gdshader")
 var is_selectable: bool = false:
 	set(value):
 		is_selectable = value
 		if !is_selectable:
 			is_targeted = false
-			material.next_pass = null
+			if material:
+				material.next_pass = null
 		_update_highlight()
 
 var is_targeted: bool = false:
@@ -90,6 +102,10 @@ var is_keyboard_selected: bool = false  # Track if selected via keyboard
 var is_mouse_selected: bool = false    # Track if selected via mouse
 
 func _update_highlight() -> void:
+	_ensure_material()
+	if not material:
+		return
+		
 	if !is_selectable or !is_valid_target:
 		material.next_pass = null
 		return
@@ -128,8 +144,6 @@ func _update_highlight() -> void:
 @onready var basic_attack_animation = "attack"
 @onready var anim_tree: AnimationTree = $AnimationTree
 var state_machine: AnimationNodeStateMachinePlayback
-@export var skill_node: SkillList
-@onready var skill_list: Array[Skill] = []
 @onready var exp_node: Experience = get_node("Experience")
 @export var damage_indicator_subviewport:SubViewport
 
@@ -137,13 +151,11 @@ var state_machine: AnimationNodeStateMachinePlayback
 ## Duration (seconds) before recovering from being hit by a counter attack
 @export var counter_stun_duration: float = 1.5
 
-# Tracks the current attack animation duration so we can wait for it without
-# relying on AnimationPlayer.animation_finished (which AnimationTree blocks).
-# Set automatically inside _try_animation when an attack state is travelled to.
 var _current_attack_duration: float = 1.0
 
-
 func _ready():
+	_ensure_material()
+	
 	# Disconnect any existing connections first
 	if SignalBus.select_target.is_connected(check_select_target):
 		SignalBus.select_target.disconnect(check_select_target)
@@ -167,15 +179,12 @@ func _ready():
 		push_error("AnimationNodeStateMachinePlayback not found! Check AnimationTree setup.")
 		return
 	
-	if !default_attack:
-		default_attack = load("res://database/skills/normal_attack.tres")
-	
-	# If all battlers use the same material, or if there are duplicate battlers of the same type
-	# this ensures that they have uniquely assigned materials so the shader does not apply
-	# to ALL of them
-	var dupe_mat:Material = material.duplicate()
-	%Alpha_Surface.material_override = dupe_mat
-	material = %Alpha_Surface.material_override
+	if material:
+		var dupe_mat: Material = material.duplicate()
+		var mesh = get_node_or_null("%Alpha_Surface")
+		if mesh:
+			mesh.material_override = dupe_mat
+			material = mesh.material_override
 	
 	if stats:
 		# Basic stats
@@ -191,15 +200,6 @@ func _ready():
 		# SP stats
 		max_sp = max_sp  # Already set by apply_level_progression
 		current_sp = max_sp
-		
-		if skill_node:
-			var updated_skill_list:Array[Skill] = skill_node.get_skills()
-			for skill in updated_skill_list:
-				if skill is Skill and !skill_list.has(skill):
-					skill_list.append(skill)
-		
-		if default_attack:
-			skill_list.append(default_attack)
 	else:
 		push_error("BattlerStats resource not set!")
 	
@@ -214,25 +214,17 @@ func _ready():
 	anim_tree.set("parameters/conditions/is_turning_right", false)
 	anim_tree.set("parameters/conditions/is_turning_left", false)
 
-func _input(event: InputEvent) -> void:
-	# Check if mouse input is enabled in battle manager
+func _input_event(_camera: Camera3D, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and not battle_manager.mouse_input_toggle:
 		return
 		
-	if event.is_action_pressed("Select") and is_selectable and is_valid_target:
-		# Allow selection if valid target, regardless of hover state
-		select_target()
-	elif event is InputEventScreenTouch and event.pressed and is_valid_target:
-		# For touchscreen devices, treat touch as selection
-		if is_selectable:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if is_selectable and is_valid_target:
+			print("3D Pick selected target: ", character_name)
 			select_target()
-	elif event is InputEventScreenTouch and !event.pressed:
-		# Touch release - clear hover state
-		has_hover(false)
 
 func _mouse_enter() -> void: 
-	# Check if mouse input is enabled in battle manager
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and not battle_manager.mouse_input_toggle:
 		return
@@ -241,7 +233,6 @@ func _mouse_enter() -> void:
 		has_hover(true)
 		
 func _mouse_exit() -> void: 
-	# Check if mouse input is enabled in battle manager
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and not battle_manager.mouse_input_toggle:
 		return
@@ -259,7 +250,6 @@ func has_hover(hover:bool = false) -> void:
 		SignalBus.hover_target.emit(self)
 
 func set_selectable(can_target: bool) -> void:
-	# Don't override is_valid_target here - that's set by BattleManager based on skill requirements
 	is_selectable = can_target and is_valid_target
 	
 	if !is_selectable:
@@ -334,12 +324,10 @@ func get_attack_damage(target) -> int:
 
 @onready var floating_damage_num:PackedScene = preload("res://battle-manager/damage_number.tscn")
 func take_damage(amount: int, attacker: Battler = null) -> void:
-	var damage_reduction = defense
+	var damage_taken = max(1, amount) if amount > 0 else 0
 	if is_defending:
-		damage_reduction *= 2
+		damage_taken = max(1, int(damage_taken * 0.5))
 		is_defending = false
-	
-	var damage_taken = max(0, amount - damage_reduction)
 	
 	# Check for weakness state BEFORE applying damage
 	var weakness_multiplier = 1.0
@@ -406,6 +394,27 @@ func defend():
 	_try_animation("idle1")
 	print("%s is defending. Defense doubled for the next attack." % character_name)
 
+func battle_item(item: Item, target: Battler) -> void:
+	print("Using item: ", item.item_name, " on target: ", target.character_name)
+	
+	# Apply item effects
+	if item.damage_amount > 0:
+		var damage = item.damage_amount
+		target.take_damage(damage, self)
+		print("Item dealt %d damage to %s" % [damage, target.character_name])
+	elif item.heal_amount > 0:
+		var healing = target.take_healing(item.heal_amount)
+		print("Item healed %s for %d health" % [target.character_name, healing])
+	
+	# Remove item from inventory
+	if inventory and inventory.collection.has(item):
+		var quantity = inventory.collection[item]
+		if quantity > 1:
+			inventory.collection[item] = quantity - 1
+		else:
+			inventory.collection.erase(item)
+		print("Item consumed. Remaining quantity: ", inventory.collection.get(item, 0))
+
 ## Switch to a different AnimationTree
 ## Returns true if switch successful, false otherwise
 func attack_anim(target) -> void:
@@ -456,82 +465,6 @@ func attack_anim(target) -> void:
 	
 	# Return to idle state
 	battle_idle()
-
-func use_skill(skill:Skill, target) -> void:
-	if skill.can_use(self):
-		# SAFETY: Prevent self-targeting for damage skills
-		if target == self and skill.effect_type == Skill.EFFECT_TYPE.DAMAGE:
-			print("[Safety] Prevented self-damage skill on ", character_name)
-			return
-		
-		await turn_to_face_target(target)
-		
-		# Advance to target for DAMAGE skills and BUFF/DEBUFF skills targeting enemies
-		var should_advance = false
-		if skill.effect_type == Skill.EFFECT_TYPE.DAMAGE:
-			should_advance = true
-		elif skill.effect_type == Skill.EFFECT_TYPE.BUFF and target != self and target.team == TEAM.ENEMY:
-			# BUFF skills on enemies (debuffs) should advance, but not on allies
-			should_advance = true
-		
-		if should_advance and advance_to_target(target):
-			_try_animation("walk")
-			await get_tree().create_timer(0.1).timeout
-			while is_advancing:
-				await get_tree().create_timer(0.016).timeout
-		
-		var anim_name = skill.animation_name
-		# Skills use their own animations, not the global dictionary
-		if anim_name.is_empty():
-			anim_name = "attack"  # Default to attack for all skill types
-		
-		if not _try_animation(anim_name):
-			# Hard fallback for damage actions: always ensure a real attack state plays.
-			if skill.effect_type == Skill.EFFECT_TYPE.DAMAGE:
-				_try_animation("attack")
-		skill.apply_costs(self)
-		
-		# Wait for animation using duration read from AnimationPlayer at travel time.
-		# AnimationTree blocks AnimationPlayer.animation_finished so we use a timer instead.
-		match skill.effect_type:
-			Skill.EFFECT_TYPE.DAMAGE:
-				# Damage is applied via animation callback (_on_anim_damage)
-				await get_tree().create_timer(_current_attack_duration + 0.12).timeout
-			Skill.EFFECT_TYPE.HEAL:
-				target.take_healing(skill.hp_delta)
-				# Apply state if present (healing with state effect)
-				if skill.applies_state and randf() * 100 <= skill.state_apply_chance:
-					target.apply_state(skill.applies_state)
-				await get_tree().create_timer(_current_attack_duration).timeout
-			Skill.EFFECT_TYPE.BUFF:
-				# State-only skill: just apply the state, no damage
-				if skill.applies_state:
-					print("Applying state: ", skill.applies_state.state_name, " to ", target.character_name)
-					if randf() * 100 <= skill.state_apply_chance:
-						target.apply_state(skill.applies_state)
-					else:
-						print("State application missed! (", skill.state_apply_chance, "% chance)")
-				else:
-					print("ERROR: BUFF skill has no applies_state set!")
-				await get_tree().create_timer(_current_attack_duration).timeout
-			_:
-				pass
-		
-		# CRITICAL: Wait for damage callback and counters to complete before returning
-		# Give time for the damage callback signal and counter execution to finish
-		await get_tree().process_frame
-		await get_tree().process_frame
-		await get_tree().create_timer(0.1).timeout
-		
-		# NOW return to original position after damage/counter completed
-		if original_position != Vector3.ZERO:
-			return_to_original_position()
-			# Wait for return movement to complete
-			while is_advancing:
-				await get_tree().create_timer(0.1).timeout
-		
-		# Return to idle state
-		battle_idle()
 
 func wait_attack():
 	if self.is_defending:
@@ -664,7 +597,7 @@ func _try_animation(anim_name: String) -> bool:
 
 	# Route attacks through the nested state machine using two-step travel.
 	# Parent playback cannot travel directly into child paths in Godot.
-	var attack_states = ["attack", "kick", "skill-strong-attack"]
+	var attack_states = ["attack", "kick"]
 	var attack_leaf = anim_name
 	if anim_name in attack_states:
 		attack_leaf = anim_name
@@ -723,7 +656,7 @@ func _resolve_state_animation_name(state_name: String) -> String:
 		return ""
 	
 	# Attack states live inside the nested basic_attacks sub-machine.
-	var attack_states = ["attack", "kick", "skill-strong-attack"]
+	var attack_states = ["attack", "kick"]
 	var leaf_state = state_name.get_slice("/", 1) if state_name.begins_with("basic_attacks/") else state_name
 	if leaf_state in attack_states:
 		if root_sm.has_node("basic_attacks"):
@@ -810,13 +743,10 @@ func _on_anim_damage():
 	if not battle_manager:
 		return
 	
-	# ONLY process damage for attack and skill actions
-	# AND only if we haven't already processed this action
-	if battle_manager.current_character and battle_manager.current_target and battle_manager.queued_action in ["attack", "skill"]:
-		var damage = battle_manager.current_character.get_attack_damage(battle_manager.current_target)
-		battle_manager.damage_calculation(battle_manager.current_character, battle_manager.current_target, damage)
-		# IMMEDIATELY clear queued action to prevent double processing
-		battle_manager.queued_action = ""
+	# This function will be replaced by the card combat system
+	# For now, keeping it for compatibility with existing animations
+	print("Animation damage callback - will be handled by card system")
+	pass
 
 # # #
 # Save System
@@ -827,7 +757,6 @@ func on_save_game(save_data):
 	new_data.current_sp = current_sp
 	new_data.current_exp = get_exp_stat().get_total_exp()
 	new_data.current_level = get_exp_stat().get_current_level()
-	new_data.skill_list = skill_list
 	
 	save_data["charNameOrID"] = new_data
 
@@ -841,7 +770,6 @@ func on_load_game(load_data):
 	current_sp = save_data.current_sp
 	get_exp_stat().exp_total = save_data.current_exp
 	get_exp_stat().char_level = save_data.current_level
-	skill_node.character_skills = save_data.skill_list
 
 func regenerate_sp():
 	if stats and current_sp < max_sp:
@@ -854,52 +782,6 @@ func regenerate_sp():
 		current_sp = min(current_sp + regen_amount, max_sp)
 		print("%s recovered %d SP. SP: %d/%d" % [character_name, regen_amount, current_sp, max_sp])
 
-func can_target_with_skill(skill: Skill, target: Battler) -> bool:
-	print("=== CAN TARGET WITH SKILL DEBUG ===")
-	print("Skill: ", skill.skill_name)
-	print("Target: ", target.character_name)
-	print("Target team: ", target.team)
-	print("Self team: ", team)
-	
-	if !skill or !target:
-		print("Skill or target is null!")
-		return false
-	
-	# Check if skill can be used (costs)
-	if !skill.can_use(self):
-		print("Skill cannot be used due to costs!")
-		return false
-	
-	# Check target type compatibility
-	match skill.target_type:
-		Skill.TARGETS_TYPES.SELF_TARGET:
-			var result = target == self
-			print("SELF_TARGET check: ", result)
-			return result
-		Skill.TARGETS_TYPES.SINGLE_ENEMY:
-			var result = target.team == TEAM.ENEMY and target != self
-			print("SINGLE_ENEMY check: ", result)
-			return result
-		Skill.TARGETS_TYPES.MULTIPLE_ENEMIES:
-			var result = target.team == TEAM.ENEMY and target != self
-			print("MULTIPLE_ENEMIES check: ", result)
-			return result
-		Skill.TARGETS_TYPES.SINGLE_ALLY:
-			var result = target.team == TEAM.ALLY and target != self
-			print("SINGLE_ALLY check: ", result)
-			return result
-		Skill.TARGETS_TYPES.MULTIPLE_ALLIES:
-			var result = target.team == TEAM.ALLY and target != self
-			print("MULTIPLE_ALLIES check: ", result)
-			return result
-		Skill.TARGETS_TYPES.ALL_TARGETS:
-			var result = target != self
-			print("ALL_TARGETS check: ", result)
-			return result
-		_:
-			print("Unknown target type!")
-			return false
-		
 var active_states: Dictionary = {}  # {state_name: State}
 
 # And add these helper functions for state management

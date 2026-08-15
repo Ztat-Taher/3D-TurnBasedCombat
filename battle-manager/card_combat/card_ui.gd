@@ -1,0 +1,183 @@
+class_name CardUI
+extends Control
+## UI system for displaying and interacting with cards
+## Shows the player's hand, handles card selection and targeting
+
+signal card_selected(card: CardData)
+signal end_turn_pressed()
+
+@onready var card_container: HBoxContainer = $CardContainer
+@onready var ap_label: Label = $APLabel
+
+var card_battle_manager: CardBattleManager
+var card_button_scene: PackedScene
+var retry_count: int = 0
+const MAX_RETRIES: int = 10
+
+func _ready():
+	if card_container:
+		card_container.child_order_changed.connect(func(): call_deferred("apply_card_fanning"))
+	
+	# Load card button scene
+	if ResourceLoader.exists("res://battle-manager/card_combat/card_button.tscn"):
+		card_button_scene = preload("res://battle-manager/card_combat/card_button.tscn")
+	else:
+		print("Card button scene not found, will use simple buttons")
+	
+	# Defer to ensure scene tree is ready
+	call_deferred("_deferred_ready")
+
+func _deferred_ready():
+	# Find card battle manager
+	card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+	if not card_battle_manager:
+		retry_count += 1
+		if retry_count < MAX_RETRIES:
+			print("CardUI: Could not find CardBattleManager, will try again later (attempt ", retry_count, ")")
+			# Retry in a moment
+			call_deferred("_deferred_ready")
+		else:
+			print("CardUI: Failed to find CardBattleManager after ", MAX_RETRIES, " attempts")
+		return
+	
+	# Connect signals
+	card_battle_manager.ap_changed.connect(_on_ap_changed)
+	card_battle_manager.card_played.connect(_on_card_played)
+	
+	# Initial UI update
+	update_hand_display()
+	update_ap_display()
+
+func update_hand_display():
+	if not card_battle_manager or not card_container:
+		return
+	
+	# Override container separation for fanned card overlapping
+	card_container.add_theme_constant_override("separation", -20)
+	
+	# Clear existing card buttons
+	for child in card_container.get_children():
+		child.queue_free()
+	
+	# Get current hand
+	var hand = card_battle_manager.get_hand()
+	
+	# Create card buttons for each card
+	for i in range(hand.size()):
+		var card = hand[i]
+		var card_button = create_card_button(card)
+		if card_button:
+			# Visual indication for unplayable cards
+			if card_battle_manager:
+				var ap_info = card_battle_manager.get_ap_info()
+				if ap_info.get("current_ap", 0) < card.cost:
+					card_button.modulate = Color(0.4, 0.4, 0.4, 0.8) # Grey out
+				else:
+					card_button.modulate = Color.WHITE
+			
+			card_container.add_child(card_button)
+			# Set initial scale to 0 for staggered pop-in
+			card_button.scale = Vector2.ZERO
+			# Stagger pop-in animation
+			var tween = create_tween()
+			tween.set_ease(Tween.EaseType.EASE_OUT)
+			tween.set_trans(Tween.TransitionType.TRANS_BACK)
+			tween.tween_property(card_button, "scale", Vector2.ONE, 0.3).set_delay(0.05 * i)
+	
+	apply_card_fanning()
+
+func apply_card_fanning() -> void:
+	if not card_container:
+		return
+	
+	var valid_children: Array = []
+	for child in card_container.get_children():
+		if is_instance_valid(child) and not child.is_queued_for_deletion():
+			valid_children.append(child)
+	
+	var card_count = valid_children.size()
+	if card_count == 0:
+		return
+	
+	var max_angle_step: float = 5.0
+	var max_arc_factor: float = 4.0
+	var mid_index: float = (card_count - 1) / 2.0
+	
+	for i in range(card_count):
+		var child = valid_children[i]
+		var offset_from_center: float = i - mid_index
+		
+		var rotation_deg: float = offset_from_center * max_angle_step
+		var y_offset: float = (offset_from_center * offset_from_center) * max_arc_factor
+		var z_idx: int = i
+		
+		if child.has_method("set_fan_parameters"):
+			child.set_fan_parameters(rotation_deg, y_offset, z_idx)
+
+func create_card_button(card: CardData) -> Control:
+	if not card_button_scene:
+		# Create a simple button if scene not available
+		var button = Button.new()
+		button.text = card.name + " (Cost: " + str(card.cost) + ")"
+		button.pressed.connect(func(): _on_card_button_pressed(card))
+		return button
+	
+	var card_button = card_button_scene.instantiate()
+	if card_button.has_method("setup"):
+		card_button.setup(card)
+		card_button.card_played.connect(func(_card_data): _on_card_button_pressed(card))
+	
+	return card_button
+
+func update_ap_display():
+	if not card_battle_manager or not ap_label:
+		return
+	
+	var ap_info = card_battle_manager.get_ap_info()
+	var current_ap = ap_info.get("current_ap", 0)
+	var max_ap = ap_info.get("max_ap", 3)
+	
+	# Animate AP change
+	var old_text = ap_label.text
+	ap_label.text = "AP: %d/%d" % [current_ap, max_ap]
+	
+	if old_text != ap_label.text:
+		# Pop animation for AP change
+		var tween = create_tween()
+		tween.set_ease(Tween.EaseType.EASE_OUT)
+		tween.set_trans(Tween.TransitionType.TRANS_BACK)
+		tween.tween_property(ap_label, "scale", Vector2(1.3, 1.3), 0.1)
+		tween.tween_property(ap_label, "scale", Vector2.ONE, 0.2).set_delay(0.1)
+
+func _on_card_button_pressed(card: CardData):
+	if card_battle_manager:
+		if card_battle_manager.is_executing_card:
+			print("Card action in progress, ignoring click for: ", card.name)
+			return
+		var ap_info = card_battle_manager.get_ap_info()
+		if ap_info.get("current_ap", 0) < card.cost:
+			print("Not enough AP to play: ", card.name)
+			return
+			
+	print("Card selected: ", card.name)
+	card_selected.emit(card)
+
+func set_end_turn_button_visible(_p_visible: bool) -> void:
+	pass
+
+func _on_end_turn_pressed():
+	print("End turn pressed in UI")
+	end_turn_pressed.emit()
+
+func _on_ap_changed(_current_ap: int, _max_ap: int):
+	update_ap_display()
+
+func _on_card_played(_card = null, _target = null):
+	update_hand_display()
+
+func set_card_targeting_mode(enabled: bool):
+	# Enable/disable card targeting UI
+	if enabled:
+		print("Card targeting mode enabled")
+	else:
+		print("Card targeting mode disabled")
