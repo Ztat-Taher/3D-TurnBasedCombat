@@ -27,25 +27,52 @@ func choose_action(character:Battler, available_targets: Array, _all_enemies: Ar
 			await aggressive_action(character, available_targets, battle_manager)
 
 func aggressive_action(character:Battler, players: Array, battle_manager:BattleManager) -> void:
+	var all_enemies = battle_manager.enemies if battle_manager else []
 	var target = choose_target(character, players)
 	if target:
 		battle_manager.current_target = target
 		battle_manager.current_character = character
 		battle_manager.battler_attacking = true
 		
-		# Camera choreography: transition to attacked ally's OTS camera
+		# ====================================================================
+		# CINEMATIC ENEMY MOVE ANNOUNCEMENT SYSTEM
+		# ====================================================================
+		
+		# STEP 1: Enemy Overview Camera
+		if battle_manager.battle_camera and not all_enemies.is_empty():
+			battle_manager.battle_camera.set_enemy_overview(all_enemies)
+			await battle_manager.get_tree().create_timer(0.45).timeout
+		
+		# STEP 2: Move to Target Focus Camera on acting enemy & Announce Move
+		var move_name = "Strike"
+		if character.stats and character.stats.character_name:
+			move_name = "%s's Attack" % character.stats.character_name
+		
+		if battle_manager.battle_camera:
+			battle_manager.battle_camera.set_target_focus(character)
+		
+		if battle_manager.hud and battle_manager.hud.has_method("show_move_announcement"):
+			battle_manager.hud.show_move_announcement(character.character_name, move_name, "attack")
+		
+		# Dramatic pause for announcement display
+		await battle_manager.get_tree().create_timer(0.85).timeout
+		
+		# STEP 3: Transition to Over-the-Shoulder Camera of attacked player ally
+		if battle_manager.hud and battle_manager.hud.has_method("hide_move_announcement"):
+			battle_manager.hud.hide_move_announcement()
+		
 		if battle_manager.battle_camera and target in players:
 			battle_manager.battle_camera.set_over_the_shoulder(target)
-			
-		await character.attack_anim(target)
+			await battle_manager.get_tree().create_timer(0.35).timeout
 		
-		# Apply damage through battle_manager so QTE reactive defense and health bars update
-		var atk_damage = character.attack if character.attack > 0 else 15
-		await battle_manager.damage_calculation(character, target, atk_damage)
+		# STEP 4: Execution
+		# attack_anim handles movement, turns, contact-frame damage at hit_moment, and return-to-origin
+		await character.attack_anim(target)
 	else:
 		print("AI has no valid targets")
 
 func defensive_action(character:Battler, players: Array, battle_manager:BattleManager) -> void:
+	var all_enemies = battle_manager.enemies if battle_manager else []
 	var health_percent = float(character.current_health) / character.max_health
 	
 	# Check if AI should use healing items (and has them)
@@ -56,6 +83,24 @@ func defensive_action(character:Battler, players: Array, battle_manager:BattleMa
 			battle_manager.current_target = character
 			battle_manager.current_character = character
 			battle_manager.battler_attacking = true
+			
+			# STEP 1: Enemy Overview Camera
+			if battle_manager.battle_camera and not all_enemies.is_empty():
+				battle_manager.battle_camera.set_enemy_overview(all_enemies)
+				await battle_manager.get_tree().create_timer(0.45).timeout
+			
+			# STEP 2: Target Focus Camera on acting enemy & Announce Item / Buff
+			if battle_manager.battle_camera:
+				battle_manager.battle_camera.set_target_focus(character)
+			
+			if battle_manager.hud and battle_manager.hud.has_method("show_move_announcement"):
+				battle_manager.hud.show_move_announcement(character.character_name, healing_item.item_name, "heal")
+			
+			await battle_manager.get_tree().create_timer(0.9).timeout
+			
+			if battle_manager.hud and battle_manager.hud.has_method("hide_move_announcement"):
+				battle_manager.hud.hide_move_announcement()
+			
 			await character.battle_item(healing_item, character)
 			return
 	

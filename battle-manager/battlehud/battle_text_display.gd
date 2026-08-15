@@ -125,3 +125,19 @@ func show_state(
 	var afflictions = _get_afflictions()
 	var formatted = afflictions.format_state_text(attacker, target, state)
 	display_battle_text(formatted)
+
+## Display dodge text
+func show_dodge(target: Battler) -> void:
+	display_battle_text("[color=#55FF88][b]⚡ %s DODGED! ⚡[/b][/color]" % target.character_name)
+
+## Display parry text
+func show_parry(target: Battler, damage_reduced: int) -> void:
+	display_battle_text("[color=#55DDFF][b]🛡️ %s PARRIED! (-%d DMG)[/b][/color]" % [target.character_name, damage_reduced])
+
+## Display perfect parry text
+func show_perfect_parry(target: Battler) -> void:
+	display_battle_text("[color=#FFDD44][b]✨ PERFECT PARRY! COUNTERATTACK! ✨[/b][/color]")
+
+## Display counterattack text
+func show_counter(attacker: Battler, target: Battler, damage: int) -> void:
+	display_battle_text("[color=#FF4444][b]💥 %s COUNTERS for %d DMG! 💥[/b][/color]" % [attacker.character_name, damage])

@@ -331,6 +331,43 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="MoveBanner" type="Control" parent="Control" unique_id=2090000002]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -320.0
+offset_top = 70.0
+offset_right = 320.0
+offset_bottom = 140.0
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Control/MoveBanner"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Control/MoveBanner/Panel"]
+layout_mode = 2
+alignment = 1
+
+[node name="ActorLabel" type="Label" parent="Control/MoveBanner/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(1, 0.8, 0.4, 1)
+horizontal_alignment = 1
+
+[node name="MoveLabel" type="Label" parent="Control/MoveBanner/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+horizontal_alignment = 1
+
 [connection signal="pressed" from="Control/Items/BackButton" to="." method="_on_item_back_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Items" to="." method="_on_items_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Run" to="." method="_on_run_pressed"]

@@ -607,8 +607,6 @@ func start_next_turn():
 			hud.hide_action_buttons()
 			if hud.card_ui:
 				hud.card_ui.visible = false
-		if battle_camera:
-			battle_camera.set_target_focus(current_character)
 		# MUST await so the enemy's entire action resolves before update_hud/next turn
 		await enemy_turn(current_character)
 	
@@ -929,10 +927,10 @@ func damage_calculation(attacker, target, damage) -> void:
 	damage = Formulas.physical_damage(attacker, target, damage)
 	print("%s attacks %s for %d damage! (hit: %.1f/%.1f)" % [attacker.character_name, target.character_name, damage, hit_chance, 100.0])
 	
-	# Check for reactive defense QTE if target is player
+	# Check for reactive defense (Dodge / Parry / Perfect Parry Counter) if target is player ally
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 	if card_battle_manager and target in players:
-		damage = await card_battle_manager.trigger_reactive_defense(attacker, damage)
+		damage = await card_battle_manager.trigger_reactive_defense(attacker, damage, target)
 		print("Damage after reactive defense: ", damage)
 	
 	# Only apply if damage is still positive after calculation

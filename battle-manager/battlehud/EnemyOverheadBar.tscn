@@ -15,6 +15,7 @@ content_margin_bottom = 4.0
 
 [node name="EnemyOverheadBar" type="Control"]
 custom_minimum_size = Vector2(160, 44)
+mouse_filter = 2
 script = ExtResource("1_script")
 
 [node name="BG" type="PanelContainer" parent="."]

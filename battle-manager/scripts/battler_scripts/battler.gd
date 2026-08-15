@@ -2,8 +2,11 @@ class_name Battler
 extends CharacterBody3D
 
 signal anim_damage()
+signal hit_moment(attacker: Battler)
 signal health_changed(current_health: int, max_health: int)
 enum TEAM {ALLY, ENEMY}
+
+@export_range(0.0, 1.0, 0.01) var hit_frame_ratio: float = 0.55 ## Default contact frame ratio for attacks (e.g. 0.55 = 55% of animation duration)
 
 @export var stats: BattlerStats
 @export var inventory: Inventory
@@ -438,12 +441,21 @@ func attack_anim(target) -> void:
 	if not _try_animation(attack_animation_name):
 		_try_animation("attack")
 	
-	# Wait for attack animation using duration read from AnimationPlayer at travel time.
-	# AnimationTree blocks AnimationPlayer.animation_finished so we use a timer instead.
-	await get_tree().create_timer(_current_attack_duration + 0.12).timeout
+	# Wait for hit_moment (contact frame) to apply damage
+	var hit_time = _current_attack_duration * hit_frame_ratio
+	var remaining_time = max(0.1, _current_attack_duration - hit_time)
+	
+	await hit_moment
+	
+	# Apply damage at exact contact frame
+	if battle_manager and target:
+		var atk_damage = attack if attack > 0 else 15
+		await battle_manager.damage_calculation(self, target, atk_damage)
+	
+	# Wait for follow-through of the attack animation
+	await get_tree().create_timer(remaining_time + 0.12).timeout
 	
 	# CRITICAL: Wait for damage callback and counters to complete before returning
-	# Give time for the damage callback signal and counter execution to finish
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().create_timer(0.1).timeout
@@ -612,10 +624,25 @@ func _try_animation(anim_name: String) -> bool:
 		# Read actual animation length from AnimationPlayer so waiters use the correct duration.
 		# AnimationTree blocks animation_finished from firing so we wait by timer instead.
 		_current_attack_duration = max(0.25, _get_animation_duration(attack_leaf))
+		_schedule_hit_moment(_current_attack_duration)
 	else:
 		state_machine.travel(anim_name)
 
 	return true
+
+var _hit_moment_timer: SceneTreeTimer = null
+
+## Schedules hit_moment signal based on hit_frame_ratio or explicit duration
+func _schedule_hit_moment(duration: float, ratio_override: float = -1.0) -> void:
+	var ratio = ratio_override if ratio_override >= 0.0 else hit_frame_ratio
+	var hit_delay = max(0.05, duration * ratio)
+	var captured_duration = duration
+	_hit_moment_timer = get_tree().create_timer(hit_delay)
+	_hit_moment_timer.timeout.connect(func():
+		print("[HitMoment] Contact frame reached for %s (delay: %.2fs / total: %.2fs)" % [character_name, hit_delay, captured_duration])
+		hit_moment.emit(self)
+		anim_damage.emit()
+	)
 
 ## Looks up the length of an animation from AnimationPlayer by state name.
 ## Searches all animation libraries if a direct match is not found.
@@ -723,9 +750,10 @@ func get_exp_stat():
 # # #
 # Animation Damage & Effects Application
 # # #
-## Called when animation reaches the hit point - applies damage and any attached states
+## Called when animation reaches the hit point (either via animation event track or timer) - applies damage and any attached states
 func apply_animation_effects():
-	print("PLAYER: Animation hit point reached")
+	print("Animation hit point reached on %s" % character_name)
+	hit_moment.emit(self)
 	anim_damage.emit()
 
 func call_attack():

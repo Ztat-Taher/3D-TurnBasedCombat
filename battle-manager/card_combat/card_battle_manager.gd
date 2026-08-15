@@ -261,11 +261,24 @@ func execute_attack_card(card: CardData, target: Battler) -> void:
 		total_damage = int(total_damage * multiplier)
 		print("Damage after QTE: ", total_damage, " (multiplier: ", multiplier, ")")
 	
-	await get_tree().create_timer(1.0).timeout
+	# Await contact frame from animation / hit_moment signal
+	var hit_ratio = current_player_battler.hit_frame_ratio
+	if card.metadata.has("hit_frame_ratio"):
+		hit_ratio = float(card.metadata["hit_frame_ratio"])
 	
-	# Apply damage
+	var attack_dur = current_player_battler._current_attack_duration
+	var hit_time = attack_dur * hit_ratio
+	var remaining_time = max(0.1, attack_dur - hit_time)
+	
+	# Wait for hit moment signal (with fallback timeout in case signal already fired)
+	await current_player_battler.hit_moment
+	
+	# Apply damage precisely at the contact frame
 	if battle_manager:
 		await battle_manager.damage_calculation(current_player_battler, target, total_damage)
+	
+	# Allow remainder of the attack animation (follow-through / recovery) to finish
+	await get_tree().create_timer(remaining_time).timeout
 	
 	# Return to position
 	print("Returning to original position: ", current_player_battler.original_position)
@@ -421,33 +434,86 @@ func await_qte_completion() -> bool:
 	
 	return state["success"]
 
-func trigger_reactive_defense(attacker: Battler, damage: int) -> int:
-	# Called when player is attacked, gives chance to dodge/parry
-	if not current_player_battler or not qte_manager or not card_config:
+func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler = null) -> int:
+	var target_defender = defender if defender else current_player_battler
+	if not target_defender or not qte_manager or not card_config:
 		return damage
 	
 	if not card_config.reactive_defense_enabled:
 		return damage
 	
-	print("Triggering reactive defense QTE")
+	print("Triggering reactive defense window for defender: ", target_defender.character_name)
 	player_attacked.emit(attacker, damage)
 	
-	# Try dodge first (easier, complete avoidance)
-	if qte_manager.start_reactive_dodge():
-		var dodge_success = await await_qte_completion()
-		if dodge_success:
-			print("Dodge successful! No damage taken.")
-			return 0  # Complete damage avoidance
+	var outcome = await qte_manager.await_reactive_defense(target_defender)
+	var hud = battle_manager.hud if battle_manager else null
 	
-	# If dodge failed, try parry (harder, partial damage reduction)
-	if qte_manager.start_reactive_parry():
-		var parry_success = await await_qte_completion()
-		if parry_success:
+	match outcome:
+		"perfect_parry":
+			print("PERFECT PARRY by %s against %s! Triggering counterattack." % [target_defender.character_name, attacker.character_name])
+			if hud and hud.battle_text_display:
+				hud.battle_text_display.show_perfect_parry(target_defender)
+			
+			# Execute counterattack from defender to attacker
+			await _execute_perfect_parry_counter(target_defender, attacker)
+			return 0 # Complete damage avoidance on defender
+			
+		"dodge":
+			print("DODGE by %s! No damage taken." % target_defender.character_name)
+			if hud and hud.battle_text_display:
+				hud.battle_text_display.show_dodge(target_defender)
+			return 0 # Complete damage avoidance
+			
+		"parry":
 			var reduction = card_config.parry_damage_reduction
 			var reduced_damage = int(damage * (1.0 - reduction))
-			print("Parry successful! Damage reduced from ", damage, " to ", reduced_damage)
+			var amount_reduced = damage - reduced_damage
+			print("PARRY by %s! Damage reduced from %d to %d" % [target_defender.character_name, damage, reduced_damage])
+			if hud and hud.battle_text_display:
+				hud.battle_text_display.show_parry(target_defender, amount_reduced)
 			return reduced_damage
+			
+		_:
+			print("Reactive defense missed or timed out. Full damage: ", damage)
+			return damage
+
+## Executes a counterattack animation & damage from defender to attacker on Perfect Parry
+func _execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> void:
+	if not is_instance_valid(defender) or not is_instance_valid(attacker):
+		return
 	
-	# Both failed, take full damage
-	print("Reactive defense failed. Taking full damage: ", damage)
-	return damage
+	print("[Counterattack] %s counterattacks %s!" % [defender.character_name, attacker.character_name])
+	
+	# Stun the attacker momentarily so they don't return before taking counter damage
+	attacker.is_counter_stunned = true
+	
+	# Face each other
+	await defender.turn_to_face_target(attacker)
+	
+	# Play attack animation on defender
+	var attack_anim_name = "basic_attacks/attack"
+	if not defender._try_animation(attack_anim_name):
+		defender._try_animation("attack")
+	
+	# Wait for defender's contact frame (hit_moment)
+	await defender.hit_moment
+	
+	# Calculate counter damage
+	var multiplier = 1.5
+	if qte_manager and qte_manager.qte_config:
+		multiplier = qte_manager.qte_config.counter_damage_multiplier
+	
+	var base_counter_dmg = int(defender.attack * multiplier)
+	var final_counter_dmg = Formulas.physical_damage(defender, attacker, max(1, base_counter_dmg))
+	
+	# Apply damage to attacker
+	await attacker.take_damage(final_counter_dmg, defender)
+	
+	if battle_manager and battle_manager.hud:
+		battle_manager.hud.update_health_bars()
+		if battle_manager.hud.battle_text_display:
+			battle_manager.hud.battle_text_display.show_counter(defender, attacker, final_counter_dmg)
+	
+	# Allow defender to finish swing and return to idle
+	await get_tree().create_timer(0.3).timeout
+	defender.battle_idle()

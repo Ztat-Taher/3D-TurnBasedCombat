@@ -1,11 +1,13 @@
 class_name QTEManager
 extends Node
-## Manages QTE (Quick Time Event) system for card combat
-## Handles QTE triggering for card execution and reactive dodge/parry
+## Manages QTE (Quick Time Event) system for card combat & reactive dodge/parry defense
 
 signal qte_started(qte_type: String)
 signal qte_completed(success: bool, qte_type: String)
 signal qte_failed(qte_type: String)
+
+# Reactive Defense Signals
+signal reactive_defense_result(result_type: String) # "perfect_parry", "parry", "dodge", "none"
 
 var qte_config: QTEConfig
 var current_qte: QTE
@@ -38,6 +40,10 @@ func load_qte_config() -> QTEConfig:
 	var default_config = QTEConfig.new()
 	return default_config
 
+# ============================================================================
+# CARD ATTACK QTE
+# ============================================================================
+
 func start_card_qte(card: CardData) -> bool:
 	if not qte_config or not qte_config.card_qte_enabled:
 		return false
@@ -46,22 +52,92 @@ func start_card_qte(card: CardData) -> bool:
 	if card_type != "attack":
 		return false  # Only attack cards get QTEs
 	
-	# Get QTE difficulty from card metadata or use default
 	var difficulty = card.metadata.get("qte_difficulty", qte_config.default_card_qte_difficulty)
-	
 	return start_qte(QTEType.CARD_ATTACK, difficulty)
 
-func start_reactive_dodge() -> bool:
-	if not qte_config or not qte_config.reactive_defense_enabled:
-		return false
-	
-	return start_qte(QTEType.REACTIVE_DODGE, qte_config.dodge_qte_difficulty)
+# ============================================================================
+# REACTIVE DEFENSE SYSTEM (TIME-WINDOW DODGE / PARRY / PERFECT PARRY)
+# ============================================================================
 
-func start_reactive_parry() -> bool:
+## Awaits reactive input from player within the defense window.
+## Returns: "perfect_parry", "parry", "dodge", or "none"
+func await_reactive_defense(defender: Battler) -> String:
 	if not qte_config or not qte_config.reactive_defense_enabled:
-		return false
+		return "none"
 	
-	return start_qte(QTEType.REACTIVE_PARRY, qte_config.parry_qte_difficulty)
+	var window_duration = qte_config.reactive_window_duration
+	var perfect_duration = qte_config.perfect_parry_window
+	var parry_action = qte_config.parry_action
+	var dodge_action = qte_config.dodge_action
+	
+	var hud = _get_hud()
+	if hud and hud.has_method("show_parry_window"):
+		hud.show_parry_window(window_duration, perfect_duration, defender.character_name if defender else "Ally")
+	
+	var start_time = Time.get_ticks_msec() / 1000.0
+	var outcome = "none"
+	
+	while true:
+		var current_time = Time.get_ticks_msec() / 1000.0
+		var elapsed = current_time - start_time
+		var time_left = window_duration - elapsed
+		
+		if hud and hud.has_method("update_parry_window"):
+			hud.update_parry_window(max(0.0, time_left))
+		
+		# Check for Dodge input (E key)
+		var dodge_pressed = false
+		if InputMap.has_action(dodge_action) and Input.is_action_just_pressed(dodge_action):
+			dodge_pressed = true
+		elif Input.is_key_pressed(KEY_E) or Input.is_physical_key_pressed(KEY_E):
+			dodge_pressed = true
+		
+		# Check for Parry input (Q key)
+		var parry_pressed = false
+		if InputMap.has_action(parry_action) and Input.is_action_just_pressed(parry_action):
+			parry_pressed = true
+		elif Input.is_key_pressed(KEY_Q) or Input.is_physical_key_pressed(KEY_Q):
+			parry_pressed = true
+		
+		if parry_pressed:
+			if elapsed <= perfect_duration:
+				outcome = "perfect_parry"
+				print("[Reactive Defense] PERFECT PARRY! (elapsed: %.3fs <= %.3fs)" % [elapsed, perfect_duration])
+			else:
+				outcome = "parry"
+				print("[Reactive Defense] Normal Parry (elapsed: %.3fs > %.3fs)" % [elapsed, perfect_duration])
+			break
+		
+		if dodge_pressed:
+			outcome = "dodge"
+			print("[Reactive Defense] Dodge! (elapsed: %.3fs)" % elapsed)
+			break
+		
+		if elapsed >= window_duration:
+			outcome = "none"
+			print("[Reactive Defense] Defense window expired. Missed.")
+			break
+		
+		await get_tree().process_frame
+	
+	if hud and hud.has_method("hide_parry_window"):
+		hud.hide_parry_window()
+	
+	reactive_defense_result.emit(outcome)
+	return outcome
+
+func _get_hud() -> BattleHud:
+	var hud_node = get_tree().get_first_node_in_group("BattleHud")
+	if hud_node is BattleHud:
+		return hud_node
+	var bm = get_tree().get_first_node_in_group("battle_manager")
+	if bm and bm.hud is BattleHud:
+		return bm.hud
+	return null
+
+# ============================================================================
+# GENERIC QTE ENGINE
+# ============================================================================
 
 var qte_ui_panel: Panel = null
 var qte_progress_bar: ProgressBar = null
@@ -77,15 +153,7 @@ func start_qte(qte_type: QTEType, difficulty: float) -> bool:
 	current_qte_type = QTEType.keys()[qte_type]
 	
 	# Create appropriate QTE based on type
-	match qte_type:
-		QTEType.CARD_ATTACK:
-			current_qte = create_countdown_qte(difficulty)
-		QTEType.REACTIVE_DODGE:
-			current_qte = create_countdown_qte(difficulty)
-		QTEType.REACTIVE_PARRY:
-			current_qte = create_countdown_qte(difficulty)
-		_:
-			current_qte = create_countdown_qte(difficulty)
+	current_qte = create_countdown_qte(difficulty)
 	
 	if not current_qte:
 		is_qte_active = false
@@ -110,17 +178,13 @@ func start_qte(qte_type: QTEType, difficulty: float) -> bool:
 func create_countdown_qte(difficulty: float) -> CountdownQTE:
 	var qte = CountdownQTE.new()
 	
-	# Use config values if available
 	var base_time = qte_config.base_qte_time if qte_config else 3.0
 	var min_time = qte_config.min_qte_time if qte_config else 0.5
 	var input_key = qte_config.qte_input_key if qte_config else "f"
 	
-	# Adjust time based on difficulty (higher difficulty = less time)
-	var time_multiplier = 1.0 - (difficulty * 0.8)  # 0.2 to 1.0 multiplier
+	var time_multiplier = 1.0 - (difficulty * 0.8)
 	var calculated_time = base_time * time_multiplier
 	qte.time_left = max(calculated_time, min_time)
-	
-	# Set input key
 	qte.input = input_key
 	
 	return qte
@@ -180,7 +244,7 @@ func _create_qte_ui(input_key: String, time_limit: float) -> void:
 	qte_ui_panel.add_child(vbox)
 	
 	qte_title_label = Label.new()
-	qte_title_label.text = "QUICK TIME EVENT!"
+	qte_title_label.text = "ATTACK QTE!"
 	qte_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	qte_title_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
 	vbox.add_child(qte_title_label)
@@ -248,16 +312,6 @@ func get_damage_multiplier(qte_type: String, success: bool) -> float:
 				return qte_config.card_qte_success_multiplier
 			else:
 				return qte_config.card_qte_failure_multiplier
-		"REACTIVE_DODGE":
-			if success:
-				return 1.0 - qte_config.dodge_damage_reduction  # Damage reduction
-			else:
-				return 1.0
-		"REACTIVE_PARRY":
-			if success:
-				return 1.0 - qte_config.parry_damage_reduction  # Damage reduction
-			else:
-				return 1.0
 		_:
 			return 1.0
 
