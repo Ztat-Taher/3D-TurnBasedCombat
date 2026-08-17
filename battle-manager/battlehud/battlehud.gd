@@ -10,17 +10,22 @@ signal end_turn_pressed
 @onready var item_container = $Control/Items/ScrollContainer/BoxContainer
 
 @onready var action_buttons: BoxContainer = $Control/ActionButtons
-@onready var enemy_stats: BoxContainer = $Control/Enemies/AllEnemies/EnemyStats
+@onready var attack_button: Button = $Control/ActionButtons/Attack
+@onready var items_button: Button = $Control/ActionButtons/Items
+@onready var run_button: Button = $Control/ActionButtons/Run
+@onready var end_turn_button: Button = $Control/ActionButtons/EndTurnButton
+@onready var global_back_button: Button = $Control/BackButton
 @onready var battle_text_display: RichTextLabel = $Control/BattleTextDisplay/Text
 @onready var item_select: Control = $Control/Items
 @onready var card_ui: Control = $Control/CardUI
 @onready var party_status_panel: HBoxContainer = $Control/PartyStatusPanel
-@onready var target_back_button: Button = $Control/TargetBackButton
 @onready var boss_bar = $Control/BossBar
 @onready var enemy_overhead_bars_container: Control = $Control/EnemyOverheadBarsContainer
 @onready var move_banner: Control = $Control/MoveBanner
 @onready var move_banner_actor: Label = $Control/MoveBanner/Panel/VBox/ActorLabel
 @onready var move_banner_label: Label = $Control/MoveBanner/Panel/VBox/MoveLabel
+
+var aoe_confirm_button: Button = null
 
 const ENEMY_OVERHEAD_BAR_SCENE: PackedScene = preload("res://battle-manager/battlehud/EnemyOverheadBar.tscn")
 
@@ -38,7 +43,6 @@ var last_ap_by_battler: Dictionary = {}
 var ally_cards_map: Dictionary = {} # Battler -> PanelContainer
 
 var _action_buttons_tween: Tween
-var _target_screen_pos: Vector2 = Vector2.ZERO
 
 func _ready():
 	print("Inside BattleHUD _ready()")
@@ -326,11 +330,6 @@ func set_activebattler(character: Node):
 
 func update_health_bars():
 	update_party_status()
-	for i in range(active_enemies.size()):
-		var target_enemy = active_enemies[i]
-		var container = $Control/Enemies/AllEnemies.get_child(i)
-		if container and container.has_method("update_character_info"):
-			container.update_character_info(target_enemy)
 
 ## Spawn an overhead health bar for a given enemy (if not already spawned).
 func _spawn_enemy_overhead_bar(enemy_node: Node) -> void:
@@ -363,7 +362,7 @@ func show_action_buttons(character: Node):
 		return
 	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	if battle_manager and (battle_manager.is_animating or battle_manager.in_target_selection):
+	if battle_manager and battle_manager.is_animating:
 		hide_action_buttons()
 		return
 	
@@ -393,7 +392,18 @@ func show_action_buttons(character: Node):
 	if end_btn:
 		end_btn.disabled = false
 	
+	# Setup input prompts
+	_setup_input_prompts()
+	
 	# Slide in from right with fade animation
+	# Show attack button initially, hide card UI
+	if attack_button:
+		attack_button.visible = true
+	if card_ui:
+		card_ui.visible = false
+	
+	_update_back_button_visibility()
+	
 	if _action_buttons_tween and _action_buttons_tween.is_running():
 		_action_buttons_tween.kill()
 	
@@ -408,9 +418,54 @@ func hide_action_buttons():
 		_action_buttons_tween.kill()
 	action_buttons.hide()
 
+func _update_back_button_visibility():
+	# Systematic back button visibility management
+	var should_show = false
+	
+	# Show back button if items menu is open
+	if item_select and item_select.visible:
+		should_show = true
+	
+	# Show back button if card UI is open
+	elif card_ui and card_ui.visible:
+		should_show = true
+	
+	# Show back button if in targeting mode
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager and battle_manager.in_target_selection:
+		should_show = true
+	
+	if global_back_button:
+		global_back_button.visible = should_show
+
+func _setup_input_prompts():
+	# Setup input prompts for action buttons
+	if attack_button:
+		var attack_prompt = attack_button.get_node_or_null("AttackPrompt")
+		if attack_prompt:
+			attack_prompt.set_meta("action_name", "attack")
+	
+	if items_button:
+		var items_prompt = items_button.get_node_or_null("ItemsPrompt")
+		if items_prompt:
+			items_prompt.set_meta("action_name", "toggle_items")
+	
+	if run_button:
+		var run_prompt = run_button.get_node_or_null("RunPrompt")
+		if run_prompt:
+			run_prompt.set_meta("action_name", "toggle_run")
+	
+	if end_turn_button:
+		var end_turn_prompt = end_turn_button.get_node_or_null("EndTurnPrompt")
+		if end_turn_prompt:
+			end_turn_prompt.set_meta("action_name", "ui_cancel")
+	
+	if global_back_button:
+		var back_prompt = global_back_button.get_node_or_null("BackPrompt")
+		if back_prompt:
+			back_prompt.set_meta("action_name", "ui_cancel")
+
 func update_character_info():
-	if enemy and enemy_stats:
-		enemy_stats.update_enemy_stats(enemy)
 	update_party_status()
 
 # Action button signals
@@ -438,24 +493,112 @@ func setup_item_list(battler: Battler) -> void:
 	menu_opened.emit()
 
 func _on_item_back_pressed() -> void:
+	_close_items_menu()
+
+func _close_items_menu():
 	item_select.visible = false
-	if card_ui:
-		card_ui.visible = true
+	# Show items button again when closing items menu
+	if items_button:
+		items_button.visible = true
 	if activeBattler:
 		show_action_buttons(activeBattler)
+	_update_back_button_visibility()
+
+func _close_card_menu():
+	close_card_ui()
+	if activeBattler:
+		show_action_buttons(activeBattler)
+	_update_back_button_visibility()
 
 func _on_item_selected(item: Item) -> void:
 	item_select.visible = false
 	if card_ui:
 		card_ui.visible = true
 	action_selected.emit("item", item)
+	_update_back_button_visibility()
 
-func _on_items_pressed() -> void:
-	hide_action_buttons()
-	setup_item_list(activeBattler)
-	item_select.visible = true
+func _on_attack_pressed() -> void:
+	# Show card UI and hide attack button
+	if card_ui:
+		card_ui.visible = true
+	if attack_button:
+		attack_button.visible = false
+	# Keep other action buttons visible
+	if items_button:
+		items_button.visible = true
+	if run_button:
+		run_button.visible = true
+	if end_turn_button:
+		end_turn_button.visible = true
+	_update_back_button_visibility()
+
+func close_card_ui() -> void:
+	# Hide card UI and show attack button again
 	if card_ui:
 		card_ui.visible = false
+	if attack_button:
+		attack_button.visible = true
+
+func _on_items_pressed() -> void:
+	# Show items and hide only items button, keep others visible
+	setup_item_list(activeBattler)
+	item_select.visible = true
+	if items_button:
+		items_button.visible = false
+	if card_ui:
+		card_ui.visible = false
+	# Keep other action buttons visible (including attack)
+	if attack_button:
+		attack_button.visible = true
+	if run_button:
+		run_button.visible = true
+	if end_turn_button:
+		end_turn_button.visible = true
+	_update_back_button_visibility()
+
+func _unhandled_input(event: InputEvent) -> void:
+	var handled = false
+	
+	# Check if reactive defense is active (B button = dodge, not end turn)
+	var qte_manager = get_tree().get_first_node_in_group("qte_manager")
+	var qte_active = qte_manager.is_qte_active if qte_manager else false
+	var qte_type = qte_manager.current_qte_type if qte_manager else ""
+	var reactive_defense_active = qte_active and (qte_type == "REACTIVE_DODGE" or qte_type == "REACTIVE_PARRY")
+	
+	# Don't handle B button when in reactive defense mode - let QTE manager handle it
+	if reactive_defense_active and event.is_action_pressed("ui_cancel"):
+		return
+	
+	# Only process action buttons when action buttons list is visible
+	if action_buttons and action_buttons.visible:
+		if event.is_action_pressed("attack"):
+			if attack_button and attack_button.visible:
+				_on_attack_pressed()
+			handled = true
+		elif event.is_action_pressed("toggle_items"):
+			if items_button and items_button.visible:
+				_on_items_pressed()
+			handled = true
+		elif event.is_action_pressed("toggle_run"):
+			if run_button and run_button.visible:
+				_on_run_pressed()
+			handled = true
+		elif event.is_action_pressed("ui_cancel"):
+			# Contextual: B button works for both end turn and cancel
+			if end_turn_button and end_turn_button.visible:
+				_on_end_turn_button_pressed()
+			else:
+				_on_global_back_pressed()
+			handled = true
+	
+	# Handle cancel key for all menus via global back (B button also cancels)
+	if not handled and event.is_action_pressed("ui_cancel"):
+		_on_global_back_pressed()
+		handled = true
+	
+	# Only consume input if we actually handled it
+	if handled:
+		get_viewport().set_input_as_handled()
 
 func _on_run_pressed() -> void:
 	hide_action_buttons()
@@ -468,22 +611,84 @@ func _on_end_turn_button_pressed() -> void:
 	end_turn_pressed.emit()
 
 func set_targeting_mode(enabled: bool) -> void:
-	if target_back_button:
-		target_back_button.visible = enabled
-	if card_ui:
-		card_ui.visible = not enabled
+	# Handle targeting mode visibility
 	if enabled:
 		hide_action_buttons()
-	elif activeBattler:
-		show_action_buttons(activeBattler)
+	else:
+		close_card_ui()
+		if activeBattler:
+			show_action_buttons(activeBattler)
+	
+	if card_ui:
+		card_ui.visible = not enabled
+	
+	# Immediately update back button visibility
+	_update_back_button_visibility()
 
-func _on_target_back_button_pressed() -> void:
+func set_aoe_confirmation_mode(enabled: bool, card_name: String = "", target_count: int = 0) -> void:
+	print("Setting AOE confirmation mode: ", enabled, " card: ", card_name, " targets: ", target_count)
+	
+	if enabled:
+		hide_action_buttons()
+		if card_ui:
+			card_ui.visible = false
+		
+		# Show AOE confirmation UI
+		if global_back_button:
+			global_back_button.visible = true
+			if global_back_button.has_method("set_text"):
+				global_back_button.set_text("Cancel")
+		
+		# Create or show confirm button
+		_ensure_aoe_confirm_button()
+		if aoe_confirm_button:
+			aoe_confirm_button.visible = true
+			if aoe_confirm_button.has_method("set_text"):
+				aoe_confirm_button.set_text("Execute " + card_name + " (" + str(target_count) + " targets)")
+	else:
+		hide_aoe_confirmation_mode()
+
+func hide_aoe_confirmation_mode() -> void:
+	print("Hiding AOE confirmation mode")
+	
+	if aoe_confirm_button:
+		aoe_confirm_button.visible = false
+	
+	if global_back_button:
+		global_back_button.visible = false
+
+func _ensure_aoe_confirm_button() -> void:
+	if not aoe_confirm_button:
+		# Create confirm button dynamically
+		aoe_confirm_button = Button.new()
+		aoe_confirm_button.name = "AOEConfirmButton"
+		aoe_confirm_button.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		aoe_confirm_button.set_position(Vector2(0, 100))
+		aoe_confirm_button.set_size(Vector2(200, 50))
+		aoe_confirm_button.pressed.connect(_on_aoe_confirm_pressed)
+		add_child(aoe_confirm_button)
+		print("Created AOE confirm button")
+
+func _on_aoe_confirm_pressed() -> void:
+	print("AOE confirm button pressed")
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	if battle_manager and battle_manager.has_method("exit_targeting_mode"):
-		battle_manager.exit_targeting_mode()
-	set_targeting_mode(false)
+	if battle_manager and battle_manager.has_method("confirm_aoe_execution"):
+		battle_manager.confirm_aoe_execution()
 
-@onready var turn_queue_container = $Control/TurnQueueUI/QueueContainer
+func _on_global_back_pressed() -> void:
+	# Handle different back contexts
+	if item_select.visible:
+		_close_items_menu()
+	elif card_ui and card_ui.visible:
+		_close_card_menu()
+	elif global_back_button and global_back_button.visible:
+		# Handle targeting mode
+		var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+		if battle_manager and battle_manager.has_method("exit_targeting_mode"):
+			battle_manager.exit_targeting_mode()
+		set_targeting_mode(false)
+
+@onready var turn_queue_container = $Control/TurnQueueUI/ScrollContainer/QueueContainer
 
 func update_turn_queue(turn_order: Array, current_turn_idx: int) -> void:
 	if not turn_queue_container:

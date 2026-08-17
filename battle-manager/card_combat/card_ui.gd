@@ -13,6 +13,16 @@ var card_button_scene: PackedScene
 var retry_count: int = 0
 const MAX_RETRIES: int = 10
 
+# Controller navigation
+var selected_card_index: int = 0
+var card_buttons: Array[Control] = []
+
+# Stepped navigation
+var last_navigation_time: float = 0.0
+var navigation_cooldown: float = 0.25  # Time between navigations in seconds
+var navigation_threshold: float = 0.6  # Joystick threshold to trigger navigation
+var joystick_active_direction: int = 0  # Track which direction joystick is active in
+
 func _ready():
 	if card_container:
 		card_container.child_order_changed.connect(func(): call_deferred("apply_card_fanning"))
@@ -47,6 +57,113 @@ func _deferred_ready():
 	update_hand_display()
 	update_ap_display()
 
+func _unhandled_input(event: InputEvent) -> void:
+	# Early return if not visible - don't consume any input
+	if not visible:
+		return
+	
+	if not card_battle_manager or card_battle_manager.is_executing_card:
+		return
+	
+	# Check if we're in targeting mode - if so, don't consume navigation events
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager and battle_manager.in_target_selection:
+		# Don't consume input events when in targeting mode
+		# Let them pass through to BattleManager for target navigation
+		return
+	
+	# Only handle card-specific actions, let everything else pass through
+	var handled = false
+	var current_time = Time.get_ticks_msec() / 1000.0
+	
+	# Controller card navigation - use stepped navigation for joystick, instant for buttons
+	if event.is_action_pressed("ui_left"):
+		_navigate_cards(-1)
+		handled = true
+	elif event.is_action_pressed("ui_right"):
+		_navigate_cards(1)
+		handled = true
+	elif event is InputEventJoypadMotion:
+		var axis_value = event.axis_value
+		if event.axis == 0:  # Left/right axis
+			# Determine direction
+			var new_direction = 0
+			if axis_value > navigation_threshold:
+				new_direction = 1
+			elif axis_value < -navigation_threshold:
+				new_direction = -1
+			
+			# If direction changed, reset cooldown and navigate immediately
+			if new_direction != 0 and new_direction != joystick_active_direction:
+				joystick_active_direction = new_direction
+				last_navigation_time = current_time
+				_navigate_cards(new_direction)
+				handled = true
+			# If same direction, check cooldown
+			elif new_direction != 0 and current_time - last_navigation_time > navigation_cooldown:
+				last_navigation_time = current_time
+				_navigate_cards(new_direction)
+				handled = true
+			# Reset if joystick centered
+			elif abs(axis_value) < 0.2:
+				joystick_active_direction = 0
+	elif event.is_action_pressed("select_card"):
+		_select_current_card()
+		handled = true
+	elif event.is_action_pressed("attack"):
+		_select_current_card()
+		handled = true
+	elif event.is_action_pressed("ui_cancel"):
+		# Cancel targeting if in targeting mode
+		if battle_manager and battle_manager.has_method("exit_targeting_mode"):
+			battle_manager.exit_targeting_mode()
+		
+		# Clear card selection to prevent re-triggering targeting
+		if battle_manager and battle_manager.has_meta("pending_card"):
+			battle_manager.set_meta("pending_card", null)
+		
+		# If not in targeting mode and card UI is visible, trigger global back
+		if not (battle_manager and battle_manager.in_target_selection) and visible:
+			var battlehud = get_tree().get_first_node_in_group("BattleHud")
+			if battlehud and battlehud.has_method("_on_global_back_pressed"):
+				battlehud._on_global_back_pressed()
+		
+		handled = true
+	
+	# Only consume input if we actually handled it
+	if handled:
+		get_viewport().set_input_as_handled()
+
+func _navigate_cards(direction: int) -> void:
+	if card_buttons.is_empty():
+		return
+	
+	selected_card_index = (selected_card_index + direction) % card_buttons.size()
+	if selected_card_index < 0:
+		selected_card_index = card_buttons.size() - 1
+	
+	_update_card_selection()
+
+func _select_current_card() -> void:
+	if selected_card_index >= 0 and selected_card_index < card_buttons.size():
+		var card_button = card_buttons[selected_card_index]
+		if card_button:
+			# Emit the card_played signal directly (same as mouse click)
+			card_button.card_played.emit(card_button.card_data)
+
+func _update_card_selection() -> void:
+	for i in range(card_buttons.size()):
+		var card_button = card_buttons[i]
+		if card_button:
+			if i == selected_card_index:
+				# Use the same hover system as mouse
+				if card_button.has_method("set_controller_hover"):
+					card_button.set_controller_hover(true)
+			else:
+				# Unhover the card
+				if card_button.has_method("set_controller_hover"):
+					card_button.set_controller_hover(false)
+
 func update_hand_display():
 	if not card_battle_manager or not card_container:
 		return
@@ -58,6 +175,9 @@ func update_hand_display():
 	for child in card_container.get_children():
 		child.queue_free()
 	
+	card_buttons.clear()
+	selected_card_index = 0
+	
 	# Get current hand
 	var hand = card_battle_manager.get_hand()
 	
@@ -66,6 +186,8 @@ func update_hand_display():
 		var card = hand[i]
 		var card_button = create_card_button(card)
 		if card_button:
+			card_buttons.append(card_button)
+			
 			# Visual indication for unplayable cards
 			if card_battle_manager:
 				var ap_info = card_battle_manager.get_ap_info()
@@ -84,6 +206,7 @@ func update_hand_display():
 			tween.tween_property(card_button, "scale", Vector2.ONE, 0.3).set_delay(0.05 * i)
 	
 	apply_card_fanning()
+	_update_card_selection()
 
 func apply_card_fanning() -> void:
 	if not card_container:

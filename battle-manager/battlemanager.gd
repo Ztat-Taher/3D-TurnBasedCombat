@@ -28,6 +28,15 @@ var current_target:Battler
 var in_target_selection:bool = false
 var in_menu_selection:bool = false
 
+# Stepped navigation for target selection
+var last_target_navigation_time: float = 0.0
+var target_navigation_cooldown: float = 0.25  # Time between navigations in seconds
+var target_navigation_threshold: float = 0.6  # Joystick threshold to trigger navigation
+var target_joystick_active_direction: int = 0  # Track which direction joystick is active in
+
+# Target type tracking (enemy vs ally)
+var current_target_type: String = "enemy"  # "enemy" or "ally"
+
 # ActionButtons is now in BattleHUD, not BattleManager
 # We'll access it through the HUD
 # For referencing and setting variables in the battle settings.
@@ -476,15 +485,26 @@ func target_selected(target: Battler) -> void:
 	print("In target selection: ", in_target_selection)
 	print("Target is selectable: ", target.is_selectable)
 	print("Has pending card: ", has_meta("pending_card"))
+	print("Valid targets count: ", valid_targets.size())
 	
 	if !in_target_selection or !target.is_selectable:
 		print("Target selection rejected - not in selection or not selectable")
+		print("  - in_target_selection: ", in_target_selection)
+		print("  - target.is_selectable: ", target.is_selectable)
 		return
 	
 	# Check if there's a pending card from card combat
 	var pending_card = get_meta("pending_card")
+	
+	# Check if this is AOE mode (no individual targeting)
+	var is_aoe_mode = get_meta("is_aoe_mode") if has_meta("is_aoe_mode") else false
+	if is_aoe_mode:
+		print("AOE mode - individual selection not allowed")
+		return
+	
 	if pending_card:
 		print("Card combat targeting: playing card ", pending_card.name, " on ", target.character_name)
+		print("Target type: ", current_target_type)
 		set_meta("pending_card", null)
 		in_target_selection = false
 		mouse_input_toggle = false
@@ -496,6 +516,10 @@ func target_selected(target: Battler) -> void:
 				battler.is_selectable = false
 				battler.deselect_as_target()
 		valid_targets.clear()
+		
+		# Switch camera to target focus for ally targeting
+		if current_target_type == "ally" and battle_camera:
+			battle_camera.set_target_focus(target)
 		
 		# Hide targeting UI and ensure action buttons and cards remain hidden during action execution
 		if hud:
@@ -748,18 +772,66 @@ func _auto_select_multiple_targets() -> void:
 
 # Enhanced controller input handling with better visual feedback
 func _unhandled_input(event: InputEvent) -> void:
+	# Only process targeting mode inputs
 	if !in_target_selection or valid_targets.is_empty():
 		return
-		
+	
+	# Only process key press events, not key release events
+	if event is InputEventKey and not event.pressed:
+		return
+	
+	# Only process mouse press events, not mouse release events
+	if event is InputEventMouseButton and not event.pressed:
+		return
+	
+	# Handle mouse clicks via camera raycasting
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_handle_mouse_click_target_selection()
+		return
+	
+	var handled = false
+	var current_time = Time.get_ticks_msec() / 1000.0
+	
+	# Handle targeting-specific inputs only
+	# D-pad navigation (instant)
 	if event.is_action_pressed("ui_right") or event.is_action_pressed("ui_left"):
 		_cycle_controller_target(1 if event.is_action_pressed("ui_right") else -1)
+		handled = true
+	# RB/LB button navigation (instant)
+	elif event.is_action_pressed("cycle_target_forward") or event.is_action_pressed("cycle_target_backward"):
+		_cycle_controller_target(1 if event.is_action_pressed("cycle_target_forward") else -1)
+		handled = true
+	# Joystick navigation (stepped with cooldown)
+	elif event is InputEventJoypadMotion:
+		var axis_value = event.axis_value
+		if event.axis == 0:  # Left/right axis
+			# Determine direction
+			var new_direction = 0
+			if axis_value > target_navigation_threshold:
+				new_direction = 1
+			elif axis_value < -target_navigation_threshold:
+				new_direction = -1
+			
+			# If direction changed, reset cooldown and navigate immediately
+			if new_direction != 0 and new_direction != target_joystick_active_direction:
+				target_joystick_active_direction = new_direction
+				last_target_navigation_time = current_time
+				_cycle_controller_target(new_direction)
+				handled = true
+			# If same direction, check cooldown
+			elif new_direction != 0 and current_time - last_target_navigation_time > target_navigation_cooldown:
+				last_target_navigation_time = current_time
+				_cycle_controller_target(new_direction)
+				handled = true
+			# Reset if joystick centered
+			elif abs(axis_value) < 0.2:
+				target_joystick_active_direction = 0
 	elif event.is_action_pressed("ui_accept"):
 		if current_controller_target:
 			current_target = current_controller_target
 			# Check pending card first (card combat system)
 			var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
 			if pending_card:
-				print("Keyboard confirm: playing card ", pending_card.name, " on ", current_target.character_name)
 				if battle_camera:
 					battle_camera.set_target_focus(current_target)
 				var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
@@ -769,10 +841,62 @@ func _unhandled_input(event: InputEvent) -> void:
 				exit_targeting_mode()
 			else:
 				_use_action_on_target()
+		handled = true
 	elif event.is_action_pressed("ui_cancel"):
 		_cancel_action_target_selection()
 		if in_target_selection:
 			exit_targeting_mode()
+		handled = true
+	
+	# Only consume input if we actually handled it
+	if handled:
+		get_viewport().set_input_as_handled()
+
+# Camera raycasting for mouse target selection
+func _handle_mouse_click_target_selection() -> void:
+	if not battle_camera:
+		return
+	
+	var viewport = get_viewport()
+	var mouse_pos = viewport.get_mouse_position()
+	
+	# Raycast from camera through mouse position
+	var ray_origin = battle_camera.project_ray_origin(mouse_pos)
+	var ray_direction = battle_camera.project_ray_normal(mouse_pos)
+	
+	# Create ray parameters
+	var ray_params = PhysicsRayQueryParameters3D.new()
+	ray_params.from = ray_origin
+	ray_params.to = ray_origin + ray_direction * 1000
+	ray_params.collision_mask = 1  # Layer 1 for enemies
+	
+	# Perform raycast
+	var space_state = get_world_3d().direct_space_state
+	var result = space_state.intersect_ray(ray_params)
+	
+	if result.has("collider"):
+		var collider = result["collider"]
+		# Find the Battler parent node
+		var battler = collider.get_parent()
+		while battler and not battler is Battler:
+			battler = battler.get_parent()
+		
+		if battler and battler is Battler:
+			# Check if this is a valid target
+			if battler.is_selectable and battler.is_valid_target:
+				current_target = battler
+				# Check pending card first (card combat system)
+				var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
+				if pending_card:
+					if battle_camera:
+						battle_camera.set_target_focus(current_target)
+					var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+					if card_battle_manager:
+						_execute_card_async(card_battle_manager, pending_card, current_target)
+					set_meta("pending_card", null)
+					exit_targeting_mode()
+				else:
+					_use_action_on_target()
 
 func _cycle_controller_target(direction: int) -> void:
 	# Clear ALL targets' selection states first - only ONE highlight allowed
@@ -829,7 +953,13 @@ func _cancel_action_target_selection() -> void:
 
 func _cancel_menu_selection() -> void:
 	in_menu_selection = false
-	hud.item_select.hide()
+	
+	# Use the systematic menu close functions instead of direct manipulation
+	if hud.item_select.visible:
+		if hud.has_method("_close_items_menu"):
+			hud._close_items_menu()
+		else:
+			hud.item_select.hide()
 	var skill_select = hud.get("skill_select")
 	if skill_select:
 		skill_select.hide()
@@ -839,7 +969,6 @@ func _cancel_menu_selection() -> void:
 
 func _do_menu_selection() -> void:
 	in_menu_selection = true
-	hud.hide_action_buttons()
 
 ## Executes the queued action on [member current_target] then calls [method end_turn].
 ## Awaits animation completion for "attack" and "skill" so the next turn does not start
@@ -1011,7 +1140,6 @@ func end_turn():
 		# Process states before SP regen
 		if current_battler:
 			current_battler.process_states()
-			current_battler.regenerate_sp()
 		
 		# ADVANCE the turn index FIRST, before cleanup removes entries
 		# This ensures we always move forward in the queue
@@ -1194,9 +1322,18 @@ func exit_targeting_mode():
 	
 	valid_targets.clear()
 	
-	# Clear pending card if exists
+	# Clear pending card if exists (prevents targeting loop on cancel)
 	if has_meta("pending_card"):
+		print("Clearing pending card on exit targeting mode")
 		set_meta("pending_card", null)
+	
+	# Clear AOE mode metadata
+	if has_meta("is_aoe_mode"):
+		set_meta("is_aoe_mode", false)
+	if has_meta("aoe_targets"):
+		set_meta("aoe_targets", null)
+	if has_meta("target_type"):
+		set_meta("target_type", null)
 	
 	# Disable mouse input when done targeting
 	mouse_input_toggle = false
@@ -1208,6 +1345,83 @@ func exit_targeting_mode():
 	# Restore OTS camera on current character if player turn
 	if battle_camera and current_character in players:
 		battle_camera.set_over_the_shoulder(current_character)
+
+func confirm_aoe_execution():
+	print("=== CONFIRM AOE EXECUTION ===")
+	var pending_card = get_meta("pending_card")
+	var aoe_targets = get_meta("aoe_targets")
+	var target_type = get_meta("target_type")
+	
+	if not pending_card or aoe_targets.is_empty():
+		print("ERROR: No pending card or AOE targets for execution")
+		exit_targeting_mode()
+		return
+	
+	print("Executing AOE card: ", pending_card.name)
+	print("AOE targets: ", aoe_targets.size())
+	print("Target type: ", target_type)
+	
+	# Clear AOE mode metadata
+	set_meta("is_aoe_mode", false)
+	set_meta("aoe_targets", null)
+	set_meta("pending_card", null)
+	
+	# Hide targeting UI
+	if hud and hud.has_method("hide_aoe_confirmation_mode"):
+		hud.hide_aoe_confirmation_mode()
+	hud.hide_action_buttons()
+	if hud.card_ui:
+		hud.card_ui.visible = false
+	
+	# Execute AOE card on all targets
+	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+	if card_battle_manager:
+		_execute_aoe_card_async(card_battle_manager, pending_card, aoe_targets)
+	else:
+		print("ERROR: CardBattleManager not found for AOE execution")
+		exit_targeting_mode()
+
+func _execute_aoe_card_async(card_battle_manager: CardBattleManager, card: CardData, targets: Array[Battler]):
+	print("=== EXECUTING AOE CARD ===")
+	print("Card: ", card.name)
+	print("Targets: ", targets.size())
+	
+	# Set animating state
+	is_animating = true
+	
+	# Execute the card effect on each target
+	for target in targets:
+		if is_instance_valid(target):
+			print("Executing on target: ", target.character_name)
+			await card_battle_manager.execute_card_effect(card, target)
+	
+	# Execute card completion logic (spend AP, discard, etc.)
+	# We need to manually handle this without calling play_card again
+	card_battle_manager.is_executing_card = true
+	
+	# Spend AP
+	if card_battle_manager.ap_system:
+		card_battle_manager.ap_system.spend_ap(card.cost)
+	
+	# Remove from hand
+	var deck = card_battle_manager._get_current_deck()
+	if deck:
+		deck.discard_card(card)
+	
+	card_battle_manager.is_executing_card = false
+	
+	# Restore camera
+	if battle_camera and is_instance_valid(current_character):
+		battle_camera.set_over_the_shoulder(current_character)
+	
+	# Reset animating state
+	is_animating = false
+	
+	# Show action buttons again
+	if hud:
+		hud.show_action_buttons(current_character)
+		if hud.card_ui:
+			hud.card_ui.visible = true
 	
 	print("Targeting mode exited")
 

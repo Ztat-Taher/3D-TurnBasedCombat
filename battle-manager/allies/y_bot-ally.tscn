@@ -18347,7 +18347,11 @@ parameters/conditions/is_walking = false
 
 [node name="AnimationController" type="Node" parent="." index="3" unique_id=970136027]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="." index="4" unique_id=409751609]
+[node name="CollisionBody" type="StaticBody3D" parent="." index="4" unique_id=2000000012]
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CollisionBody" index="0" unique_id=409751609]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.918676, 0)
 shape = SubResource("BoxShape3D_0fjwj")
 

@@ -85,19 +85,29 @@ func await_reactive_defense(defender: Battler) -> String:
 		if hud and hud.has_method("update_parry_window"):
 			hud.update_parry_window(max(0.0, time_left))
 		
-		# Check for Dodge input (E key)
+		# Check for Dodge input (E key or B button)
 		var dodge_pressed = false
-		if InputMap.has_action(dodge_action) and Input.is_action_just_pressed(dodge_action):
-			dodge_pressed = true
-		elif Input.is_key_pressed(KEY_E) or Input.is_physical_key_pressed(KEY_E):
-			dodge_pressed = true
+		if InputMap.has_action(dodge_action):
+			if Input.is_action_just_pressed(dodge_action):
+				dodge_pressed = true
+				print("[Reactive Defense] Dodge action pressed (controller)")
+		if not dodge_pressed:
+			if Input.is_key_pressed(KEY_E) or Input.is_physical_key_pressed(KEY_E):
+				dodge_pressed = true
+				print("[Reactive Defense] Dodge key pressed (keyboard)")
 		
-		# Check for Parry input (Q key)
+		# Check for Parry input (Q key or LB button)
 		var parry_pressed = false
-		if InputMap.has_action(parry_action) and Input.is_action_just_pressed(parry_action):
-			parry_pressed = true
-		elif Input.is_key_pressed(KEY_Q) or Input.is_physical_key_pressed(KEY_Q):
-			parry_pressed = true
+		if InputMap.has_action(parry_action):
+			if Input.is_action_just_pressed(parry_action):
+				parry_pressed = true
+				print("[Reactive Defense] Parry action pressed (controller)")
+		if not parry_pressed:
+			if Input.is_key_pressed(KEY_Q) or Input.is_physical_key_pressed(KEY_Q):
+				parry_pressed = true
+				print("[Reactive Defense] Parry key pressed (keyboard)")
+		
+		print("[Reactive Defense] Input check - dodge: ", dodge_pressed, " parry: ", parry_pressed)
 		
 		if parry_pressed:
 			if elapsed <= perfect_duration:

@@ -17,5 +17,6 @@ metadata = {
 "target_type": "self",
 "applies_state": "haste",
 "state_duration": 3,
-"speed_multiplier": 1.5
+"speed_multiplier": 1.5,
+"target_scope": "self"
 }

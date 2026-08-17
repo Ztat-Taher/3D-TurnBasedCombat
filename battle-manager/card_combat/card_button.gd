@@ -144,6 +144,13 @@ func _on_mouse_exited():
 	z_index = base_z_index
 	_animate_hover(false)
 
+func set_controller_hover(hover: bool) -> void:
+	# Same visual effect as mouse hover for controller navigation
+	if hover and not is_hovered:
+		_on_mouse_entered()
+	elif not hover and is_hovered:
+		_on_mouse_exited()
+
 func _animate_hover(hover: bool):
 	if hover_tween and hover_tween.is_running():
 		hover_tween.kill()

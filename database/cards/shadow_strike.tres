@@ -15,5 +15,6 @@ metadata = {
 "description": "Strike from the shadows dealing 60 dark damage with high critical chance",
 "element": "dark",
 "qte_difficulty": 0.3,
-"critical_bonus": 0.3
+"critical_bonus": 0.3,
+"target_scope": "single_enemy"
 }

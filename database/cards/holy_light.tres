@@ -14,5 +14,6 @@ metadata = {
 "card_type": "heal",
 "description": "Channel divine light to heal 45 HP and cleanse debuffs",
 "element": "holy",
-"cleanses_debuffs": true
+"cleanses_debuffs": true,
+"target_scope": "single_ally"
 }

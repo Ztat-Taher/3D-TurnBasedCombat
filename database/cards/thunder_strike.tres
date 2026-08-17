@@ -15,5 +15,6 @@ metadata = {
 "description": "Summon a lightning bolt dealing 55 air damage",
 "element": "air",
 "qte_difficulty": 0.45,
-"accuracy_bonus": 0.2
+"accuracy_bonus": 0.2,
+"target_scope": "single_enemy"
 }

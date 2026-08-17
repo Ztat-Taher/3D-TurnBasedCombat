@@ -15,5 +15,6 @@ metadata = {
 "description": "Revive a fallen ally with 50% health",
 "element": "holy",
 "revive_percent": 0.5,
-"target_type": "single_ally"
+"target_type": "single_ally",
+"target_scope": "single_ally"
 }

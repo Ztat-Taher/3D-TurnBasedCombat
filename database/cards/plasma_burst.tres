@@ -14,5 +14,6 @@ metadata = {
 "card_type": "attack",
 "description": "Unleash a devastating plasma burst dealing 70 physical damage",
 "element": "physical",
-"qte_difficulty": 0.5
+"qte_difficulty": 0.5,
+"target_scope": "single_enemy"
 }

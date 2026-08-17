@@ -13,5 +13,6 @@ play_kind = 0
 metadata = {
 "card_type": "attack",
 "description": "A basic attack dealing 6 damage",
-"qte_difficulty": 0.3
+"qte_difficulty": 0.3,
+"target_scope": "single_enemy"
 }

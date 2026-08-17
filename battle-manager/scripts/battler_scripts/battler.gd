@@ -215,7 +215,6 @@ func _input_event(_camera: Camera3D, event: InputEvent, _position: Vector3, _nor
 		
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if is_selectable and is_valid_target:
-			print("3D Pick selected target: ", character_name)
 			select_target()
 
 func _mouse_enter() -> void: 

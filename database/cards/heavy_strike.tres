@@ -13,5 +13,6 @@ play_kind = 0
 metadata = {
 "card_type": "attack",
 "description": "A powerful attack dealing 12 damage",
-"qte_difficulty": 0.5
+"qte_difficulty": 0.5,
+"target_scope": "single_enemy"
 }

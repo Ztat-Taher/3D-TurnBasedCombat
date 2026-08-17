@@ -15,5 +15,6 @@ metadata = {
 "description": "A blazing fireball dealing 65 fire damage",
 "element": "fire",
 "qte_difficulty": 0.4,
-"burn_chance": 0.25
+"burn_chance": 0.25,
+"target_scope": "single_enemy"
 }

@@ -17,5 +17,6 @@ metadata = {
 "applies_state": "poison",
 "state_duration": 5,
 "state_chance": 1.0,
-"poison_damage": 6
+"poison_damage": 6,
+"target_scope": "single_enemy"
 }

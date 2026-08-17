@@ -12,5 +12,6 @@ health = 0
 play_kind = 0
 metadata = {
 "card_type": "defense",
-"description": "Block incoming damage"
+"description": "Block incoming damage",
+"target_scope": "self"
 }

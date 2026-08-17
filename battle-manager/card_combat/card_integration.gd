@@ -98,52 +98,126 @@ func get_alive_enemies() -> Array[Battler]:
 						battle_manager.enemies.append(node as Battler)
 	return alive
 
+func get_alive_allies() -> Array[Battler]:
+	var alive: Array[Battler] = []
+	if battle_manager:
+		for player in battle_manager.players:
+			if is_instance_valid(player) and player is Battler and not player.is_defeated():
+				alive.append(player)
+	return alive
+
 func _on_card_selected(card: CardData):
 	print("Card selected in UI: ", card.name)
 	
-	var available_enemies = get_alive_enemies()
-	var card_type = card.metadata.get("card_type", "attack")
+	# Update back button visibility when card is selected
+	if battle_manager and battle_manager.hud and battle_manager.hud.has_method("_update_back_button_visibility"):
+		battle_manager.hud._update_back_button_visibility()
 	
-	if card_type == "attack" and battle_manager:
-		print("Attack card selected, enemies available: ", available_enemies.size())
-		if available_enemies.size() > 0:
-			print("Entering targeting mode")
-			start_targeting_mode(card)
-		else:
-			print("No enemies available for targeting")
-	else:
-		if available_enemies.size() > 0:
-			var target = available_enemies[0]
-			card_battle_manager.play_card(card, target)
-		else:
-			print("No enemies to target")
+	# Get target scope from card metadata (default to single_enemy for backward compatibility)
+	var target_scope = card.metadata.get("target_scope", "single_enemy")
+	print("Card target scope: ", target_scope)
+	
+	match target_scope:
+		"self":
+			# Execute immediately on self without targeting
+			print("Self-targeting card, executing immediately")
+			if card_battle_manager and card_battle_manager.current_player_battler:
+				card_battle_manager.play_card(card, card_battle_manager.current_player_battler)
+		
+		"single_enemy":
+			# Existing enemy targeting flow
+			var available_enemies = get_alive_enemies()
+			if available_enemies.size() > 0:
+				print("Single enemy targeting mode")
+				start_targeting_mode(card, "enemy")
+			else:
+				print("No enemies available for targeting")
+		
+		"all_enemies":
+			# AOE on all enemies - show overview camera, confirm execution
+			var available_enemies = get_alive_enemies()
+			if available_enemies.size() > 0:
+				print("All enemies AOE mode")
+				start_aoe_targeting_mode(card, available_enemies, "enemy")
+			else:
+				print("No enemies available for AOE")
+		
+		"single_ally":
+			# Single ally targeting with target focus camera
+			var available_allies = get_alive_allies()
+			if available_allies.size() > 0:
+				print("Single ally targeting mode")
+				start_targeting_mode(card, "ally")
+			else:
+				print("No allies available for targeting")
+		
+		"all_allies":
+			# AOE on all allies - show default camera, confirm execution
+			var available_allies = get_alive_allies()
+			if available_allies.size() > 0:
+				print("All allies AOE mode")
+				start_aoe_targeting_mode(card, available_allies, "ally")
+			else:
+				print("No allies available for AOE")
+		
+		"all_allies_self":
+			# AOE on all allies including self - show default camera, confirm execution
+			var available_allies = get_alive_allies()
+			if available_allies.size() > 0:
+				print("All allies including self AOE mode")
+				start_aoe_targeting_mode(card, available_allies, "ally")
+			else:
+				print("No allies available for AOE")
+		
+		_:
+			# Fallback to existing behavior for unknown scopes
+			print("Unknown target scope: ", target_scope, ", using fallback")
+			var available_enemies = get_alive_enemies()
+			if available_enemies.size() > 0:
+				var target = available_enemies[0]
+				card_battle_manager.play_card(card, target)
+			else:
+				print("No targets available")
 
-func start_targeting_mode(card: CardData):
+func start_targeting_mode(card: CardData, target_type: String = "enemy"):
 	if not battle_manager:
 		print("ERROR: No battle manager for targeting")
 		return
 	
-	var available_enemies = get_alive_enemies()
-	print("=== STARTING TARGETING MODE ===")
-	print("Battle manager enemies: ", available_enemies.size())
+	var available_targets = []
+	if target_type == "enemy":
+		available_targets = get_alive_enemies()
+	else:
+		available_targets = get_alive_allies()
 	
-	if available_enemies.size() == 0:
-		print("ERROR: No enemies available for targeting")
+	print("=== STARTING TARGETING MODE ===")
+	print("Target type: ", target_type)
+	print("Available targets: ", available_targets.size())
+	
+	if available_targets.size() == 0:
+		print("ERROR: No targets available for targeting")
 		return
 	
+	# Set camera based on target type
 	if battle_manager.battle_camera:
-		battle_manager.battle_camera.set_enemy_overview(available_enemies)
-		
+		if target_type == "enemy":
+			battle_manager.battle_camera.set_enemy_overview(available_targets)
+		else:
+			# For ally targeting, we'll use target focus when a specific ally is selected
+			# Start with default camera until ally is selected
+			battle_manager.battle_camera.set_default_camera()
+	
 	battle_manager.mouse_input_toggle = true
 	battle_manager.in_target_selection = true
 	battle_manager.current_character = card_battle_manager.current_player_battler
-	battle_manager.valid_targets = available_enemies
+	battle_manager.valid_targets = available_targets
+	battle_manager.set_meta("target_type", target_type)  # Track target type
 	
-	for enemy in available_enemies:
-		if enemy is Battler:
-			enemy.is_valid_target = true
-			enemy.is_selectable = true
-			print("Made enemy selectable: ", enemy.character_name)
+	for target in available_targets:
+		if target is Battler:
+			target.is_valid_target = true
+			target.is_selectable = true
+			print("Made target selectable: ", target.character_name)
 	
 	battle_manager.set_meta("pending_card", card)
 	
@@ -154,6 +228,40 @@ func start_targeting_mode(card: CardData):
 	print("Targeting mode started for card: ", card.name)
 	print("Valid targets: ", battle_manager.valid_targets.size())
 	print("Mouse input enabled: ", battle_manager.mouse_input_toggle)
+
+func start_aoe_targeting_mode(card: CardData, targets: Array[Battler], target_type: String = "enemy"):
+	if not battle_manager:
+		print("ERROR: No battle manager for AOE targeting")
+		return
+	
+	print("=== STARTING AOE TARGETING MODE ===")
+	print("Target type: ", target_type)
+	print("AOE targets: ", targets.size())
+	
+	if targets.size() == 0:
+		print("ERROR: No targets available for AOE")
+		return
+	
+	# Set camera based on target type
+	if battle_manager.battle_camera:
+		if target_type == "enemy":
+			battle_manager.battle_camera.set_enemy_overview(targets)
+		else:
+			# For ally AOE, use default camera showing all entities
+			battle_manager.battle_camera.set_default_camera()
+	
+	# Store AOE targets for execution
+	battle_manager.set_meta("aoe_targets", targets)
+	battle_manager.set_meta("pending_card", card)
+	battle_manager.set_meta("target_type", target_type)
+	battle_manager.set_meta("is_aoe_mode", true)
+	
+	# Update HUD: show confirm button, hide individual targeting
+	if battle_manager.hud and battle_manager.hud.has_method("set_aoe_confirmation_mode"):
+		battle_manager.hud.set_aoe_confirmation_mode(true, card.name, targets.size())
+	
+	print("AOE confirmation mode started for card: ", card.name)
+	print("AOE will affect: ", targets.size(), " targets")
 
 func _on_end_turn_pressed():
 	print("End turn pressed")

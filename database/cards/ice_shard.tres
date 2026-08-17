@@ -15,5 +15,6 @@ metadata = {
 "description": "Launches a glacial ice shard dealing 50 ice damage",
 "element": "ice",
 "qte_difficulty": 0.35,
-"freeze_chance": 0.15
+"freeze_chance": 0.15,
+"target_scope": "single_enemy"
 }

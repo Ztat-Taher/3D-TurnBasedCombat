@@ -211,25 +211,29 @@ func execute_card_effect(card: CardData, target: Battler) -> void:
 	
 	# Handle different card types based on metadata
 	var card_type = card.metadata.get("card_type", "attack")
+	var target_scope = card.metadata.get("target_scope", "single_enemy")
+	
+	# Skip camera setup for AOE cards (camera is set by integration layer)
+	var is_aoe = target_scope in ["all_enemies", "all_allies", "all_allies_self"]
 	
 	match card_type:
 		"attack":
-			await execute_attack_card(card, target)
+			await execute_attack_card(card, target, is_aoe)
 		"skill":
-			await execute_skill_card(card, target)
+			await execute_skill_card(card, target, is_aoe)
 		"defense":
 			execute_defense_card(card)
 		"heal":
-			execute_heal_card(card, target)
+			execute_heal_card(card, target, is_aoe)
 		"buff":
-			execute_buff_card(card, target)
+			execute_buff_card(card, target, is_aoe)
 		"debuff":
-			await execute_debuff_card(card, target)
+			await execute_debuff_card(card, target, is_aoe)
 		_:
 			print("Unknown card type: ", card_type)
 
-func execute_attack_card(card: CardData, target: Battler) -> void:
-	print("Executing attack card: ", card.name)
+func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+	print("Executing attack card: ", card.name, " AOE: ", is_aoe)
 	
 	if not current_player_battler or not target:
 		print("Missing player battler or target for attack card")
@@ -244,15 +248,17 @@ func execute_attack_card(card: CardData, target: Battler) -> void:
 	if card_config:
 		total_damage = int(total_damage * card_config.attack_damage_multiplier)
 	
-	# Move to target and attack
-	await current_player_battler.turn_to_face_target(target)
-	
-	if current_player_battler.advance_to_target(target):
-		current_player_battler._try_animation("walk")
-		while current_player_battler.is_advancing:
-			await get_tree().create_timer(0.016).timeout
-	
-	await current_player_battler.turn_to_face_target(target)
+	# For AOE, skip movement animation - just play attack animation from current position
+	if not is_aoe:
+		# Move to target and attack
+		await current_player_battler.turn_to_face_target(target)
+		
+		if current_player_battler.advance_to_target(target):
+			current_player_battler._try_animation("walk")
+			while current_player_battler.is_advancing:
+				await get_tree().create_timer(0.016).timeout
+		
+		await current_player_battler.turn_to_face_target(target)
 	
 	# Play attack animation
 	current_player_battler._try_animation("attack")
@@ -281,19 +287,20 @@ func execute_attack_card(card: CardData, target: Battler) -> void:
 	# Wait for attack animation to complete
 	await get_tree().create_timer(0.5).timeout
 	
-	# Return to position
-	print("Returning to original position: ", current_player_battler.original_position)
-	current_player_battler.return_to_original_position()
-	if current_player_battler.is_advancing:
-		while current_player_battler.is_advancing:
-			await get_tree().create_timer(0.1).timeout
+	# Return to position (only for single target)
+	if not is_aoe:
+		print("Returning to original position: ", current_player_battler.original_position)
+		current_player_battler.return_to_original_position()
+		if current_player_battler.is_advancing:
+			while current_player_battler.is_advancing:
+				await get_tree().create_timer(0.1).timeout
 	
 	current_player_battler.battle_idle()
 	print("Attack execution complete")
 
-func execute_skill_card(card: CardData, target: Battler) -> void:
-	print("Executing skill card: ", card.name)
-	await execute_attack_card(card, target)
+func execute_skill_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+	print("Executing skill card: ", card.name, " AOE: ", is_aoe)
+	await execute_attack_card(card, target, is_aoe)
 
 func execute_defense_card(card: CardData) -> void:
 	print("Executing defense card: ", card.name)
@@ -302,16 +309,16 @@ func execute_defense_card(card: CardData) -> void:
 		var boost = card.metadata["defense_boost"]
 		print("Defense boost: ", boost)
 
-func execute_heal_card(card: CardData, target: Battler) -> void:
-	print("Executing heal card: ", card.name)
+func execute_heal_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+	print("Executing heal card: ", card.name, " AOE: ", is_aoe)
 	var heal_amount = card.health
 	target.take_healing(heal_amount)
 	
 	if battle_manager and battle_manager.hud:
 		battle_manager.hud.update_health_bars()
 
-func execute_buff_card(card: CardData, target: Battler) -> void:
-	print("Executing buff card: ", card.name)
+func execute_buff_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+	print("Executing buff card: ", card.name, " AOE: ", is_aoe)
 	# Handle buff effects like damage multipliers, speed boosts, etc.
 	if card.metadata.has("damage_multiplier"):
 		var multiplier = card.metadata["damage_multiplier"]
@@ -328,11 +335,11 @@ func execute_buff_card(card: CardData, target: Battler) -> void:
 		print("Applying damage reduction: ", reduction)
 		# This would need a buff system integration
 
-func execute_debuff_card(card: CardData, target: Battler) -> void:
-	print("Executing debuff card: ", card.name)
+func execute_debuff_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+	print("Executing debuff card: ", card.name, " AOE: ", is_aoe)
 	# Deal initial damage
 	if card.attack > 0:
-		await execute_attack_card(card, target)
+		await execute_attack_card(card, target, is_aoe)
 	
 func apply_card_states(card: CardData, target: Battler) -> void:
 	if not card.metadata.has("applies_state"):

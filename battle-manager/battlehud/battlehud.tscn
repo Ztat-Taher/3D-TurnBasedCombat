@@ -3,42 +3,10 @@
 [ext_resource type="Script" uid="uid://835wmi7qej15" path="res://battle-manager/battlehud/battlehud.gd" id="1_0qukq"]
 [ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_uiugx"]
 [ext_resource type="Script" uid="uid://gl487spddx3j" path="res://battle-manager/battlehud/battle_text_display.gd" id="3_btt"]
+[ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="3_input"]
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://battle-manager/battlehud/battleresults.tscn" id="6_g4nh0"]
 [ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="7_cardui"]
 [ext_resource type="PackedScene" path="res://battle-manager/battlehud/BossBar.tscn" id="8_bossbar"]
-[ext_resource type="PackedScene" path="res://battle-manager/battlehud/EnemyOverheadBar.tscn" id="9_overheadbar"]
-
-[sub_resource type="GDScript" id="GDScript_mbt63"]
-resource_name = "EnemyStats"
-script/source = "extends VBoxContainer
-
-# Declare the progress bar node
-@onready var name_label = $EnemyNameLabel
-@onready var health_bar = $EnemyHealthBar
-
-func add_character(_character: Node):
-	pass
-
-func update_enemy_stats(character: Node):
-	if character and is_instance_valid(character):
-		name_label.text = character.character_name
-		health_bar.max_value = character.max_health
-		health_bar.value = character.current_health
-
-func update_character_info(character: Node):
-	update_enemy_stats(character)
-"
-
-[sub_resource type="GDScript" id="GDScript_djde1"]
-resource_name = "EnemyStats"
-script/source = "extends VBoxContainer
-
-# Declare the progress bar node
-@onready var enemy_health_bar: ProgressBar = $EnemyHealthBar
-
-func add_character(_character: Node):
-	pass
-"
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -54,86 +22,27 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_uiugx")
 
-[node name="Enemies" type="Control" parent="Control" unique_id=163295688]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -212.0
-offset_bottom = 228.0
-grow_horizontal = 0
-
-[node name="AllEnemies" type="BoxContainer" parent="Control/Enemies" unique_id=1582774903]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-vertical = true
-
-[node name="EnemyStats" type="VBoxContainer" parent="Control/Enemies/AllEnemies" unique_id=1936541486]
-layout_mode = 2
-script = SubResource("GDScript_mbt63")
-
-[node name="EnemyNameLabel" type="Label" parent="Control/Enemies/AllEnemies/EnemyStats" unique_id=1226921246]
-layout_mode = 2
-text = "Test"
-
-[node name="EnemyHealthBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats" unique_id=1972268872]
-layout_mode = 2
-
-[node name="EnemyStats2" type="VBoxContainer" parent="Control/Enemies/AllEnemies" unique_id=834907052]
-visible = false
-layout_mode = 2
-script = SubResource("GDScript_djde1")
-
-[node name="EnemyNameLabel" type="Label" parent="Control/Enemies/AllEnemies/EnemyStats2" unique_id=1960495143]
-layout_mode = 2
-text = "Test"
-
-[node name="EnemyHealthBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats2" unique_id=151162531]
-layout_mode = 2
-
-[node name="EnemyStats3" type="VBoxContainer" parent="Control/Enemies/AllEnemies" unique_id=1413065645]
-visible = false
-layout_mode = 2
-script = SubResource("GDScript_mbt63")
-
-[node name="EnemyNameLabel" type="Label" parent="Control/Enemies/AllEnemies/EnemyStats3" unique_id=181842404]
-layout_mode = 2
-text = "Test"
-
-[node name="EnemyHealthBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats3" unique_id=1906703926]
-layout_mode = 2
-
-[node name="EnemyStats4" type="VBoxContainer" parent="Control/Enemies/AllEnemies" unique_id=38448121]
-visible = false
-layout_mode = 2
-script = SubResource("GDScript_djde1")
-
-[node name="EnemyNameLabel" type="Label" parent="Control/Enemies/AllEnemies/EnemyStats4" unique_id=321043939]
-layout_mode = 2
-text = "Test"
-
-[node name="EnemyHealthBar" type="ProgressBar" parent="Control/Enemies/AllEnemies/EnemyStats4" unique_id=922601932]
-layout_mode = 2
-
 [node name="TurnQueueUI" type="Control" parent="Control" unique_id=999999994]
 layout_mode = 1
 anchors_preset = 0
 offset_left = 20.0
 offset_top = 20.0
-offset_right = 500.0
-offset_bottom = 110.0
+offset_right = 120.0
+offset_bottom = 400.0
 
-[node name="QueueContainer" type="HBoxContainer" parent="Control/TurnQueueUI" unique_id=999999993]
+[node name="ScrollContainer" type="ScrollContainer" parent="Control/TurnQueueUI" unique_id=2000000008]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
+
+[node name="QueueContainer" type="VBoxContainer" parent="Control/TurnQueueUI/ScrollContainer" unique_id=999999993]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
 [node name="BattleTextDisplay" type="Control" parent="Control" unique_id=-389943844]
@@ -189,17 +98,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 vertical = true
 
-[node name="BackButton" type="Button" parent="Control/Items" unique_id=2074786862]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -80.0
-offset_top = -35.0
-offset_bottom = -5.0
-grow_horizontal = 0
-text = "◄ Back"
-
 [node name="QTEContainer" type="Control" parent="Control" unique_id=999999995]
 layout_mode = 1
 anchors_preset = 8
@@ -243,30 +141,98 @@ theme_override_constants/separation = -20
 alignment = 1
 
 [node name="ActionButtons" type="BoxContainer" parent="Control" unique_id=1087849572]
-visible = false
 layout_mode = 1
-offset_right = 160.0
-offset_bottom = 120.0
+offset_right = 188.0
+offset_bottom = 140.0
 size_flags_horizontal = 0
 size_flags_vertical = 0
 theme = ExtResource("2_uiugx")
 alignment = 1
 vertical = true
 
+[node name="Attack" type="Button" parent="Control/ActionButtons" unique_id=2000000004]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Attack"
+
+[node name="AttackPrompt" type="Label" parent="Control/ActionButtons/Attack" unique_id=2000000005]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[A]"
+script = ExtResource("3_input")
+
 [node name="Items" type="Button" parent="Control/ActionButtons" unique_id=150334854]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Items"
+
+[node name="ItemsPrompt" type="Label" parent="Control/ActionButtons/Items" unique_id=2000000001]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[X]"
+script = ExtResource("3_input")
 
 [node name="Run" type="Button" parent="Control/ActionButtons" unique_id=1887464156]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Run"
 
+[node name="RunPrompt" type="Label" parent="Control/ActionButtons/Run" unique_id=2000000002]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[Y]"
+script = ExtResource("3_input")
+
 [node name="EndTurnButton" type="Button" parent="Control/ActionButtons" unique_id=999999996]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "End Turn"
+
+[node name="EndTurnPrompt" type="Label" parent="Control/ActionButtons/EndTurnButton" unique_id=2000000003]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[B]"
+script = ExtResource("3_input")
 
 [node name="PartyStatusPanel" type="HBoxContainer" parent="Control" unique_id=2080000001]
 layout_mode = 1
@@ -283,32 +249,38 @@ grow_horizontal = 0
 grow_vertical = 0
 theme_override_constants/separation = 12
 
-[node name="TargetBackButton" type="Button" parent="Control" unique_id=2080000002]
+[node name="BackButton" type="Button" parent="Control" unique_id=2000000007]
 visible = false
 layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
+anchors_preset = 2
 anchor_top = 1.0
-anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -80.0
-offset_top = -80.0
-offset_right = 80.0
-offset_bottom = -35.0
-grow_horizontal = 2
+offset_left = 20.0
+offset_top = -37.0
+offset_right = 148.0
+offset_bottom = -5.0
 grow_vertical = 0
-theme_override_font_sizes/font_size = 14
-text = "◄ Cancel Target"
+text = "◄ Back"
+alignment = 0
 
-[node name="BossBar" parent="Control" instance=ExtResource("8_bossbar")]
+[node name="BackPrompt" type="Label" parent="Control/BackButton" unique_id=2000000009]
 layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -300.0
-offset_right = 300.0
-offset_bottom = 80.0
-grow_horizontal = 2
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[B]"
+script = ExtResource("3_input")
+
+[node name="BossBar" parent="Control" unique_id=1980246889 instance=ExtResource("8_bossbar")]
+visible = false
 
 [node name="EnemyOverheadBarsContainer" type="Control" parent="Control" unique_id=2090000001]
 layout_mode = 1
@@ -332,7 +304,7 @@ offset_bottom = 140.0
 grow_horizontal = 2
 mouse_filter = 2
 
-[node name="Panel" type="PanelContainer" parent="Control/MoveBanner"]
+[node name="Panel" type="PanelContainer" parent="Control/MoveBanner" unique_id=1232197317]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -340,24 +312,24 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBox" type="VBoxContainer" parent="Control/MoveBanner/Panel"]
+[node name="VBox" type="VBoxContainer" parent="Control/MoveBanner/Panel" unique_id=59357062]
 layout_mode = 2
 alignment = 1
 
-[node name="ActorLabel" type="Label" parent="Control/MoveBanner/Panel/VBox"]
+[node name="ActorLabel" type="Label" parent="Control/MoveBanner/Panel/VBox" unique_id=1567824733]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(1, 0.8, 0.4, 1)
+theme_override_font_sizes/font_size = 12
 horizontal_alignment = 1
 
-[node name="MoveLabel" type="Label" parent="Control/MoveBanner/Panel/VBox"]
+[node name="MoveLabel" type="Label" parent="Control/MoveBanner/Panel/VBox" unique_id=1166628456]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 
-[connection signal="pressed" from="Control/Items/BackButton" to="." method="_on_item_back_pressed"]
+[connection signal="pressed" from="Control/ActionButtons/Attack" to="." method="_on_attack_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Items" to="." method="_on_items_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Run" to="." method="_on_run_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/EndTurnButton" to="." method="_on_end_turn_button_pressed"]
-[connection signal="pressed" from="Control/TargetBackButton" to="." method="_on_target_back_button_pressed"]
+[connection signal="pressed" from="Control/BackButton" to="." method="_on_global_back_pressed"]

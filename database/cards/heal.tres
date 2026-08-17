@@ -12,5 +12,6 @@ health = 50
 play_kind = 0
 metadata = {
 "card_type": "heal",
-"description": "Restore 50 health"
+"description": "Restore 50 health",
+"target_scope": "single_ally"
 }

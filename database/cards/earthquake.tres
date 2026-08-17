@@ -16,5 +16,6 @@ metadata = {
 "element": "earth",
 "qte_difficulty": 0.4,
 "target_type": "aoe",
-"aoe_targets": "all_enemies"
+"aoe_targets": "all_enemies",
+"target_scope": "all_enemies"
 }
