@@ -10,6 +10,7 @@ signal end_turn_pressed
 @onready var item_container = $Control/Items/ScrollContainer/BoxContainer
 @onready var turn_queue_card_scene: PackedScene = preload("res://battle-manager/battlehud/turn_queue_card.tscn")
 @onready var party_status_card_scene: PackedScene = preload("res://battle-manager/battlehud/party_status_card.tscn")
+@onready var parry_window_scene: PackedScene = preload("res://battle-manager/battlehud/parry_window.tscn")
 
 @onready var action_buttons: BoxContainer = $Control/ActionButtons
 @onready var attack_button: TextureButton = $Control/ActionButtons/Attack
@@ -582,141 +583,31 @@ func update_ui():
 # ============================================================================
 # REACTIVE DEFENSE UI (DODGE / PARRY / PERFECT PARRY)
 # ============================================================================
-var _parry_panel: PanelContainer = null
-var _parry_progress: ProgressBar = null
-var _parry_perfect_indicator: Panel = null
+var _parry_window: ParryWindow = null
 
 func show_parry_window(duration: float, perfect_duration: float, defender_name: String) -> void:
 	hide_parry_window()
 	
-	_parry_panel = PanelContainer.new()
-	_parry_panel.name = "ParryPromptPanel"
-	_parry_panel.custom_minimum_size = Vector2(340, 75)
-	_parry_panel.anchors_preset = Control.PRESET_CENTER_BOTTOM
-	_parry_panel.anchor_left = 0.5
-	_parry_panel.anchor_right = 0.5
-	_parry_panel.anchor_top = 1.0
-	_parry_panel.anchor_bottom = 1.0
-	_parry_panel.offset_left = -170.0
-	_parry_panel.offset_right = 170.0
-	_parry_panel.offset_top = -220.0
-	_parry_panel.offset_bottom = -145.0
-	_parry_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_parry_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	if not parry_window_scene:
+		push_error("Parry window scene not loaded!")
+		return
 	
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.06, 0.08, 0.14, 0.92)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(1.0, 0.8, 0.2, 0.8)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_right = 8
-	style.corner_radius_bottom_left = 8
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
-	_parry_panel.add_theme_stylebox_override("panel", style)
+	_parry_window = parry_window_scene.instantiate() as ParryWindow
+	if not _parry_window:
+		push_error("Failed to instantiate parry window!")
+		return
 	
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 5)
-	_parry_panel.add_child(vbox)
-	
-	# Header Row: Defender Name & Action Prompts
-	var header = HBoxContainer.new()
-	vbox.add_child(header)
-	
-	var title = Label.new()
-	title.text = "DEFEND [%s]!" % defender_name.to_upper()
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
-	header.add_child(title)
-	
-	var prompt_parry = Label.new()
-	prompt_parry.text = "[Q] PARRY"
-	prompt_parry.add_theme_font_size_override("font_size", 11)
-	prompt_parry.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))
-	header.add_child(prompt_parry)
-	
-	var prompt_dodge = Label.new()
-	prompt_dodge.text = "[E] DODGE"
-	prompt_dodge.add_theme_font_size_override("font_size", 11)
-	prompt_dodge.add_theme_color_override("font_color", Color(0.4, 1.0, 0.5))
-	header.add_child(prompt_dodge)
-	
-	# Timing Bar Stack
-	var bar_container = Control.new()
-	bar_container.custom_minimum_size = Vector2(0, 14)
-	bar_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_child(bar_container)
-	
-	_parry_progress = ProgressBar.new()
-	_parry_progress.anchors_preset = Control.PRESET_FULL_RECT
-	_parry_progress.anchor_right = 1.0
-	_parry_progress.anchor_bottom = 1.0
-	_parry_progress.max_value = duration
-	_parry_progress.value = duration
-	_parry_progress.show_percentage = false
-	
-	var fill_style = StyleBoxFlat.new()
-	fill_style.bg_color = Color(0.25, 0.7, 1.0, 0.95)
-	fill_style.corner_radius_top_left = 3
-	fill_style.corner_radius_top_right = 3
-	fill_style.corner_radius_bottom_right = 3
-	fill_style.corner_radius_bottom_left = 3
-	_parry_progress.add_theme_stylebox_override("fill", fill_style)
-	
-	var bg_style = StyleBoxFlat.new()
-	bg_style.bg_color = Color(0.12, 0.14, 0.2, 0.8)
-	bg_style.corner_radius_top_left = 3
-	bg_style.corner_radius_top_right = 3
-	bg_style.corner_radius_bottom_right = 3
-	bg_style.corner_radius_bottom_left = 3
-	_parry_progress.add_theme_stylebox_override("background", bg_style)
-	bar_container.add_child(_parry_progress)
-	
-	# Perfect parry highlight zone (overlay at the right/start of progress drain)
-	_parry_perfect_indicator = Panel.new()
-	var perfect_ratio = clampf(perfect_duration / max(duration, 0.001), 0.1, 0.9)
-	_parry_perfect_indicator.anchors_preset = Control.PRESET_FULL_RECT
-	_parry_perfect_indicator.anchor_right = 1.0
-	_parry_perfect_indicator.anchor_left = 1.0 - perfect_ratio
-	_parry_perfect_indicator.anchor_bottom = 1.0
-	
-	var perf_style = StyleBoxFlat.new()
-	perf_style.bg_color = Color(1.0, 0.85, 0.2, 0.45)
-	perf_style.border_width_left = 1
-	perf_style.border_width_right = 1
-	perf_style.border_color = Color(1.0, 0.9, 0.3, 0.9)
-	perf_style.corner_radius_top_right = 3
-	perf_style.corner_radius_bottom_right = 3
-	_parry_perfect_indicator.add_theme_stylebox_override("panel", perf_style)
-	bar_container.add_child(_parry_perfect_indicator)
-	
-	# Subtitle / Hint
-	var hint = Label.new()
-	hint.text = "⚡ Golden zone = Perfect Parry Counterattack!"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 9)
-	hint.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9, 0.7))
-	vbox.add_child(hint)
-	
-	$Control.add_child(_parry_panel)
+	_parry_window.setup(defender_name, duration, perfect_duration)
+	$Control.add_child(_parry_window)
 
 func update_parry_window(time_remaining: float) -> void:
-	if _parry_progress and is_instance_valid(_parry_progress):
-		_parry_progress.value = time_remaining
+	if _parry_window and is_instance_valid(_parry_window):
+		_parry_window.update_progress(time_remaining)
 
 func hide_parry_window() -> void:
-	if _parry_panel and is_instance_valid(_parry_panel):
-		_parry_panel.queue_free()
-		_parry_panel = null
-		_parry_progress = null
-		_parry_perfect_indicator = null
+	if _parry_window and is_instance_valid(_parry_window):
+		_parry_window.queue_free()
+		_parry_window = null
 
 # ============================================================================
 # MOVE ANNOUNCEMENT BANNER

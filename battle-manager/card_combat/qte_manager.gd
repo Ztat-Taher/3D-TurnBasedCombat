@@ -15,6 +15,8 @@ var current_qte_type: String = ""
 var is_qte_active: bool = false
 var qte_result: bool = false
 
+var qte_overlay_scene: PackedScene = preload("res://battle-manager/battlehud/qte_overlay.tscn")
+
 # Public property to access the last QTE result
 var last_qte_result: bool = false:
 	get:
@@ -149,10 +151,7 @@ func _get_hud() -> BattleHud:
 # GENERIC QTE ENGINE
 # ============================================================================
 
-var qte_ui_panel: Panel = null
-var qte_progress_bar: ProgressBar = null
-var qte_key_label: Label = null
-var qte_title_label: Label = null
+var qte_ui_panel: QTEOverlay = null
 
 func start_qte(qte_type: QTEType, difficulty: float) -> bool:
 	if is_qte_active:
@@ -202,6 +201,10 @@ func create_countdown_qte(difficulty: float) -> CountdownQTE:
 func _create_qte_ui(input_key: String, time_limit: float) -> void:
 	_remove_qte_ui()
 	
+	if not qte_overlay_scene:
+		push_error("QTE overlay scene not loaded!")
+		return
+	
 	var target_parent: Control = null
 	var hud_node = get_tree().get_first_node_in_group("BattleHud")
 	if hud_node:
@@ -218,76 +221,24 @@ func _create_qte_ui(input_key: String, time_limit: float) -> void:
 	if not target_parent:
 		return
 	
-	qte_ui_panel = Panel.new()
-	qte_ui_panel.name = "QTEOverlay"
-	qte_ui_panel.anchors_preset = Control.PRESET_FULL_RECT
-	qte_ui_panel.anchor_left = 0.0
-	qte_ui_panel.anchor_top = 0.0
-	qte_ui_panel.anchor_right = 1.0
-	qte_ui_panel.anchor_bottom = 1.0
-	qte_ui_panel.offset_left = 0
-	qte_ui_panel.offset_top = 0
-	qte_ui_panel.offset_right = 0
-	qte_ui_panel.offset_bottom = 0
-	qte_ui_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	qte_ui_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	qte_ui_panel = qte_overlay_scene.instantiate() as QTEOverlay
+	if not qte_ui_panel:
+		push_error("Failed to instantiate QTE overlay!")
+		return
 	
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.9)
-	style.border_width_left = 3
-	style.border_width_top = 3
-	style.border_width_right = 3
-	style.border_width_bottom = 3
-	style.border_color = Color(0.9, 0.7, 0.2, 1.0)
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_right = 10
-	style.corner_radius_bottom_left = 10
-	qte_ui_panel.add_theme_stylebox_override("panel", style)
-	
-	var vbox = VBoxContainer.new()
-	vbox.anchors_preset = Control.PRESET_FULL_RECT
-	vbox.offset_left = 10
-	vbox.offset_top = 10
-	vbox.offset_right = -10
-	vbox.offset_bottom = -10
-	qte_ui_panel.add_child(vbox)
-	
-	qte_title_label = Label.new()
-	qte_title_label.text = "ATTACK QTE!"
-	qte_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	qte_title_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
-	vbox.add_child(qte_title_label)
-	
-	qte_key_label = Label.new()
-	qte_key_label.text = "[ " + input_key.to_upper() + " ]"
-	qte_key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	qte_key_label.add_theme_font_size_override("font_size", 28)
-	qte_key_label.add_theme_color_override("font_color", Color(1, 1, 1))
-	vbox.add_child(qte_key_label)
-	
-	qte_progress_bar = ProgressBar.new()
-	qte_progress_bar.custom_minimum_size = Vector2(0, 20)
-	qte_progress_bar.max_value = time_limit
-	qte_progress_bar.value = time_limit
-	qte_progress_bar.show_percentage = false
-	vbox.add_child(qte_progress_bar)
-	
+	qte_ui_panel.setup(input_key, time_limit)
 	target_parent.add_child(qte_ui_panel)
 
 func _process(_delta: float) -> void:
 	if is_qte_active and current_qte and is_instance_valid(current_qte):
-		if qte_progress_bar and is_instance_valid(qte_progress_bar):
+		if qte_ui_panel and is_instance_valid(qte_ui_panel):
 			if current_qte.timer and is_instance_valid(current_qte.timer):
-				qte_progress_bar.value = current_qte.timer.time_left
+				qte_ui_panel.update_progress(current_qte.timer.time_left)
 
 func _remove_qte_ui() -> void:
 	if qte_ui_panel and is_instance_valid(qte_ui_panel):
 		qte_ui_panel.queue_free()
 		qte_ui_panel = null
-		qte_progress_bar = null
-		qte_key_label = null
-		qte_title_label = null
 
 func _on_qte_success() -> void:
 	print("QTE success: ", current_qte_type)

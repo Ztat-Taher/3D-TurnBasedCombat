@@ -136,12 +136,6 @@ func _update_highlight() -> void:
 		# Add debug info to confirm which battler is highlighted
 		print("Highlighting battler: ", character_name, " with cyan outline")
 
-@export_group("Rotation Settings", "rotation")
-## Invert rotation direction if character model faces opposite direction (-1 = invert, 1 = normal)
-@export var rotation_direction: int = 1
-## Whether to face away from target instead of towards (for back-to-back positioning)
-@export var face_away_from_target: bool = false
-
 @export_group("Special Dependencies")
 @onready var basic_attack_animation = "attack"
 @onready var anim_tree: AnimationTree = $AnimationTree
@@ -203,10 +197,6 @@ func _ready():
 	elif team == TEAM.ALLY:
 		add_to_group("players")
 	print("Current Element: ", stats.element)
-	
-	# Set up animation parameters
-	anim_tree.set("parameters/conditions/is_turning_right", false)
-	anim_tree.set("parameters/conditions/is_turning_left", false)
 
 func _input_event(_camera: Camera3D, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -340,10 +330,6 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 	health_changed.emit(current_health, max_health)
 	print("%s took %d damage. Health: %d/%d" % [character_name, damage_taken, current_health, max_health])
 	
-	# Turn to face attacker after being hit (for visual feedback)
-	if attacker:
-		await turn_to_face_target(attacker)
-	
 	# WAKE UP FROM SLEEP WHEN ATTACKED
 	if active_states.has("Sleep"):
 		remove_state("Sleep")
@@ -356,20 +342,32 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 			await counter_state.perform_counter(self, attacker)
 	
 	# Check if this battler is defeated and should be removed
-	if current_health <= 0 and team == TEAM.ENEMY:
+	if current_health <= 0:
 		if _is_despawning:
 			return
 		_is_despawning = true
 		var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 		if battle_manager and battle_manager.has_method("register_enemy_defeat_reward"):
 			battle_manager.register_enemy_defeat_reward(self)
-		if battle_manager and battle_manager.remove_defeated_enemies:
+		if battle_manager and battle_manager.remove_defeated_enemies and team == TEAM.ENEMY:
 			print("Removing defeated enemy: ", character_name)
 			if battle_manager.turn_order.has(self):
 				battle_manager.turn_order.erase(self)
 			if battle_manager.enemies.has(self):
 				battle_manager.enemies.erase(self)
+			# Update HUD turn queue immediately
+			if battle_manager.hud and battle_manager.hud.has_method("update_turn_queue"):
+				battle_manager.hud.update_turn_queue(battle_manager.turn_order, battle_manager.current_turn)
 			await _fade_and_remove()
+		elif battle_manager and team == TEAM.ALLY:
+			# For players, just update the turn queue when they die
+			if battle_manager.turn_order.has(self):
+				battle_manager.turn_order.erase(self)
+			if battle_manager.players.has(self):
+				battle_manager.players.erase(self)
+			# Update HUD turn queue immediately
+			if battle_manager.hud and battle_manager.hud.has_method("update_turn_queue"):
+				battle_manager.hud.update_turn_queue(battle_manager.turn_order, battle_manager.current_turn)
 		else:
 			_is_despawning = false
 
@@ -420,14 +418,10 @@ func attack_anim(target) -> void:
 	
 	current_target = target
 	
-	await turn_to_face_target(target)
-	
 	if advance_to_target(target):
 		_try_animation("walk")
 		while is_advancing:
 			await get_tree().create_timer(0.016).timeout
-	
-	await turn_to_face_target(target)
 	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	var attack_animation_name = battle_manager.get_animation("attack") if battle_manager else "attack"
@@ -490,61 +484,7 @@ func battle_idle():
 	_try_animation(anim_name)
 	# Clear any lingering animation conditions
 	anim_tree.set("parameters/conditions/is_walking", false)
-	anim_tree.set("parameters/conditions/is_turning", false)
 	anim_tree.set("parameters/conditions/is_attacking", false)
-
-# Turning animation system
-var is_turning: bool = false
-var turn_target_rotation: float
-
-var is_turning_right: bool = false
-var is_turning_left: bool = false
-
-func turn_to_face_target(target: Battler) -> void:
-	if not target:
-		return
-	
-	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	var speed_mult = battle_manager.speed_multiplier if battle_manager else 1.0
-	
-	var direction = (target.global_position - global_position).normalized()
-	if face_away_from_target:
-		direction = -direction
-	
-	var target_angle = atan2(direction.x * rotation_direction, direction.z)
-	var current_angle = atan2(global_transform.basis.z.x, global_transform.basis.z.z)
-	var angle_diff = angle_difference(current_angle, target_angle)
-	
-	# If angle difference is small enough, just rotate directly
-	if abs(angle_diff) < 0.1:
-		var new_basis = global_transform.basis
-		new_basis = new_basis.rotated(Vector3.UP, angle_diff)
-		global_transform.basis = new_basis
-		return
-	
-	# Otherwise use animation
-	is_turning = true
-	if angle_diff > 0:
-		anim_tree.set("parameters/conditions/is_turning_right", true)
-		anim_tree.set("parameters/conditions/is_turning_left", false)
-	else:
-		anim_tree.set("parameters/conditions/is_turning_left", true)
-		anim_tree.set("parameters/conditions/is_turning_right", false)
-	
-	await get_tree().create_timer(0.3 / speed_mult).timeout
-	
-	anim_tree.set("parameters/conditions/is_turning_right", false)
-	anim_tree.set("parameters/conditions/is_turning_left", false)
-	
-	var final_basis = global_transform.basis
-	final_basis = final_basis.rotated(Vector3.UP, angle_diff)
-	global_transform.basis = final_basis
-	
-	is_turning = false
-
-func angle_difference(from: float, to: float) -> float:
-	var diff = fmod(to - from + PI, TAU) - PI
-	return diff
 
 func advance_to_target(target: Battler) -> bool:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")

@@ -138,9 +138,16 @@ func _navigate_cards(direction: int) -> void:
 	if card_buttons.is_empty():
 		return
 	
-	selected_card_index = (selected_card_index + direction) % card_buttons.size()
+	# If no card is currently selected, select the first one in the direction
 	if selected_card_index < 0:
-		selected_card_index = card_buttons.size() - 1
+		if direction > 0:
+			selected_card_index = 0
+		else:
+			selected_card_index = card_buttons.size() - 1
+	else:
+		selected_card_index = (selected_card_index + direction) % card_buttons.size()
+		if selected_card_index < 0:
+			selected_card_index = card_buttons.size() - 1
 	
 	_update_card_selection()
 
@@ -155,7 +162,7 @@ func _update_card_selection() -> void:
 	for i in range(card_buttons.size()):
 		var card_button = card_buttons[i]
 		if card_button:
-			if i == selected_card_index:
+			if i == selected_card_index and selected_card_index >= 0:
 				# Use the same hover system as mouse
 				if card_button.has_method("set_controller_hover"):
 					card_button.set_controller_hover(true)
@@ -176,7 +183,7 @@ func update_hand_display():
 		child.queue_free()
 	
 	card_buttons.clear()
-	selected_card_index = 0
+	selected_card_index = -1  # Don't auto-select first card
 	
 	# Get current hand
 	var hand = card_battle_manager.get_hand()

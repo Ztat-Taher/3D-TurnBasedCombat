@@ -251,14 +251,10 @@ func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) 
 	# For AOE, skip movement animation - just play attack animation from current position
 	if not is_aoe:
 		# Move to target and attack
-		await current_player_battler.turn_to_face_target(target)
-		
 		if current_player_battler.advance_to_target(target):
 			current_player_battler._try_animation("walk")
 			while current_player_battler.is_advancing:
 				await get_tree().create_timer(0.016).timeout
-		
-		await current_player_battler.turn_to_face_target(target)
 	
 	# Play attack animation
 	current_player_battler._try_animation("attack")
@@ -560,9 +556,6 @@ func _execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> voi
 	
 	# Stun the attacker momentarily so they don't return before taking counter damage
 	attacker.is_counter_stunned = true
-	
-	# Face each other
-	await defender.turn_to_face_target(attacker)
 	
 	# Play attack animation on defender
 	var attack_anim_name = "basic_attacks/attack"
