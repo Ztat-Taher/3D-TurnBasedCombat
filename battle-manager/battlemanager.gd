@@ -323,8 +323,8 @@ func _ready():
 	effect_manager.name = "EffectManager"
 	add_child(effect_manager)
 	
-	# Connect camera shake to battle camera after a short delay to ensure camera is ready
-	call_deferred("_connect_effect_camera")
+	# Connect screen flash from HUD after a short delay to ensure HUD is ready
+	call_deferred("_connect_effect_screen_flash")
 	
 	# Initialize card integration
 	initialize_card_integration()
@@ -332,17 +332,7 @@ func _ready():
 	# Initialize battle
 	initialize_battle()
 
-func _connect_effect_camera() -> void:
-	if effect_manager and battle_camera:
-		var camera_shake = battle_camera.get_camera_shake()
-		if camera_shake:
-			print("Connecting effect camera - camera: ", camera_shake.camera)
-			effect_manager.setup_camera(camera_shake.camera)
-		else:
-			print("Camera shake not available in battle_camera")
-	else:
-		print("EffectManager or battle_camera not available")
-	
+func _connect_effect_screen_flash() -> void:
 	# Connect screen flash from HUD
 	if effect_manager and hud:
 		print("Attempting to connect screen flash - hud: ", hud)

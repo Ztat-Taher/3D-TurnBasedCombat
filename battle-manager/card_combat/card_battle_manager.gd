@@ -527,6 +527,10 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			if battle_manager and battle_manager.effect_manager:
 				battle_manager.effect_manager.trigger_dodge()
 			
+			# Perform dodge dash movement
+			if target_defender and target_defender.has_method("perform_dodge_dash"):
+				target_defender.perform_dodge_dash()
+			
 			return 0 # Complete damage avoidance
 			
 		"parry":

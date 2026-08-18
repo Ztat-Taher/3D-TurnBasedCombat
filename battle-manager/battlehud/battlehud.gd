@@ -8,6 +8,8 @@ signal end_turn_pressed
 
 @onready var item_button_scene: PackedScene = preload("res://battle-manager/battlehud/item-button-preset.tscn")
 @onready var item_container = $Control/Items/ScrollContainer/BoxContainer
+@onready var turn_queue_card_scene: PackedScene = preload("res://battle-manager/battlehud/turn_queue_card.tscn")
+@onready var party_status_card_scene: PackedScene = preload("res://battle-manager/battlehud/party_status_card.tscn")
 
 @onready var action_buttons: BoxContainer = $Control/ActionButtons
 @onready var attack_button: TextureButton = $Control/ActionButtons/Attack
@@ -40,7 +42,7 @@ var active_enemies: Array = []
 
 # Tracks last known AP for each ally: { Battler -> { "current": int, "max": int } }
 var last_ap_by_battler: Dictionary = {}
-var ally_cards_map: Dictionary = {} # Battler -> PanelContainer
+var ally_cards_map: Dictionary = {} # Battler -> PartyStatusCard
 
 var _action_buttons_tween: Tween
 
@@ -141,188 +143,42 @@ func _rebuild_party_status_panel() -> void:
 	update_party_status()
 
 func _create_ally_status_card(ally: Battler) -> PanelContainer:
-	var card = PanelContainer.new()
-	card.custom_minimum_size = Vector2(160, 95)
+	if not party_status_card_scene:
+		push_error("Party status card scene not loaded!")
+		return null
 	
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.06, 0.09, 0.16, 0.88)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.2, 0.45, 0.7, 0.6)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_right = 8
-	style.corner_radius_bottom_left = 8
-	style.content_margin_left = 10
-	style.content_margin_right = 10
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
-	card.add_theme_stylebox_override("panel", style)
+	var card = party_status_card_scene.instantiate()
+	if not card:
+		push_error("Failed to instantiate party status card!")
+		return null
 	
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	card.add_child(vbox)
-	
-	# Name & Active Indicator
-	var header_hbox = HBoxContainer.new()
-	vbox.add_child(header_hbox)
-	
-	var name_lbl = Label.new()
-	name_lbl.name = "NameLabel"
-	name_lbl.text = ally.character_name
-	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_lbl.add_theme_font_size_override("font_size", 13)
-	name_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0))
-	header_hbox.add_child(name_lbl)
-	
-	var active_tag = Label.new()
-	active_tag.name = "ActiveTag"
-	active_tag.text = "●"
-	active_tag.add_theme_font_size_override("font_size", 10)
-	active_tag.add_theme_color_override("font_color", Color(0.2, 0.9, 1.0))
-	active_tag.visible = (ally == activeBattler)
-	header_hbox.add_child(active_tag)
-	
-	# HP Section (Label + Bar)
-	var hp_hbox = HBoxContainer.new()
-	vbox.add_child(hp_hbox)
-	
-	var hp_tag = Label.new()
-	hp_tag.text = "HP"
-	hp_tag.custom_minimum_size = Vector2(24, 0)
-	hp_tag.add_theme_font_size_override("font_size", 10)
-	hp_tag.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35))
-	hp_hbox.add_child(hp_tag)
-	
-	var hp_bar = ProgressBar.new()
-	hp_bar.name = "HPBar"
-	hp_bar.custom_minimum_size = Vector2(0, 10)
-	hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hp_bar.show_percentage = false
-	
-	var hp_fill = StyleBoxFlat.new()
-	hp_fill.bg_color = Color(0.85, 0.22, 0.22, 0.95)
-	hp_fill.corner_radius_top_left = 3
-	hp_fill.corner_radius_top_right = 3
-	hp_fill.corner_radius_bottom_right = 3
-	hp_fill.corner_radius_bottom_left = 3
-	hp_bar.add_theme_stylebox_override("fill", hp_fill)
-	
-	var hp_bg = StyleBoxFlat.new()
-	hp_bg.bg_color = Color(0.18, 0.08, 0.08, 0.8)
-	hp_bg.corner_radius_top_left = 3
-	hp_bg.corner_radius_top_right = 3
-	hp_bg.corner_radius_bottom_right = 3
-	hp_bg.corner_radius_bottom_left = 3
-	hp_bar.add_theme_stylebox_override("background", hp_bg)
-	hp_hbox.add_child(hp_bar)
-	
-	var hp_num = Label.new()
-	hp_num.name = "HPNumLabel"
-	hp_num.text = "%d/%d" % [ally.current_health, ally.max_health]
-	hp_num.add_theme_font_size_override("font_size", 10)
-	hp_num.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
-	hp_hbox.add_child(hp_num)
-	
-	# AP Section (Label + Bar)
-	var ap_hbox = HBoxContainer.new()
-	vbox.add_child(ap_hbox)
-	
-	var ap_tag = Label.new()
-	ap_tag.text = "AP"
-	ap_tag.custom_minimum_size = Vector2(24, 0)
-	ap_tag.add_theme_font_size_override("font_size", 10)
-	ap_tag.add_theme_color_override("font_color", Color(0.35, 0.75, 1.0))
-	ap_hbox.add_child(ap_tag)
-	
-	var ap_bar = ProgressBar.new()
-	ap_bar.name = "APBar"
-	ap_bar.custom_minimum_size = Vector2(0, 8)
-	ap_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ap_bar.show_percentage = false
-	
-	var ap_fill = StyleBoxFlat.new()
-	ap_fill.bg_color = Color(0.2, 0.65, 1.0, 0.95)
-	ap_fill.corner_radius_top_left = 3
-	ap_fill.corner_radius_top_right = 3
-	ap_fill.corner_radius_bottom_right = 3
-	ap_fill.corner_radius_bottom_left = 3
-	ap_bar.add_theme_stylebox_override("fill", ap_fill)
-	
-	var ap_bg = StyleBoxFlat.new()
-	ap_bg.bg_color = Color(0.08, 0.12, 0.22, 0.8)
-	ap_bg.corner_radius_top_left = 3
-	ap_bg.corner_radius_top_right = 3
-	ap_bg.corner_radius_bottom_right = 3
-	ap_bg.corner_radius_bottom_left = 3
-	ap_bar.add_theme_stylebox_override("background", ap_bg)
-	ap_hbox.add_child(ap_bar)
-	
-	var ap_num = Label.new()
-	ap_num.name = "APNumLabel"
-	ap_num.text = "3/3"
-	ap_num.add_theme_font_size_override("font_size", 10)
-	ap_num.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
-	ap_hbox.add_child(ap_num)
-	
-	return card
+	if card is PartyStatusCard:
+		card.setup(ally)
+		return card
+	else:
+		push_error("Instantiated node is not a PartyStatusCard!")
+		return null
 
 func update_party_status() -> void:
 	for ally in active_allies:
 		if not is_instance_valid(ally) or not ally_cards_map.has(ally):
 			continue
 		
-		var card = ally_cards_map[ally] as PanelContainer
+		var card = ally_cards_map[ally] as PartyStatusCard
 		if not is_instance_valid(card):
 			continue
 		
 		var is_active = (ally == activeBattler)
-		
-		# Card highlight style
-		var style = card.get_theme_stylebox("panel") as StyleBoxFlat
-		if style:
-			if is_active:
-				style.border_color = Color(0.3, 0.85, 1.0, 1.0)
-				style.border_width_left = 3
-				style.border_width_top = 3
-				style.border_width_right = 3
-				style.border_width_bottom = 3
-				style.bg_color = Color(0.1, 0.18, 0.32, 0.95)
-			else:
-				style.border_color = Color(0.2, 0.35, 0.55, 0.5)
-				style.border_width_left = 2
-				style.border_width_top = 2
-				style.border_width_right = 2
-				style.border_width_bottom = 2
-				style.bg_color = Color(0.06, 0.09, 0.16, 0.85)
-		
-		var active_tag = card.find_child("ActiveTag", true, false)
-		if active_tag:
-			active_tag.visible = is_active
+		card.set_active(is_active)
 		
 		# Update HP
-		var hp_bar = card.find_child("HPBar", true, false) as ProgressBar
-		if hp_bar:
-			hp_bar.max_value = ally.max_health
-			hp_bar.value = ally.current_health
-		var hp_num = card.find_child("HPNumLabel", true, false) as Label
-		if hp_num:
-			hp_num.text = "%d/%d" % [ally.current_health, ally.max_health]
+		card.update_hp(ally.current_health, ally.max_health)
 		
 		# Update AP (from last_ap_by_battler)
 		var ap_data = last_ap_by_battler.get(ally, { "current": 3, "max": 3 })
 		var cur_ap = ap_data.get("current", 3)
 		var max_ap = ap_data.get("max", 3)
-		
-		var ap_bar = card.find_child("APBar", true, false) as ProgressBar
-		if ap_bar:
-			ap_bar.max_value = max_ap
-			ap_bar.value = cur_ap
-		var ap_num = card.find_child("APNumLabel", true, false) as Label
-		if ap_num:
-			ap_num.text = "%d/%d" % [cur_ap, max_ap]
+		card.update_ap(cur_ap, max_ap)
 
 func set_activebattler(character: Node):
 	activeBattler = character
@@ -700,6 +556,10 @@ func update_turn_queue(turn_order: Array, current_turn_idx: int) -> void:
 	if turn_order.is_empty():
 		return
 	
+	if not turn_queue_card_scene:
+		push_error("Turn queue card scene not loaded!")
+		return
+	
 	var total = turn_order.size()
 	for i in range(total):
 		var idx = (current_turn_idx + i) % total
@@ -707,76 +567,13 @@ func update_turn_queue(turn_order: Array, current_turn_idx: int) -> void:
 		if not is_instance_valid(battler) or battler.is_defeated():
 			continue
 		
-		var card_panel = Panel.new()
-		card_panel.custom_minimum_size = Vector2(80, 75)
-		
-		var is_player = battler.is_in_group("players")
 		var is_current = (i == 0)
-		
-		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.08, 0.12, 0.22, 0.9) if is_player else Color(0.22, 0.08, 0.10, 0.9)
-		style.border_width_left = 2
-		style.border_width_top = 2
-		style.border_width_right = 2
-		style.border_width_bottom = 2
-		
-		if is_current:
-			style.border_color = Color(1.0, 0.85, 0.2, 1.0)
-			style.border_width_left = 3
-			style.border_width_top = 3
-			style.border_width_right = 3
-			style.border_width_bottom = 3
-			style.bg_color = Color(0.15, 0.22, 0.38, 0.95) if is_player else Color(0.38, 0.12, 0.14, 0.95)
+		var card = turn_queue_card_scene.instantiate()
+		if card is TurnQueueCard:
+			card.setup(battler, is_current)
+			turn_queue_container.add_child(card)
 		else:
-			style.border_color = Color(0.3, 0.6, 0.9, 0.7) if is_player else Color(0.9, 0.3, 0.3, 0.7)
-			
-		style.corner_radius_top_left = 6
-		style.corner_radius_top_right = 6
-		style.corner_radius_bottom_right = 6
-		style.corner_radius_bottom_left = 6
-		card_panel.add_theme_stylebox_override("panel", style)
-		
-		var vbox = VBoxContainer.new()
-		vbox.anchors_preset = Control.PRESET_FULL_RECT
-		vbox.offset_left = 4
-		vbox.offset_top = 4
-		vbox.offset_right = -4
-		vbox.offset_bottom = -4
-		card_panel.add_child(vbox)
-		
-		# Team tag (ALLY / ENEMY)
-		var team_label = Label.new()
-		team_label.text = "ALLY" if is_player else "ENEMY"
-		team_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		team_label.add_theme_font_size_override("font_size", 8)
-		team_label.add_theme_color_override("font_color",
-			Color(0.4, 0.8, 1.0) if is_player else Color(1.0, 0.4, 0.4))
-		vbox.add_child(team_label)
-		
-		# Actor name / number
-		var name_label = Label.new()
-		name_label.text = battler.character_name
-		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_label.add_theme_font_size_override("font_size", 11)
-		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		vbox.add_child(name_label)
-		
-		var hp_bar = ProgressBar.new()
-		hp_bar.custom_minimum_size = Vector2(0, 8)
-		hp_bar.max_value = battler.max_health
-		hp_bar.value = battler.current_health
-		hp_bar.show_percentage = false
-		vbox.add_child(hp_bar)
-		
-		if is_current:
-			var turn_label = Label.new()
-			turn_label.text = "► NOW"
-			turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			turn_label.add_theme_font_size_override("font_size", 9)
-			turn_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
-			vbox.add_child(turn_label)
-		
-		turn_queue_container.add_child(card_panel)
+			push_error("Instantiated node is not a TurnQueueCard!")
 
 func update_ui():
 	update_character_info()

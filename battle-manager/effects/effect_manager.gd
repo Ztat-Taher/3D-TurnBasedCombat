@@ -7,7 +7,6 @@ class_name EffectManager
 signal effect_triggered(effect_name: String)
 signal all_effects_finished
 
-var camera_shake: CameraShake
 var screen_flash: ScreenFlash
 var time_slow: TimeSlow
 var impact_frame: ImpactFrame
@@ -29,9 +28,6 @@ func _ready() -> void:
 	print("EffectManager _ready() called")
 	
 	# Initialize effect systems
-	camera_shake = CameraShake.new()
-	add_child(camera_shake)
-	
 	# Don't create ScreenFlash - it should be in the HUD
 	# We'll get a reference to it via setup_screen_flash()
 	
@@ -42,9 +38,6 @@ func _ready() -> void:
 	add_child(impact_frame)
 	
 	# Connect signals to track active effects
-	camera_shake.shake_started.connect(_on_effect_started.bind("camera_shake"))
-	camera_shake.shake_finished.connect(_on_effect_finished.bind("camera_shake"))
-	
 	time_slow.time_slow_started.connect(_on_effect_started.bind("time_slow"))
 	time_slow.time_slow_finished.connect(_on_effect_finished.bind("time_slow"))
 	
@@ -63,8 +56,6 @@ func setup_screen_flash(flash: ScreenFlash) -> void:
 # Normal hit
 func trigger_normal_hit() -> void:
 	print("EffectManager: trigger_normal_hit")
-	if camera_shake:
-		camera_shake.impact_shake(2.0, 0.5)  # Increased intensity for testing
 	if screen_flash:
 		screen_flash.damage_flash(0.5, 1.0)  # Increased duration and intensity for testing
 	if impact_frame:
@@ -73,8 +64,6 @@ func trigger_normal_hit() -> void:
 # Critical hit
 func trigger_critical_hit() -> void:
 	print("EffectManager: trigger_critical_hit")
-	if camera_shake:
-		camera_shake.critical_shake(0.8, 0.2)
 	if screen_flash:
 		screen_flash.critical_flash(0.15, 0.8)
 	if time_slow:
@@ -84,8 +73,6 @@ func trigger_critical_hit() -> void:
 
 # Perfect parry
 func trigger_perfect_parry() -> void:
-	if camera_shake:
-		camera_shake.directional_shake(Vector3.UP, 0.4, 0.4)
 	if screen_flash:
 		screen_flash.block_flash(0.2, 0.6)
 	if time_slow:
@@ -95,8 +82,6 @@ func trigger_perfect_parry() -> void:
 
 # AOE attack
 func trigger_aoe_attack() -> void:
-	if camera_shake:
-		camera_shake.sustained_shake(0.4, 0.6)
 	if screen_flash:
 		screen_flash.aoe_flash(0.25, 0.7)
 	if impact_frame:
@@ -104,8 +89,6 @@ func trigger_aoe_attack() -> void:
 
 # Big damage
 func trigger_big_damage() -> void:
-	if camera_shake:
-		camera_shake.sustained_shake(0.6, 0.5)
 	if screen_flash:
 		screen_flash.damage_flash(0.15, 0.7)
 	if time_slow:
@@ -115,8 +98,6 @@ func trigger_big_damage() -> void:
 
 # Block/parry
 func trigger_block() -> void:
-	if camera_shake:
-		camera_shake.directional_shake(Vector3.UP, 0.3, 0.3)
 	if screen_flash:
 		screen_flash.block_flash(0.15, 0.5)
 	if impact_frame:
@@ -124,8 +105,6 @@ func trigger_block() -> void:
 
 # Dodge
 func trigger_dodge() -> void:
-	if camera_shake:
-		camera_shake.directional_shake(Vector3.DOWN, 0.2, 0.2)
 	if screen_flash:
 		screen_flash.dodge_flash(0.1, 0.4)
 	if impact_frame:
@@ -140,9 +119,6 @@ func trigger_hit_stop(duration: float = 0.1, time_scale: float = 0.1) -> void:
 		impact_frame.custom_freeze(duration)
 
 # Individual effect access
-func get_camera_shake() -> CameraShake:
-	return camera_shake
-
 func get_screen_flash() -> ScreenFlash:
 	return screen_flash
 
@@ -151,10 +127,6 @@ func get_time_slow() -> TimeSlow:
 
 func get_impact_frame() -> ImpactFrame:
 	return impact_frame
-
-# Camera setup
-func setup_camera(camera: Camera3D) -> void:
-	camera_shake.set_camera(camera)
 
 # Node registration for impact frames
 func register_impact_node(node: Node) -> void:
@@ -209,7 +181,6 @@ func _on_effect_finished(effect_name: String) -> void:
 
 # Stop all effects immediately
 func stop_all_effects() -> void:
-	camera_shake.stop_shake()
 	screen_flash.stop_flash()
 	time_slow.stop_slow()
 	impact_frame.stop_freeze()
@@ -226,9 +197,6 @@ func get_active_effect_count() -> int:
 	return active_effects.size()
 
 # Disable/enable specific effect systems
-func set_camera_shake_enabled(enabled: bool) -> void:
-	camera_shake.process_mode = Node.PROCESS_MODE_INHERIT if enabled else Node.PROCESS_MODE_DISABLED
-
 func set_screen_flash_enabled(enabled: bool) -> void:
 	screen_flash.process_mode = Node.PROCESS_MODE_INHERIT if enabled else Node.PROCESS_MODE_DISABLED
 

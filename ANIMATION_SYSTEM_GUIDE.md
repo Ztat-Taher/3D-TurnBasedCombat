@@ -95,7 +95,7 @@ _current_attack_duration = max(0.25, clip_length)
 ```
 
 ### Step 2: The `hit_moment` Signal
-To ensure damage numbers, screen shakes, and reactive defense windows (dodge/parry) line up precisely with the physical impact of the swing/punch (rather than firing when the animation starts or finishes), the system schedules a `hit_moment` signal:
+To ensure damage numbers and reactive defense windows (dodge/parry) line up precisely with the physical impact of the swing/punch (rather than firing when the animation starts or finishes), the system schedules a `hit_moment` signal:
 
 ```gdscript
 # Default: contact occurs at 55% of the total animation duration

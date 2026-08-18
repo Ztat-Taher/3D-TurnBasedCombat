@@ -733,6 +733,62 @@ func return_to_original_position():
 		global_position.distance_to(original_position) / movement_speed)
 	tween.tween_callback(_on_return_complete)
 
+## Performs a fixed dash backwards when dodging
+func perform_dodge_dash() -> void:
+	if is_advancing:
+		print("[Dodge] Movement already in progress on ", character_name)
+		return
+	
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if not battle_manager:
+		return
+	
+	# Store current position before dodge
+	var dodge_start_position = global_position
+	
+	# Calculate backward direction (opposite to current facing direction)
+	var backward_direction = -global_transform.basis.z.normalized()
+	
+	# Fixed dodge distance
+	var dodge_distance = 2.0
+	var dodge_target_position = global_position + backward_direction * dodge_distance
+	
+	print("[Dodge] %s dashing backwards from %v to %v" % [character_name, global_position, dodge_target_position])
+	
+	set_advancing(true)
+	_try_animation("walk")
+	
+	var movement_speed = custom_movement_speed if custom_movement_speed > 0 else battle_manager.movement_speed
+	movement_speed *= battle_manager.speed_multiplier * 1.5  # Faster movement for dodge
+	
+	var tween = create_tween()
+	tween.set_speed_scale(battle_manager.speed_multiplier)
+	tween.tween_property(self, "global_position", dodge_target_position, 
+		global_position.distance_to(dodge_target_position) / movement_speed)
+	tween.tween_callback(_on_dodge_dash_complete.bind(dodge_start_position))
+
+func _on_dodge_dash_complete(original_position: Vector3):
+	print("[Dodge] Dash complete for %s, returning to original position" % character_name)
+	
+	# Small pause at the end of dodge
+	await get_tree().create_timer(0.15).timeout
+	
+	# Return to original position
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if not battle_manager:
+		set_advancing(false)
+		_try_animation("idle1")
+		return
+	
+	var movement_speed = custom_movement_speed if custom_movement_speed > 0 else battle_manager.movement_speed
+	movement_speed *= battle_manager.speed_multiplier
+	
+	var tween = create_tween()
+	tween.set_speed_scale(battle_manager.speed_multiplier)
+	tween.tween_property(self, "global_position", original_position, 
+		global_position.distance_to(original_position) / movement_speed)
+	tween.tween_callback(_on_return_complete)
+
 func _on_return_complete():
 	set_advancing(false)
 	_try_animation("idle1")
