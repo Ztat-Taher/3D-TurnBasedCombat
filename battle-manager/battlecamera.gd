@@ -13,6 +13,7 @@ enum CameraMode {
 var camera: Camera3D
 var current_mode: CameraMode = CameraMode.DEFAULT
 var tween: Tween
+var camera_shake: CameraShake
 
 var _default_transform: Transform3D
 var _default_fov: float
@@ -31,6 +32,7 @@ var _focus_instance: Camera3D
 
 func _ready() -> void:
 	call_deferred("_setup_camera")
+	_setup_camera_shake()
 
 func _setup_camera() -> void:
 	if not camera:
@@ -45,6 +47,18 @@ func _setup_camera() -> void:
 	if camera:
 		_default_transform = camera.global_transform
 		_default_fov = camera.fov
+
+func _setup_camera_shake() -> void:
+	camera_shake = CameraShake.new()
+	add_child(camera_shake)
+	call_deferred("_connect_camera_shake")
+
+func _connect_camera_shake() -> void:
+	if camera_shake and camera:
+		camera_shake.set_camera(camera)
+
+func get_camera_shake() -> CameraShake:
+	return camera_shake
 
 func set_default_camera() -> void:
 	current_mode = CameraMode.DEFAULT

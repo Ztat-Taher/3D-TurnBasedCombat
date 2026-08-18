@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dskqhs3k6c8xn"]
 
 [ext_resource type="Script" uid="uid://c5dbtyrtv3prv" path="res://battle-manager/card_combat/card_button.gd" id="1"]
+[ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="2_kg3nd"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_glow"]
 bg_color = Color(1, 1, 1, 0)
@@ -80,7 +81,6 @@ mouse_filter = 2
 
 [node name="CardName" type="Label" parent="CardPanel/Content/VBox" unique_id=1279491388]
 layout_mode = 2
-mouse_filter = 2
 text = "Card Name"
 horizontal_alignment = 1
 
@@ -102,7 +102,6 @@ offset_right = 15.0
 offset_bottom = 15.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 text = "3"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -110,9 +109,11 @@ vertical_alignment = 1
 [node name="CardDescription" type="Label" parent="CardPanel/Content/VBox" unique_id=698020426]
 layout_mode = 2
 size_flags_vertical = 3
-mouse_filter = 2
 text = "Card description"
 autowrap_mode = 3
+
+[node name="ButtonJuice" type="Node" parent="." unique_id=357471438]
+script = ExtResource("2_kg3nd")
 
 [connection signal="gui_input" from="." to="." method="_on_gui_input"]
 [connection signal="mouse_entered" from="." to="." method="_on_mouse_entered"]

@@ -1,11 +1,11 @@
-[gd_scene load_steps=3 format=3 uid="uid://52sutka7rtgo"]
+[gd_scene format=3 uid="uid://52sutka7rtgo"]
 
 [ext_resource type="Script" uid="uid://ec0y25we1j16" path="res://battle-manager/battlehud/item_button.gd" id="1_d51ap"]
 [ext_resource type="Texture2D" uid="uid://desmmvfvehe3b" path="res://assets/images/icons/Asset 11.png" id="3_8hd16"]
+[ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="3_r004x"]
 
-[node name="ItemRow" type="Button"]
+[node name="ItemRow" type="Button" unique_id=633410267]
 custom_minimum_size = Vector2(259, 40)
-anchors_preset = -1
 anchor_right = 0.224826
 anchor_bottom = 0.0617284
 grow_vertical = 2
@@ -14,7 +14,7 @@ size_flags_vertical = 3
 script = ExtResource("1_d51ap")
 metadata/_edit_use_anchors_ = true
 
-[node name="HBoxContainer" type="HBoxContainer" parent="."]
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=816861729]
 layout_mode = 1
 anchors_preset = 14
 anchor_top = 0.5
@@ -25,21 +25,24 @@ offset_bottom = 16.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="HBox#Icon" type="TextureRect" parent="HBoxContainer"]
+[node name="HBox#Icon" type="TextureRect" parent="HBoxContainer" unique_id=1436927916]
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
 texture = ExtResource("3_8hd16")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="HBox#ItemName" type="Label" parent="HBoxContainer"]
+[node name="HBox#ItemName" type="Label" parent="HBoxContainer" unique_id=558412731]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Item Name"
 
-[node name="HBox#ItemCount" type="Label" parent="HBoxContainer"]
+[node name="HBox#ItemCount" type="Label" parent="HBoxContainer" unique_id=658573197]
 custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Count"
 horizontal_alignment = 2
+
+[node name="ButtonJuice" type="Node" parent="." unique_id=188790932]
+script = ExtResource("3_r004x")

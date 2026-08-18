@@ -281,6 +281,10 @@ func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) 
 	var final_damage = int(total_damage * damage_multiplier)
 	print("Final damage to apply: ", final_damage)
 	
+	# Trigger AOE effect if applicable
+	if is_aoe and battle_manager and battle_manager.effect_manager:
+		battle_manager.effect_manager.trigger_aoe_attack()
+	
 	if battle_manager:
 		await battle_manager.damage_calculation(current_player_battler, target, final_damage)
 	
@@ -506,6 +510,10 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			if hud and hud.battle_text_display:
 				hud.battle_text_display.show_perfect_parry(target_defender)
 			
+			# Trigger perfect parry effect
+			if battle_manager and battle_manager.effect_manager:
+				battle_manager.effect_manager.trigger_perfect_parry()
+			
 			# Execute counterattack from defender to attacker
 			await _execute_perfect_parry_counter(target_defender, attacker)
 			return 0 # Complete damage avoidance on defender
@@ -514,6 +522,11 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			print("DODGE by %s! No damage taken." % target_defender.character_name)
 			if hud and hud.battle_text_display:
 				hud.battle_text_display.show_dodge(target_defender)
+			
+			# Trigger dodge effect
+			if battle_manager and battle_manager.effect_manager:
+				battle_manager.effect_manager.trigger_dodge()
+			
 			return 0 # Complete damage avoidance
 			
 		"parry":
@@ -523,6 +536,11 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			print("PARRY by %s! Damage reduced from %d to %d" % [target_defender.character_name, damage, reduced_damage])
 			if hud and hud.battle_text_display:
 				hud.battle_text_display.show_parry(target_defender, amount_reduced)
+			
+			# Trigger block/parry effect
+			if battle_manager and battle_manager.effect_manager:
+				battle_manager.effect_manager.trigger_block()
+			
 			return reduced_damage
 			
 		_:
@@ -565,6 +583,14 @@ func _execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> voi
 		battle_manager.hud.update_health_bars()
 		if battle_manager.hud.battle_text_display:
 			battle_manager.hud.battle_text_display.show_counter(defender, attacker, final_counter_dmg)
+	
+	# Check if attacker was defeated by counter attack
+	if attacker.is_defeated():
+		print("[Counterattack] Attacker %s was defeated by counter attack!" % attacker.character_name)
+		# Clean up defeated enemy
+		if battle_manager:
+			battle_manager._cleanup_defeated_from_turn_order()
+			battle_manager._cleanup_defeated_enemies()
 	
 	# Allow defender to finish swing and return to idle
 	await get_tree().create_timer(0.3).timeout

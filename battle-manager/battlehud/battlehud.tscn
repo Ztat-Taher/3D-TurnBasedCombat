@@ -3,10 +3,16 @@
 [ext_resource type="Script" uid="uid://835wmi7qej15" path="res://battle-manager/battlehud/battlehud.gd" id="1_0qukq"]
 [ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_uiugx"]
 [ext_resource type="Script" uid="uid://gl487spddx3j" path="res://battle-manager/battlehud/battle_text_display.gd" id="3_btt"]
-[ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="3_input"]
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://battle-manager/battlehud/battleresults.tscn" id="6_g4nh0"]
+[ext_resource type="Texture2D" uid="uid://yp7lgpib21q3" path="res://assets/images/ui/attack.png" id="6_xkcqd"]
 [ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="7_cardui"]
+[ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="7_p32nk"]
 [ext_resource type="PackedScene" path="res://battle-manager/battlehud/BossBar.tscn" id="8_bossbar"]
+[ext_resource type="Script" uid="uid://igumddyitxrw" path="res://battle-manager/effects/screen_flash.gd" id="9_flash"]
+[ext_resource type="Texture2D" uid="uid://canwm08m3musu" path="res://assets/images/ui/items.png" id="9_ldk3v"]
+[ext_resource type="Texture2D" uid="uid://bramr4vhhulsw" path="res://assets/images/ui/run.png" id="10_ejl8j"]
+[ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="10_input"]
+[ext_resource type="Texture2D" uid="uid://dmqu76l8ut0f4" path="res://assets/images/ui/end.png" id="11_7fy88"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -150,10 +156,10 @@ theme = ExtResource("2_uiugx")
 alignment = 1
 vertical = true
 
-[node name="Attack" type="Button" parent="Control/ActionButtons" unique_id=2000000004]
+[node name="Attack" type="TextureButton" parent="Control/ActionButtons" unique_id=545694122]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Attack"
+texture_normal = ExtResource("6_xkcqd")
 
 [node name="AttackPrompt" type="Label" parent="Control/ActionButtons/Attack" unique_id=2000000005]
 layout_mode = 1
@@ -169,12 +175,16 @@ offset_bottom = 10.0
 grow_horizontal = 0
 grow_vertical = 2
 text = "[A]"
-script = ExtResource("3_input")
+script = ExtResource("10_input")
 
-[node name="Items" type="Button" parent="Control/ActionButtons" unique_id=150334854]
+[node name="ButtonJuice" type="Node" parent="Control/ActionButtons/Attack" unique_id=1104936912]
+script = ExtResource("7_p32nk")
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Items" type="TextureButton" parent="Control/ActionButtons" unique_id=1476885559]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Items"
+texture_normal = ExtResource("9_ldk3v")
 
 [node name="ItemsPrompt" type="Label" parent="Control/ActionButtons/Items" unique_id=2000000001]
 layout_mode = 1
@@ -190,12 +200,16 @@ offset_bottom = 10.0
 grow_horizontal = 0
 grow_vertical = 2
 text = "[X]"
-script = ExtResource("3_input")
+script = ExtResource("10_input")
 
-[node name="Run" type="Button" parent="Control/ActionButtons" unique_id=1887464156]
+[node name="ButtonJuice" type="Node" parent="Control/ActionButtons/Items" unique_id=235453035]
+script = ExtResource("7_p32nk")
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Run" type="TextureButton" parent="Control/ActionButtons" unique_id=1932166834]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Run"
+texture_normal = ExtResource("10_ejl8j")
 
 [node name="RunPrompt" type="Label" parent="Control/ActionButtons/Run" unique_id=2000000002]
 layout_mode = 1
@@ -211,12 +225,16 @@ offset_bottom = 10.0
 grow_horizontal = 0
 grow_vertical = 2
 text = "[Y]"
-script = ExtResource("3_input")
+script = ExtResource("10_input")
 
-[node name="EndTurnButton" type="Button" parent="Control/ActionButtons" unique_id=999999996]
+[node name="ButtonJuice" type="Node" parent="Control/ActionButtons/Run" unique_id=2072622228]
+script = ExtResource("7_p32nk")
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="EndTurnButton" type="TextureButton" parent="Control/ActionButtons" unique_id=1519840055]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "End Turn"
+texture_normal = ExtResource("11_7fy88")
 
 [node name="EndTurnPrompt" type="Label" parent="Control/ActionButtons/EndTurnButton" unique_id=2000000003]
 layout_mode = 1
@@ -232,7 +250,11 @@ offset_bottom = 10.0
 grow_horizontal = 0
 grow_vertical = 2
 text = "[B]"
-script = ExtResource("3_input")
+script = ExtResource("10_input")
+
+[node name="ButtonJuice" type="Node" parent="Control/ActionButtons/EndTurnButton" unique_id=1031274832]
+script = ExtResource("7_p32nk")
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
 [node name="PartyStatusPanel" type="HBoxContainer" parent="Control" unique_id=2080000001]
 layout_mode = 1
@@ -277,7 +299,10 @@ offset_bottom = 10.0
 grow_horizontal = 0
 grow_vertical = 2
 text = "[B]"
-script = ExtResource("3_input")
+script = ExtResource("10_input")
+
+[node name="ButtonJuice" type="Node" parent="Control/BackButton" unique_id=1929906410]
+script = ExtResource("7_p32nk")
 
 [node name="BossBar" parent="Control" unique_id=1980246889 instance=ExtResource("8_bossbar")]
 visible = false
@@ -327,6 +352,18 @@ layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
+
+[node name="ScreenFlashOverlay" type="ColorRect" parent="Control" unique_id=1438965132]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0)
+z_index = 1000
+script = ExtResource("9_flash")
 
 [connection signal="pressed" from="Control/ActionButtons/Attack" to="." method="_on_attack_pressed"]
 [connection signal="pressed" from="Control/ActionButtons/Items" to="." method="_on_items_pressed"]

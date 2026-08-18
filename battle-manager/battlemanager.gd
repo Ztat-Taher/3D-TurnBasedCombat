@@ -304,6 +304,7 @@ func cleanup_defeated_enemies():
 var is_animating: bool = false
 var card_integration: CardIntegration
 var battle_camera: BattleCamera
+var effect_manager: EffectManager
 
 func _ready():
 	add_to_group("battle_manager")
@@ -317,11 +318,44 @@ func _ready():
 	battle_camera.name = "BattleCameraController"
 	add_child(battle_camera)
 	
+	# Initialize effect manager
+	effect_manager = EffectManager.new()
+	effect_manager.name = "EffectManager"
+	add_child(effect_manager)
+	
+	# Connect camera shake to battle camera after a short delay to ensure camera is ready
+	call_deferred("_connect_effect_camera")
+	
 	# Initialize card integration
 	initialize_card_integration()
 	
 	# Initialize battle
 	initialize_battle()
+
+func _connect_effect_camera() -> void:
+	if effect_manager and battle_camera:
+		var camera_shake = battle_camera.get_camera_shake()
+		if camera_shake:
+			print("Connecting effect camera - camera: ", camera_shake.camera)
+			effect_manager.setup_camera(camera_shake.camera)
+		else:
+			print("Camera shake not available in battle_camera")
+	else:
+		print("EffectManager or battle_camera not available")
+	
+	# Connect screen flash from HUD
+	if effect_manager and hud:
+		print("Attempting to connect screen flash - hud: ", hud)
+		var screen_flash = hud.get_node_or_null("Control/ScreenFlashOverlay")
+		print("ScreenFlashOverlay node: ", screen_flash)
+		if screen_flash:
+			print("Connecting screen flash from HUD: ", screen_flash, " visible: ", screen_flash.visible, " modulate: ", screen_flash.modulate)
+			effect_manager.setup_screen_flash(screen_flash)
+		else:
+			print("ScreenFlashOverlay not found in HUD - checking Control children")
+			var control = hud.get_node_or_null("Control")
+			if control:
+				print("Control node found, children: ", control.get_children())
 
 func initialize_card_integration():
 	# Create card integration node
@@ -1064,6 +1098,23 @@ func damage_calculation(attacker, target, damage) -> void:
 	
 	# Only apply if damage is still positive after calculation
 	if damage > 0:
+		# Trigger game feel effects based on damage
+		if effect_manager:
+			# Check for critical hit (damage > 20% of target's max HP)
+			var is_critical = damage > (target.max_health * 0.2)
+			var is_big_damage = damage > (target.max_health * 0.1)
+			
+			print("Triggering effect - damage: ", damage, " max_health: ", target.max_health, " is_critical: ", is_critical, " is_big_damage: ", is_big_damage)
+			
+			if is_critical:
+				effect_manager.trigger_critical_hit()
+			elif is_big_damage:
+				effect_manager.trigger_big_damage()
+			else:
+				effect_manager.trigger_normal_hit()
+		else:
+			print("EffectManager not available!")
+		
 		# AWAIT damage so counters complete before continuing
 		await target.take_damage(damage, attacker)
 		hud.update_health_bars()

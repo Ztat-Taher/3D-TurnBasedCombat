@@ -10,10 +10,10 @@ signal end_turn_pressed
 @onready var item_container = $Control/Items/ScrollContainer/BoxContainer
 
 @onready var action_buttons: BoxContainer = $Control/ActionButtons
-@onready var attack_button: Button = $Control/ActionButtons/Attack
-@onready var items_button: Button = $Control/ActionButtons/Items
-@onready var run_button: Button = $Control/ActionButtons/Run
-@onready var end_turn_button: Button = $Control/ActionButtons/EndTurnButton
+@onready var attack_button: TextureButton = $Control/ActionButtons/Attack
+@onready var items_button: TextureButton = $Control/ActionButtons/Items
+@onready var run_button: TextureButton = $Control/ActionButtons/Run
+@onready var end_turn_button: TextureButton = $Control/ActionButtons/EndTurnButton
 @onready var global_back_button: Button = $Control/BackButton
 @onready var battle_text_display: RichTextLabel = $Control/BattleTextDisplay/Text
 @onready var item_select: Control = $Control/Items
