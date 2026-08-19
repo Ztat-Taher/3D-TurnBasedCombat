@@ -12,11 +12,11 @@ signal end_turn_pressed
 @onready var party_status_card_scene: PackedScene = preload("res://battle-manager/battlehud/party_status_card.tscn")
 @onready var parry_window_scene: PackedScene = preload("res://battle-manager/battlehud/parry_window.tscn")
 
-@onready var action_buttons: BoxContainer = $Control/ActionButtons
-@onready var attack_button: TextureButton = $Control/ActionButtons/Attack
-@onready var items_button: TextureButton = $Control/ActionButtons/Items
-@onready var run_button: TextureButton = $Control/ActionButtons/Run
-@onready var end_turn_button: TextureButton = $Control/ActionButtons/EndTurnButton
+@onready var action_buttons: ActionButtons = $Control/ActionButtons
+@onready var attack_button: TextureButton = $Control/ActionButtons.get_node("Attack")
+@onready var items_button: TextureButton = $Control/ActionButtons.get_node("Items")
+@onready var run_button: TextureButton = $Control/ActionButtons.get_node("Run")
+@onready var end_turn_button: TextureButton = $Control/ActionButtons.get_node("EndTurnButton")
 @onready var global_back_button: Button = $Control/BackButton
 @onready var battle_text_display: RichTextLabel = $Control/BattleTextDisplay/Text
 @onready var item_select: Control = $Control/Items
@@ -45,17 +45,24 @@ var active_enemies: Array = []
 var last_ap_by_battler: Dictionary = {}
 var ally_cards_map: Dictionary = {} # Battler -> PartyStatusCard
 
-var _action_buttons_tween: Tween
-
 func _ready():
-	print("Inside BattleHUD _ready()")
-	
 	# Connect CardUI signals if it exists
 	if card_ui:
 		if card_ui.has_signal("card_selected"):
 			card_ui.card_selected.connect(func(card): card_selected.emit(card))
 		if card_ui.has_signal("end_turn_pressed"):
 			card_ui.end_turn_pressed.connect(func(): end_turn_pressed.emit())
+	
+	# Connect ActionButtons signals
+	if action_buttons:
+		if attack_button:
+			attack_button.pressed.connect(_on_attack_pressed)
+		if items_button:
+			items_button.pressed.connect(_on_items_pressed)
+		if run_button:
+			run_button.pressed.connect(_on_run_pressed)
+		if end_turn_button:
+			end_turn_button.pressed.connect(_on_end_turn_button_pressed)
 	
 	item_select.visible = false
 	hide_action_buttons()
@@ -78,7 +85,7 @@ func _process(_delta: float) -> void:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and (battle_manager.is_animating or battle_manager.in_target_selection):
 		if action_buttons and action_buttons.visible:
-			hide_action_buttons()
+			action_buttons.hide()
 		return
 	
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
@@ -214,6 +221,8 @@ func _check_boss_bar(enemy_node: Node) -> void:
 		boss_bar.show_boss(enemy_node as Battler)
 
 func show_action_buttons(character: Node):
+	if not action_buttons:
+		return
 	if not character or not character.is_in_group("players"):
 		hide_action_buttons()
 		return
@@ -239,20 +248,16 @@ func show_action_buttons(character: Node):
 			if not cam.is_position_behind(world_pos):
 				var screen_pos = cam.unproject_position(world_pos)
 				var target_pos = screen_pos + Vector2(70.0, -50.0)
-				# Start offset further to the right for slide-in
-				action_buttons.position = target_pos + Vector2(40.0, 0.0)
+				action_buttons.position = target_pos
 	
 	action_buttons.show()
-	action_buttons.modulate.a = 0.0
 	
-	var end_btn = action_buttons.get_node_or_null("EndTurnButton")
-	if end_btn:
-		end_btn.disabled = false
+	if end_turn_button:
+		end_turn_button.disabled = false
 	
 	# Setup input prompts
 	_setup_input_prompts()
 	
-	# Slide in from right with fade animation
 	# Show attack button initially, hide card UI
 	if attack_button:
 		attack_button.visible = true
@@ -261,19 +266,16 @@ func show_action_buttons(character: Node):
 	
 	_update_back_button_visibility()
 	
-	if _action_buttons_tween and _action_buttons_tween.is_running():
-		_action_buttons_tween.kill()
-	
-	_action_buttons_tween = create_tween()
-	_action_buttons_tween.set_parallel(true)
-	_action_buttons_tween.set_ease(Tween.EaseType.EASE_OUT)
-	_action_buttons_tween.set_trans(Tween.TransitionType.TRANS_CUBIC)
-	_action_buttons_tween.tween_property(action_buttons, "modulate:a", 1.0, 0.25)
+	# Use the new ActionButtons animation system
+	action_buttons.animate_buttons_in()
 
 func hide_action_buttons():
-	if _action_buttons_tween and _action_buttons_tween.is_running():
-		_action_buttons_tween.kill()
-	action_buttons.hide()
+	if action_buttons:
+		action_buttons.animate_buttons_out()
+		var action_tween = action_buttons.get_tween()
+		if action_tween:
+			await action_tween.finished
+		action_buttons.hide()
 
 func _update_back_button_visibility():
 	# Systematic back button visibility management
@@ -354,9 +356,9 @@ func _on_item_back_pressed() -> void:
 
 func _close_items_menu():
 	item_select.visible = false
-	# Show items button again when closing items menu
-	if items_button:
-		items_button.visible = true
+	# Show items button again when closing items menu with animation
+	if action_buttons and items_button:
+		action_buttons.show_button("Items")
 	if activeBattler:
 		show_action_buttons(activeBattler)
 	_update_back_button_visibility()
@@ -375,42 +377,42 @@ func _on_item_selected(item: Item) -> void:
 	_update_back_button_visibility()
 
 func _on_attack_pressed() -> void:
-	# Show card UI and hide attack button
+	# Show card UI and hide attack button with animation
 	if card_ui:
 		card_ui.visible = true
-	if attack_button:
-		attack_button.visible = false
+	if action_buttons and attack_button:
+		action_buttons.hide_button("Attack")
 	# Keep other action buttons visible
-	if items_button:
-		items_button.visible = true
-	if run_button:
-		run_button.visible = true
-	if end_turn_button:
-		end_turn_button.visible = true
+	if action_buttons and items_button:
+		action_buttons.show_button("Items")
+	if action_buttons and run_button:
+		action_buttons.show_button("Run")
+	if action_buttons and end_turn_button:
+		action_buttons.show_button("EndTurnButton")
 	_update_back_button_visibility()
 
 func close_card_ui() -> void:
-	# Hide card UI and show attack button again
+	# Hide card UI and show attack button again with animation
 	if card_ui:
 		card_ui.visible = false
-	if attack_button:
-		attack_button.visible = true
+	if action_buttons and attack_button:
+		action_buttons.show_button("Attack")
 
 func _on_items_pressed() -> void:
 	# Show items and hide only items button, keep others visible
 	setup_item_list(activeBattler)
 	item_select.visible = true
-	if items_button:
-		items_button.visible = false
+	if action_buttons and items_button:
+		action_buttons.hide_button("Items")
 	if card_ui:
 		card_ui.visible = false
 	# Keep other action buttons visible (including attack)
-	if attack_button:
-		attack_button.visible = true
-	if run_button:
-		run_button.visible = true
-	if end_turn_button:
-		end_turn_button.visible = true
+	if action_buttons and attack_button:
+		action_buttons.show_button("Attack")
+	if action_buttons and run_button:
+		action_buttons.show_button("Run")
+	if action_buttons and end_turn_button:
+		action_buttons.show_button("EndTurnButton")
 	_update_back_button_visibility()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -429,20 +431,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Only process action buttons when action buttons list is visible
 	if action_buttons and action_buttons.visible:
 		if event.is_action_pressed("attack"):
-			if attack_button and attack_button.visible:
+			if attack_button and action_buttons.is_button_visible("Attack"):
 				_on_attack_pressed()
 			handled = true
 		elif event.is_action_pressed("toggle_items"):
-			if items_button and items_button.visible:
+			if items_button and action_buttons.is_button_visible("Items"):
 				_on_items_pressed()
 			handled = true
 		elif event.is_action_pressed("toggle_run"):
-			if run_button and run_button.visible:
+			if run_button and action_buttons.is_button_visible("Run"):
 				_on_run_pressed()
 			handled = true
 		elif event.is_action_pressed("ui_cancel"):
 			# Contextual: B button works for both end turn and cancel
-			if end_turn_button and end_turn_button.visible:
+			if end_turn_button and action_buttons.is_button_visible("EndTurnButton"):
 				_on_end_turn_button_pressed()
 			else:
 				_on_global_back_pressed()
@@ -462,9 +464,8 @@ func _on_run_pressed() -> void:
 	action_selected.emit("run", null)
 
 func _on_end_turn_button_pressed() -> void:
-	var end_btn = action_buttons.get_node_or_null("EndTurnButton")
-	if end_btn:
-		end_btn.disabled = true
+	if end_turn_button:
+		end_turn_button.disabled = true
 	end_turn_pressed.emit()
 
 func set_targeting_mode(enabled: bool) -> void:
@@ -483,8 +484,6 @@ func set_targeting_mode(enabled: bool) -> void:
 	_update_back_button_visibility()
 
 func set_aoe_confirmation_mode(enabled: bool, card_name: String = "", target_count: int = 0) -> void:
-	print("Setting AOE confirmation mode: ", enabled, " card: ", card_name, " targets: ", target_count)
-	
 	if enabled:
 		hide_action_buttons()
 		if card_ui:
@@ -506,8 +505,6 @@ func set_aoe_confirmation_mode(enabled: bool, card_name: String = "", target_cou
 		hide_aoe_confirmation_mode()
 
 func hide_aoe_confirmation_mode() -> void:
-	print("Hiding AOE confirmation mode")
-	
 	if aoe_confirm_button:
 		aoe_confirm_button.visible = false
 	
@@ -524,10 +521,8 @@ func _ensure_aoe_confirm_button() -> void:
 		aoe_confirm_button.set_size(Vector2(200, 50))
 		aoe_confirm_button.pressed.connect(_on_aoe_confirm_pressed)
 		add_child(aoe_confirm_button)
-		print("Created AOE confirm button")
 
 func _on_aoe_confirm_pressed() -> void:
-	print("AOE confirm button pressed")
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and battle_manager.has_method("confirm_aoe_execution"):
 		battle_manager.confirm_aoe_execution()

@@ -4,15 +4,12 @@
 [ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_uiugx"]
 [ext_resource type="Script" uid="uid://gl487spddx3j" path="res://battle-manager/battlehud/battle_text_display.gd" id="3_btt"]
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://battle-manager/battlehud/battleresults.tscn" id="6_g4nh0"]
-[ext_resource type="Texture2D" uid="uid://yp7lgpib21q3" path="res://assets/images/ui/attack.png" id="6_xkcqd"]
 [ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="7_cardui"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="7_p32nk"]
 [ext_resource type="PackedScene" path="res://battle-manager/battlehud/BossBar.tscn" id="8_bossbar"]
 [ext_resource type="Script" uid="uid://igumddyitxrw" path="res://battle-manager/effects/screen_flash.gd" id="9_flash"]
-[ext_resource type="Texture2D" uid="uid://canwm08m3musu" path="res://assets/images/ui/items.png" id="9_ldk3v"]
-[ext_resource type="Texture2D" uid="uid://bramr4vhhulsw" path="res://assets/images/ui/run.png" id="10_ejl8j"]
 [ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="10_input"]
-[ext_resource type="Texture2D" uid="uid://dmqu76l8ut0f4" path="res://assets/images/ui/end.png" id="11_7fy88"]
+[ext_resource type="PackedScene" path="res://battle-manager/battlehud/action_buttons.tscn" id="12_action_buttons"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -111,10 +108,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -140.0
-offset_top = -70.0
-offset_right = 140.0
-offset_bottom = 70.0
+offset_left = -125.0
+offset_top = -125.0
+offset_right = 125.0
+offset_bottom = 125.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -146,192 +143,13 @@ grow_vertical = 0
 theme_override_constants/separation = -20
 alignment = 1
 
-[node name="ActionButtons" type="BoxContainer" parent="Control" unique_id=1087849572]
+[node name="ActionButtons" parent="Control" unique_id=1087849572 instance=ExtResource("12_action_buttons")]
 layout_mode = 1
-offset_right = 188.0
-offset_bottom = 140.0
-size_flags_horizontal = 0
-size_flags_vertical = 0
-theme = ExtResource("2_uiugx")
-theme_override_constants/separation = 5
-alignment = 1
-vertical = true
 
-[node name="Attack" type="TextureButton" parent="Control/ActionButtons" unique_id=545694122]
-layout_mode = 2
-custom_minimum_size = Vector2(120, 80)
-size_flags_horizontal = 3
-texture_normal = ExtResource("6_xkcqd")
-stretch_mode = 5
-
-[node name="AttackPrompt" type="Label" parent="Control/ActionButtons/Attack" unique_id=2000000005]
-layout_mode = 1
-anchors_preset = 6
-anchor_left = 1.0
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = -35.0
-offset_top = -10.0
-offset_right = -5.0
-offset_bottom = 10.0
-grow_horizontal = 0
-grow_vertical = 2
-text = "[A]"
-script = ExtResource("10_input")
-
-[node name="ButtonJuice" type="Node" parent="Control/ActionButtons/Attack" unique_id=1104936912]
-script = ExtResource("7_p32nk")
-metadata/_custom_type_script = "uid://1mbdi00spy5j"
-
-[node name="ActionLabel" type="Label" parent="Control/ActionButtons/Attack"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 10.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "Attack"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="Items" type="TextureButton" parent="Control/ActionButtons" unique_id=1476885559]
-layout_mode = 2
-custom_minimum_size = Vector2(120, 80)
-size_flags_horizontal = 3
-texture_normal = ExtResource("9_ldk3v")
-stretch_mode = 5
-
-[node name="ItemsPrompt" type="Label" parent="Control/ActionButtons/Items" unique_id=2000000001]
-layout_mode = 1
-anchors_preset = 6
-anchor_left = 1.0
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = -35.0
-offset_top = -10.0
-offset_right = -5.0
-offset_bottom = 10.0
-grow_horizontal = 0
-grow_vertical = 2
-text = "[X]"
-script = ExtResource("10_input")
-
-[node name="ButtonJuice" type="Node" parent="Control/ActionButtons/Items" unique_id=235453035]
-script = ExtResource("7_p32nk")
-metadata/_custom_type_script = "uid://1mbdi00spy5j"
-
-[node name="ActionLabel" type="Label" parent="Control/ActionButtons/Items"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 10.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "Items"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="Run" type="TextureButton" parent="Control/ActionButtons" unique_id=1932166834]
-layout_mode = 2
-custom_minimum_size = Vector2(120, 80)
-size_flags_horizontal = 3
-texture_normal = ExtResource("10_ejl8j")
-stretch_mode = 5
-
-[node name="RunPrompt" type="Label" parent="Control/ActionButtons/Run" unique_id=2000000002]
-layout_mode = 1
-anchors_preset = 6
-anchor_left = 1.0
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = -35.0
-offset_top = -10.0
-offset_right = -5.0
-offset_bottom = 10.0
-grow_horizontal = 0
-grow_vertical = 2
-text = "[Y]"
-script = ExtResource("10_input")
-
-[node name="ButtonJuice" type="Node" parent="Control/ActionButtons/Run" unique_id=2072622228]
-script = ExtResource("7_p32nk")
-metadata/_custom_type_script = "uid://1mbdi00spy5j"
-
-[node name="ActionLabel" type="Label" parent="Control/ActionButtons/Run"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 10.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "Run"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="EndTurnButton" type="TextureButton" parent="Control/ActionButtons" unique_id=1519840055]
-layout_mode = 2
-custom_minimum_size = Vector2(120, 80)
-size_flags_horizontal = 3
-texture_normal = ExtResource("11_7fy88")
-stretch_mode = 5
-
-[node name="EndTurnPrompt" type="Label" parent="Control/ActionButtons/EndTurnButton" unique_id=2000000003]
-layout_mode = 1
-anchors_preset = 6
-anchor_left = 1.0
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = -35.0
-offset_top = -10.0
-offset_right = -5.0
-offset_bottom = 10.0
-grow_horizontal = 0
-grow_vertical = 2
-text = "[B]"
-script = ExtResource("10_input")
-
-[node name="ButtonJuice" type="Node" parent="Control/ActionButtons/EndTurnButton" unique_id=1031274832]
-script = ExtResource("7_p32nk")
-metadata/_custom_type_script = "uid://1mbdi00spy5j"
-
-[node name="ActionLabel" type="Label" parent="Control/ActionButtons/EndTurnButton"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 10.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "End Turn"
-horizontal_alignment = 1
-vertical_alignment = 1
+[connection signal="pressed" from="ActionButtons/Attack" to="." method="_on_attack_pressed"]
+[connection signal="pressed" from="ActionButtons/Items" to="." method="_on_items_pressed"]
+[connection signal="pressed" from="ActionButtons/Run" to="." method="_on_run_pressed"]
+[connection signal="pressed" from="ActionButtons/EndTurnButton" to="." method="_on_end_turn_button_pressed"]
 
 [node name="PartyStatusPanel" type="HBoxContainer" parent="Control" unique_id=2080000001]
 layout_mode = 1
@@ -347,6 +165,7 @@ offset_bottom = -20.0
 grow_horizontal = 0
 grow_vertical = 0
 theme_override_constants/separation = 12
+alignment = 2
 
 [node name="BackButton" type="Button" parent="Control" unique_id=2000000007]
 visible = false
@@ -431,6 +250,7 @@ theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 
 [node name="ScreenFlashOverlay" type="ColorRect" parent="Control" unique_id=1438965132]
+z_index = 1000
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -439,11 +259,6 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(1, 1, 1, 0)
-z_index = 1000
 script = ExtResource("9_flash")
 
-[connection signal="pressed" from="Control/ActionButtons/Attack" to="." method="_on_attack_pressed"]
-[connection signal="pressed" from="Control/ActionButtons/Items" to="." method="_on_items_pressed"]
-[connection signal="pressed" from="Control/ActionButtons/Run" to="." method="_on_run_pressed"]
-[connection signal="pressed" from="Control/ActionButtons/EndTurnButton" to="." method="_on_end_turn_button_pressed"]
 [connection signal="pressed" from="Control/BackButton" to="." method="_on_global_back_pressed"]

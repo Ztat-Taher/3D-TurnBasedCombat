@@ -10,7 +10,6 @@ signal qte_failed(qte_type: String)
 signal reactive_defense_result(result_type: String) # "perfect_parry", "parry", "dodge", "none"
 
 var qte_config: QTEConfig
-var current_qte: QTE
 var current_qte_type: String = ""
 var is_qte_active: bool = false
 var qte_result: bool = false
@@ -151,7 +150,7 @@ func _get_hud() -> BattleHud:
 # GENERIC QTE ENGINE
 # ============================================================================
 
-var qte_ui_panel: QTEOverlay = null
+var qte_ui_panel: Control = null
 
 func start_qte(qte_type: QTEType, difficulty: float) -> bool:
 	if is_qte_active:
@@ -161,42 +160,24 @@ func start_qte(qte_type: QTEType, difficulty: float) -> bool:
 	is_qte_active = true
 	current_qte_type = QTEType.keys()[qte_type]
 	
-	# Create appropriate QTE based on type
-	current_qte = create_countdown_qte(difficulty)
-	
-	if not current_qte:
-		is_qte_active = false
-		return false
-	
-	# Connect signals
-	current_qte.success.connect(_on_qte_success)
-	current_qte.failed.connect(_on_qte_failed)
-	
-	# Add to scene and start
-	add_child(current_qte)
-	current_qte.start_qte()
-	
-	# Create visual UI on BattleHUD
-	_create_qte_ui(current_qte.input, current_qte.time_left)
-	
-	qte_started.emit(current_qte_type)
-	print("QTE started: ", current_qte_type, " with difficulty: ", difficulty)
-	
-	return true
-
-func create_countdown_qte(difficulty: float) -> CountdownQTE:
-	var qte = CountdownQTE.new()
-	
+	# Calculate time based on difficulty (using the same logic as before)
 	var base_time = qte_config.base_qte_time if qte_config else 3.0
 	var min_time = qte_config.min_qte_time if qte_config else 0.5
 	var input_key = qte_config.qte_input_key if qte_config else "f"
 	
 	var time_multiplier = 1.0 - (difficulty * 0.8)
 	var calculated_time = base_time * time_multiplier
-	qte.time_left = max(calculated_time, min_time)
-	qte.input = input_key
+	var time_limit = max(calculated_time, min_time)
 	
-	return qte
+	# Create the new self-contained visual UI on BattleHUD
+	_create_qte_ui(input_key, time_limit)
+	
+	qte_started.emit(current_qte_type)
+	print("QTE started: ", current_qte_type, " with difficulty: ", difficulty, " time_limit: ", time_limit)
+	
+	return true
+
+
 
 func _create_qte_ui(input_key: String, time_limit: float) -> void:
 	_remove_qte_ui()
@@ -219,49 +200,54 @@ func _create_qte_ui(input_key: String, time_limit: float) -> void:
 				target_parent = bm.hud.get_node_or_null("Control")
 	
 	if not target_parent:
+		print("QTE Manager: Could not find valid parent for QTE overlay")
 		return
 	
-	qte_ui_panel = qte_overlay_scene.instantiate() as QTEOverlay
+	qte_ui_panel = qte_overlay_scene.instantiate()
 	if not qte_ui_panel:
 		push_error("Failed to instantiate QTE overlay!")
 		return
 	
-	qte_ui_panel.setup(input_key, time_limit)
+	# Connect to the new QTE overlay's completion signal
+	if qte_ui_panel.has_signal("qte_completed"):
+		qte_ui_panel.qte_completed.connect(_on_qte_overlay_completed)
+	
+	# Setup the QTE overlay with the input key and time limit
+	if qte_ui_panel.has_method("setup"):
+		qte_ui_panel.setup(input_key, time_limit)
+	else:
+		push_error("QTE overlay instance does not have setup method!")
+		return
+	
 	target_parent.add_child(qte_ui_panel)
 
-func _process(_delta: float) -> void:
-	if is_qte_active and current_qte and is_instance_valid(current_qte):
-		if qte_ui_panel and is_instance_valid(qte_ui_panel):
-			if current_qte.timer and is_instance_valid(current_qte.timer):
-				qte_ui_panel.update_progress(current_qte.timer.time_left)
+
 
 func _remove_qte_ui() -> void:
 	if qte_ui_panel and is_instance_valid(qte_ui_panel):
+		if qte_ui_panel.has_signal("qte_completed"):
+			if qte_ui_panel.qte_completed.is_connected(_on_qte_overlay_completed):
+				qte_ui_panel.qte_completed.disconnect(_on_qte_overlay_completed)
 		qte_ui_panel.queue_free()
 		qte_ui_panel = null
 
-func _on_qte_success() -> void:
-	print("QTE success: ", current_qte_type)
-	is_qte_active = false
-	qte_result = true
-	qte_completed.emit(true, current_qte_type)
-	_remove_qte_ui()
+func _on_qte_overlay_completed(success: bool) -> void:
+	# Handle completion from the new self-contained QTE overlay
+	print("QTE overlay completed: ", success)
 	
-	if current_qte:
-		current_qte.queue_free()
-		current_qte = null
+	# Emit the appropriate signals
+	if success:
+		qte_result = true
+		qte_completed.emit(true, current_qte_type)
+	else:
+		qte_result = false
+		qte_failed.emit(current_qte_type)
+		qte_completed.emit(false, current_qte_type)
+	
+	is_qte_active = false
+	# Note: UI cleanup is handled by the overlay itself (queue_free)
 
-func _on_qte_failed() -> void:
-	print("QTE failed: ", current_qte_type)
-	is_qte_active = false
-	qte_result = false
-	qte_failed.emit(current_qte_type)
-	qte_completed.emit(false, current_qte_type)
-	_remove_qte_ui()
-	
-	if current_qte:
-		current_qte.queue_free()
-		current_qte = null
+
 
 func get_damage_multiplier(qte_type: String, success: bool) -> float:
 	if not qte_config:
@@ -277,9 +263,8 @@ func get_damage_multiplier(qte_type: String, success: bool) -> float:
 			return 1.0
 
 func cancel_qte() -> void:
-	if is_qte_active and current_qte:
-		current_qte.queue_free()
-		current_qte = null
+	if is_qte_active:
+		_remove_qte_ui()
 		is_qte_active = false
 		print("QTE cancelled")
 

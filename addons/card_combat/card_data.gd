@@ -35,6 +35,9 @@ enum PlayKind { UNIT, EFFECT, PERSISTENT }
 ## Spell effects, authored on the card. Exportable now that SpellEffect is a
 ## Resource, so a card defined as a .tres persists its effects natively.
 @export var spell_effects: Array[SpellEffect] = []
+## Extended card configuration for modular behavior
+## When set, this overrides the metadata-based configuration system
+@export var card_config: CardConfig = null
 
 
 func get_total_cost() -> int:
@@ -69,6 +72,61 @@ func targets_enemies() -> bool:
 		return true
 	return spell_effects[0].is_damage()
 
+## Check if this card uses the new card config system
+func has_card_config() -> bool:
+	return card_config != null
+
+## Get card type from either config or metadata (backward compatibility)
+func get_card_type() -> String:
+	if has_card_config():
+		return CardConfig.TargetScope.keys()[card_config.target_type]
+	return metadata.get("card_type", "attack")
+
+## Get target scope from either config or metadata (backward compatibility)
+func get_target_scope() -> String:
+	if has_card_config():
+		return CardConfig.TargetScope.keys()[card_config.target_type]
+	return metadata.get("target_scope", "single_enemy")
+
+## Get QTE difficulty from either config or metadata (backward compatibility)
+func get_qte_difficulty() -> float:
+	if has_card_config():
+		return card_config.qte_difficulty
+	return metadata.get("qte_difficulty", 0.5)
+
+## Check if card should trigger QTE
+func should_trigger_qte() -> bool:
+	if has_card_config():
+		return card_config.should_trigger_qte()
+	return metadata.get("card_type", "attack") == "attack"
+
+## Get animation from card config or fallback to metadata
+func get_animation() -> String:
+	if has_card_config() and not card_config.actor_animation.is_empty():
+		return card_config.actor_animation
+	return metadata.get("animation", "attack")
+
+## Get the appropriate target scope enum value
+func get_target_scope_enum() -> CardConfig.TargetScope:
+	if has_card_config():
+		return card_config.target_type
+	
+	# Convert metadata string to enum
+	var scope_string = metadata.get("target_scope", "single_enemy")
+	match scope_string:
+		"single_enemy":
+			return CardConfig.TargetScope.SINGLE_ENEMY
+		"all_enemies":
+			return CardConfig.TargetScope.ALL_ENEMIES
+		"single_ally":
+			return CardConfig.TargetScope.SINGLE_ALLY
+		"all_allies":
+			return CardConfig.TargetScope.ALL_ALLIES
+		"self":
+			return CardConfig.TargetScope.SELF
+		_:
+			return CardConfig.TargetScope.SINGLE_ENEMY
+
 
 func can_afford(player_mana: int) -> bool:
 	return player_mana >= get_total_cost()
@@ -96,6 +154,12 @@ static func from_dict(data: Dictionary) -> CardData:
 			if e is Dictionary:
 				parsed.append(SpellEffect.from_dict(e))
 		card.spell_effects = parsed
+	
+	# Load card config if path is provided
+	var config_path = data.get("card_config_path", "")
+	if not config_path.is_empty() and ResourceLoader.exists(config_path):
+		card.card_config = load(config_path)
+	
 	return card
 
 
@@ -103,7 +167,8 @@ func serialize() -> Dictionary:
 	var effects: Array = []
 	for e in spell_effects:
 		effects.append(e.serialize())
-	return {
+	
+	var serialized_data = {
 		"card_id": card_id,
 		"name": name,
 		"cost": cost,
@@ -113,3 +178,9 @@ func serialize() -> Dictionary:
 		"metadata": metadata.duplicate(),
 		"spell_effects": effects,
 	}
+	
+	# Add card config if present (serialize as resource path)
+	if card_config:
+		serialized_data["card_config_path"] = card_config.resource_path
+	
+	return serialized_data

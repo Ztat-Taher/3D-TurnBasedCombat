@@ -1,8 +1,17 @@
 [gd_scene format=3 uid="uid://qte_overlay_scene"]
 
 [ext_resource type="Script" path="res://battle-manager/battlehud/qte_overlay.gd" id="1_qte_overlay"]
+[ext_resource type="Shader" path="res://battle-manager/battlehud/circular_countdown_ring.gdshader" id="2_countdown_shader"]
 
-[node name="QTEOverlay" type="Panel"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_1"]
+shader = ExtResource("2_countdown_shader")
+shader_parameter/ring_radius = 0.3
+shader_parameter/ring_width = 0.08
+shader_parameter/ring_color = Vector3(0.9, 0.7, 0.2)
+shader_parameter/ring_fade = 1.0
+shader_parameter/ring_countdown = 1.0
+
+[node name="QTEOverlay" type="Control"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -10,33 +19,60 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_qte_overlay")
 
-[node name="VBox" type="VBoxContainer" parent="."]
+[node name="CenterContainer" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="TitleLabel" type="Label" parent="VBox"]
+[node name="QTEContainer" type="VBoxContainer" parent="CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 250)
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/QTEContainer"]
 layout_mode = 2
 text = "ATTACK QTE!"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 16
 theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
 
-[node name="KeyLabel" type="Label" parent="VBox"]
+[node name="RingContainer" type="Control" parent="CenterContainer/QTEContainer"]
 layout_mode = 2
-text = "[ F ]"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 28
-theme_override_colors/font_color = Color(1, 1, 1, 1)
+custom_minimum_size = Vector2(200, 200)
 
-[node name="ProgressBar" type="ProgressBar" parent="VBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 20)
-show_percentage = false
+[node name="CountdownRing" type="ColorRect" parent="CenterContainer/QTEContainer/RingContainer"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -100.0
+offset_right = 100.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0)
+material = SubResource("ShaderMaterial_1")
+
+[node name="KeyLabel" type="Label" parent="CenterContainer/QTEContainer/RingContainer"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -50.0
+offset_top = -30.0
+offset_right = 50.0
+offset_bottom = 30.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "F"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(1, 1, 1, 1)

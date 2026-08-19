@@ -209,28 +209,468 @@ func execute_card_effect(card: CardData, target: Battler) -> void:
 	# Apply state effects BEFORE execution (to avoid target being freed)
 	apply_card_states(card, target)
 	
-	# Handle different card types based on metadata
-	var card_type = card.metadata.get("card_type", "attack")
-	var target_scope = card.metadata.get("target_scope", "single_enemy")
+	# Use card config if available, otherwise fall back to metadata
+	if card.has_card_config():
+		await execute_card_with_config(card, target)
+	else:
+		# Handle different card types based on metadata (backward compatibility)
+		var card_type = card.metadata.get("card_type", "attack")
+		var target_scope = card.metadata.get("target_scope", "single_enemy")
+		
+		# Skip camera setup for AOE cards (camera is set by integration layer)
+		var is_aoe = target_scope in ["all_enemies", "all_allies", "all_allies_self"]
+		
+		match card_type:
+			"attack":
+				await execute_attack_card(card, target, is_aoe)
+			"skill":
+				await execute_skill_card(card, target, is_aoe)
+			"defense":
+				execute_defense_card(card)
+			"heal":
+				execute_heal_card(card, target, is_aoe)
+			"buff":
+				execute_buff_card(card, target, is_aoe)
+			"debuff":
+				await execute_debuff_card(card, target, is_aoe)
+			_:
+				print("Unknown card type: ", card_type)
+
+## Execute card using the new CardConfig system
+func execute_card_with_config(card: CardData, target: Battler) -> void:
+	var card_config = card.card_config
+	if not card_config:
+		push_error("Card has_card_config() returned true but card_config is null")
+		return
 	
-	# Skip camera setup for AOE cards (camera is set by integration layer)
-	var is_aoe = target_scope in ["all_enemies", "all_allies", "all_allies_self"]
+	print("Executing card with config: ", card.name)
 	
-	match card_type:
-		"attack":
-			await execute_attack_card(card, target, is_aoe)
-		"skill":
-			await execute_skill_card(card, target, is_aoe)
-		"defense":
-			execute_defense_card(card)
-		"heal":
-			execute_heal_card(card, target, is_aoe)
-		"buff":
-			execute_buff_card(card, target, is_aoe)
-		"debuff":
-			await execute_debuff_card(card, target, is_aoe)
+	# Build execution context
+	var context = {
+		"card_data": card,
+		"card_config": card_config,
+		"actor": current_player_battler,
+		"target": target,
+		"enemies": battle_manager.enemies if battle_manager else [],
+		"allies": battle_manager.allies if battle_manager else [],
+		"effect_manager": battle_manager.effect_manager if battle_manager else null,
+		"qte_manager": qte_manager,
+		"camera": battle_manager.battle_camera if battle_manager else null,
+		"parent_node": self
+	}
+	
+	# Phase 1: Animation Phase
+	await execute_animation_phase(card_config, context)
+	
+	# Phase 2: QTE Phase
+	if card_config.should_trigger_qte():
+		await execute_qte_phase(card_config, context)
+	
+	# Phase 3: Effect Phase
+	await execute_effect_phase(card_config, context)
+	
+	# Phase 4: VFX Phase
+	execute_vfx_phase(card_config, context)
+	
+	# Phase 5: Camera Phase
+	execute_camera_phase(card_config, context)
+	
+	# Phase 6: Screen Phase
+	execute_screen_phase(card_config, context)
+	
+	# Phase 7: Audio Phase
+	execute_audio_phase(card_config, context)
+	
+	print("Card execution with config complete: ", card.name)
+
+## Execute animation phase
+func execute_animation_phase(card_config: CardConfig, context: Dictionary) -> void:
+	var actor = context["actor"]
+	if not actor:
+		return
+	
+	var animation_name = card_config.actor_animation
+	if animation_name.is_empty():
+		animation_name = card_config.fallback_animation
+	
+	if not animation_name.is_empty():
+		# Apply animation settings
+		if actor.has_method("_try_animation"):
+			actor._try_animation(animation_name)
+			
+			# Handle animation events
+			if not card_config.animation_events.is_empty():
+				await process_animation_events(card_config, context)
+	else:
+		print("No animation specified for card")
+
+## Process animation events
+func process_animation_events(card_config: CardConfig, context: Dictionary) -> void:
+	var actor = context["actor"]
+	if not actor or not actor.has_method("_get_animation_duration"):
+		return
+	
+	var animation_duration = actor._get_animation_duration(card_config.actor_animation)
+	var animation_time = 0.0
+	
+	while animation_time < animation_duration:
+		var animation_progress = animation_time / animation_duration
+		
+		# Check each animation event
+		for event in card_config.animation_events:
+			if event.should_trigger(animation_progress, animation_duration):
+				if event.check_condition(actor, context["target"]):
+					var event_result = event.execute(actor, context["target"], context)
+					print("Animation event executed: ", event.get_description(), " Result: ", event_result)
+		
+		await get_tree().process_frame
+		animation_time += get_process_delta_time()
+
+## Execute QTE phase
+func execute_qte_phase(card_config: CardConfig, context: Dictionary) -> void:
+	var qte_manager = context["qte_manager"]
+	if not qte_manager:
+		return
+	
+	match card_config.qte_type:
+		CardConfig.QTEType.TIMING:
+			await execute_timing_qte(card_config, context)
+		CardConfig.QTEType.BUTTON_MASH:
+			await execute_button_mash_qte(card_config, context)
+		CardConfig.QTEType.SEQUENCE:
+			await execute_sequence_qte(card_config, context)
 		_:
-			print("Unknown card type: ", card_type)
+			print("No QTE to execute")
+
+## Execute timing-based QTE
+func execute_timing_qte(card_config: CardConfig, context: Dictionary) -> void:
+	var qte_manager = context["qte_manager"]
+	if not qte_manager.has_method("start_qte"):
+		return
+	
+	var difficulty = card_config.qte_difficulty
+	var time_limit = card_config.qte_window_duration
+	
+	var qte_started = qte_manager.start_qte(QTEManager.QTEType.CARD_ATTACK, difficulty)
+	if qte_started:
+		var qte_success = await await_qte_completion()
+		var multiplier = card_config.qte_success_multiplier if qte_success else card_config.qte_failure_multiplier
+		context["qte_multiplier"] = multiplier
+		print("Timing QTE result: ", qte_success, " Multiplier: ", multiplier)
+
+## Execute button mash QTE
+func execute_button_mash_qte(card_config: CardConfig, context: Dictionary) -> void:
+	var required_presses = card_config.qte_mash_count
+	var time_window = card_config.qte_window_duration
+	var current_presses = 0
+	var start_time = Time.get_ticks_msec() / 1000.0
+	
+	print("Button mash QTE: Press ", required_presses, " times in ", time_window, " seconds")
+	
+	while current_presses < required_presses:
+		var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
+		if elapsed >= time_window:
+			print("Button mash QTE failed - time expired")
+			context["qte_multiplier"] = card_config.qte_failure_multiplier
+			return
+		
+		# Check for button press (would need input system integration)
+		if Input.is_action_just_pressed("ui_accept"):
+			current_presses += 1
+			print("Button mash progress: ", current_presses, "/", required_presses)
+		
+		await get_tree().process_frame
+	
+	print("Button mash QTE succeeded!")
+	context["qte_multiplier"] = card_config.qte_success_multiplier
+
+## Execute sequence QTE
+func execute_sequence_qte(card_config: CardConfig, context: Dictionary) -> void:
+	var sequence = card_config.qte_sequence
+	if sequence.is_empty():
+		return
+	
+	var time_window = card_config.qte_window_duration
+	var current_index = 0
+	var start_time = Time.get_ticks_msec() / 1000.0
+	
+	print("Sequence QTE: Input sequence: ", sequence)
+	
+	while current_index < sequence.size():
+		var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
+		if elapsed >= time_window:
+			print("Sequence QTE failed - time expired")
+			context["qte_multiplier"] = card_config.qte_failure_multiplier
+			return
+		
+		var required_button = sequence[current_index]
+		
+		# Check for correct button input (would need input system integration)
+		if Input.is_action_just_pressed(required_button):
+			current_index += 1
+			print("Sequence progress: ", current_index, "/", sequence.size())
+		elif Input.is_action_just_pressed("ui_accept"):
+			print("Sequence QTE failed - wrong button")
+			context["qte_multiplier"] = card_config.qte_failure_multiplier
+			return
+		
+		await get_tree().process_frame
+	
+	print("Sequence QTE succeeded!")
+	context["qte_multiplier"] = card_config.qte_success_multiplier
+
+## Execute effect phase
+func execute_effect_phase(card_config: CardConfig, context: Dictionary) -> void:
+	var actor = context["actor"]
+	var target = context["target"]
+	var enemies = context["enemies"]
+	var allies = context["allies"]
+	
+	# Check all conditions before executing effects
+	if not check_card_conditions(card_config, context):
+		print("Card conditions not met, skipping effect execution")
+		return
+	
+	# Apply QTE multiplier if present
+	var qte_multiplier = context.get("qte_multiplier", 1.0)
+	
+	# Handle effect timing
+	match card_config.effect_timing:
+		CardConfig.EffectTiming.IMMEDIATE:
+			_execute_effects_immediate(card_config, context, qte_multiplier)
+		CardConfig.EffectTiming.AFTER_ANIMATION:
+			# Effects are handled after animation completes (already in animation phase)
+			_execute_effects_immediate(card_config, context, qte_multiplier)
+		CardConfig.EffectTiming.ON_HIT:
+			# Wait for hit frame timing
+			await _execute_effects_on_hit(card_config, context, qte_multiplier)
+		CardConfig.EffectTiming.ON_IMPACT:
+			# Wait for impact timing
+			await _execute_effects_on_impact(card_config, context, qte_multiplier)
+		CardConfig.EffectTiming.CHANNEL_START:
+			_execute_effects_channel_start(card_config, context, qte_multiplier)
+		CardConfig.EffectTiming.CHANNEL_END:
+			await _execute_effects_channel_end(card_config, context, qte_multiplier)
+		_:
+			# Default to immediate
+			_execute_effects_immediate(card_config, context, qte_multiplier)
+
+## Check all conditions for card execution
+func check_card_conditions(card_config: CardConfig, context: Dictionary) -> bool:
+	var actor = context["actor"]
+	var target = context["target"]
+	
+	# Check effect conditions
+	for condition in card_config.effect_conditions:
+		if not condition.evaluate(actor, target):
+			print("Card condition failed: ", condition.get_description())
+			return false
+	
+	# Check primary effect conditions
+	if card_config.primary_effect:
+		for condition in card_config.primary_effect.conditions:
+			if not condition.evaluate(actor, target):
+				print("Primary effect condition failed: ", condition.get_description())
+				return false
+	
+	# Check secondary effect conditions
+	for effect in card_config.secondary_effects:
+		for condition in effect.conditions:
+			if not condition.evaluate(actor, target):
+				print("Secondary effect condition failed: ", condition.get_description())
+				return false
+	
+	# Check state application conditions
+	for state_config in card_config.applies_states:
+		if not check_state_conditions(state_config, actor, target):
+			print("State condition failed for: ", state_config.state_name)
+			return false
+	
+	print("All card conditions passed")
+	return true
+
+## Check conditions for state application
+func check_state_conditions(state_config: StateConfig, actor: Node, target: Node) -> bool:
+	# Check application chance
+	if randf() > state_config.chance:
+		print("State application failed (chance check): ", state_config.chance)
+		return false
+	
+	# Check if target is immune
+	if _is_immune_to_state(target, state_config.state_id):
+		print("Target is immune to state: ", state_config.state_id)
+		return false
+	
+	return true
+
+## Check if target is immune to a specific state
+func _is_immune_to_state(target: Node, state_id: String) -> bool:
+	if not target:
+		return false
+	
+	if target.has_method("has_state_immunity"):
+		return target.has_state_immunity(state_id)
+	
+	if target.has_method("has_state"):
+		return target.has_state("immunity_" + state_id)
+	
+	return false
+
+## Execute effects immediately
+func _execute_effects_immediate(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+	var actor = context["actor"]
+	var target = context["target"]
+	var enemies = context["enemies"]
+	var allies = context["allies"]
+	
+	# Execute primary effect
+	if card_config.primary_effect:
+		var effect_result = card_config.primary_effect.apply_effect(actor, target, enemies, allies)
+		print("Primary effect result: ", effect_result)
+		
+		# Apply damage/healing with QTE multiplier
+		if effect_result["success"] and qte_multiplier != 1.0:
+			var original_value = effect_result["total_value"]
+			var modified_value = int(original_value * qte_multiplier)
+			print("Effect value modified by QTE: ", original_value, " -> ", modified_value)
+	
+	# Execute secondary effects
+	for effect in card_config.secondary_effects:
+		# Check individual effect conditions
+		var conditions_met = true
+		for condition in effect.conditions:
+			if not condition.evaluate(actor, target):
+				print("Secondary effect condition failed: ", condition.get_description())
+				conditions_met = false
+				break
+		
+		if conditions_met:
+			var effect_result = effect.apply_effect(actor, target, enemies, allies)
+			print("Secondary effect result: ", effect_result)
+	
+	# Apply states
+	for state_config in card_config.applies_states:
+		if check_state_conditions(state_config, actor, target):
+			var state_result = state_config.apply_state(target, actor)
+			print("State application result: ", state_result)
+	
+	# Apply self states
+	for state_config in card_config.applies_self_states:
+		if check_state_conditions(state_config, actor, actor):
+			var state_result = state_config.apply_state(actor, actor)
+			print("Self state application result: ", state_result)
+
+## Execute effects on hit frame
+func _execute_effects_on_hit(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+	var actor = context["actor"]
+	if not actor or not actor.has_method("_get_animation_duration"):
+		# Fallback to immediate execution
+		_execute_effects_immediate(card_config, context, qte_multiplier)
+		return
+	
+	var animation_duration = actor._get_animation_duration(card_config.actor_animation)
+	var hit_frame_delay = animation_duration * 0.55 # Typical hit frame at 55%
+	
+	print("Waiting for hit frame: ", hit_frame_delay, " seconds")
+	await get_tree().create_timer(hit_frame_delay).timeout
+	
+	print("Hit frame reached, executing effects")
+	_execute_effects_immediate(card_config, context, qte_multiplier)
+
+## Execute effects on impact
+func _execute_effects_on_impact(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+	# Wait slightly longer than hit frame for impact
+	var actor = context["actor"]
+	if not actor or not actor.has_method("_get_animation_duration"):
+		_execute_effects_immediate(card_config, context, qte_multiplier)
+		return
+	
+	var animation_duration = actor._get_animation_duration(card_config.actor_animation)
+	var impact_delay = animation_duration * 0.65 # Impact at 65%
+	
+	print("Waiting for impact: ", impact_delay, " seconds")
+	await get_tree().create_timer(impact_delay).timeout
+	
+	print("Impact reached, executing effects")
+	_execute_effects_immediate(card_config, context, qte_multiplier)
+
+## Execute effects at channel start
+func _execute_effects_channel_start(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+	# Apply channeling effects immediately
+	print("Channel start effects")
+	_execute_effects_immediate(card_config, context, qte_multiplier)
+	
+	# Store channel end time for later execution
+	var channel_duration = card_config.effect_conditions.size() > 0 ? 2.0 : 1.0 # Default channel duration
+	context["channel_end_time"] = Time.get_ticks_msec() / 1000.0 + channel_duration
+
+## Execute effects at channel end
+func _execute_effects_channel_end(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+	var channel_end_time = context.get("channel_end_time", 0.0)
+	var current_time = Time.get_ticks_msec() / 1000.0
+	
+	if channel_end_time > current_time:
+		var wait_time = channel_end_time - current_time
+		print("Waiting for channel end: ", wait_time, " seconds")
+		await get_tree().create_timer(wait_time).timeout
+	
+	print("Channel end, executing delayed effects")
+	_execute_effects_immediate(card_config, context, qte_multiplier)
+
+## Execute VFX phase
+func execute_vfx_phase(card_config: CardConfig, context: Dictionary) -> void:
+	var effect_manager = context["effect_manager"]
+	if not effect_manager:
+		return
+	
+	var actor = context["actor"]
+	var target = context["target"]
+	
+	# Spawn VFX on actor
+	if card_config.vfx_on_actor:
+		var vfx_instance = card_config.vfx_on_actor.spawn_vfx(actor.global_position, actor)
+		if vfx_instance:
+			get_tree().current_scene.add_child(vfx_instance)
+	
+	# Spawn VFX on target
+	if card_config.vfx_on_target and target:
+		var vfx_instance = card_config.vfx_on_target.spawn_vfx(target.global_position, target)
+		if vfx_instance:
+			get_tree().current_scene.add_child(vfx_instance)
+
+## Execute camera phase
+func execute_camera_phase(card_config: CardConfig, context: Dictionary) -> void:
+	var camera = context["camera"]
+	if not camera or not card_config.camera_effects:
+		return
+	
+	card_config.camera_effects.apply_camera_effects(camera, context["actor"], context["target"])
+
+## Execute screen phase
+func execute_screen_phase(card_config: CardConfig, context: Dictionary) -> void:
+	var effect_manager = context["effect_manager"]
+	if not effect_manager or not card_config.screen_effects:
+		return
+	
+	card_config.screen_effects.apply_screen_effect(effect_manager)
+
+## Execute audio phase
+func execute_audio_phase(card_config: CardConfig, context: Dictionary) -> void:
+	var actor = context["actor"]
+	var target = context["target"]
+	
+	# Play cast sound
+	if card_config.cast_sound:
+		card_config.cast_sound.play_audio(self, actor.global_position)
+	
+	# Play hit sound
+	if card_config.hit_sound and target:
+		card_config.hit_sound.play_audio(self, target.global_position)
+	
+	# Play impact sound
+	if card_config.impact_sound and target:
+		await get_tree().create_timer(0.3).timeout # Delay for impact
+		card_config.impact_sound.play_audio(self, target.global_position)
 
 func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
 	print("Executing attack card: ", card.name, " AOE: ", is_aoe)

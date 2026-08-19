@@ -1,0 +1,199 @@
+[gd_scene format=3 uid="uid://c57p8obm33ioi"]
+
+[ext_resource type="Script" uid="uid://cq3o50hp8k2t0" path="res://battle-manager/battlehud/action_buttons.gd" id="1_action_buttons_script"]
+[ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_ui_theme"]
+[ext_resource type="Texture2D" uid="uid://yp7lgpib21q3" path="res://assets/images/ui/attack.png" id="3_attack_tex"]
+[ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="5_21sk8"]
+[ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="5_input_prompt"]
+[ext_resource type="Texture2D" uid="uid://canwm08m3musu" path="res://assets/images/ui/items.png" id="6_items_tex"]
+[ext_resource type="Texture2D" uid="uid://bramr4vhhulsw" path="res://assets/images/ui/run.png" id="7_run_tex"]
+[ext_resource type="Texture2D" uid="uid://dmqu76l8ut0f4" path="res://assets/images/ui/end.png" id="8_end_tex"]
+
+[node name="ActionButtons" type="BoxContainer" unique_id=74957540]
+offset_right = 200.0
+offset_bottom = 275.0
+size_flags_horizontal = 0
+size_flags_vertical = 0
+theme = ExtResource("2_ui_theme")
+theme_override_constants/separation = 5
+vertical = true
+script = ExtResource("1_action_buttons_script")
+roll_in_duration = 0.1
+roll_out_duration = 0.01
+roll_delay_between_buttons = 0.01
+
+[node name="Attack" type="TextureButton" parent="." unique_id=1746743827]
+custom_minimum_size = Vector2(32, 64)
+layout_mode = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("3_attack_tex")
+stretch_mode = 5
+
+[node name="AttackPrompt" type="Label" parent="Attack" unique_id=1721489119]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[A]"
+script = ExtResource("5_input_prompt")
+
+[node name="ActionLabel" type="Label" parent="Attack" unique_id=363918673]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -30.0
+offset_top = -10.0
+offset_right = 30.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Attack"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ButtonJuice" type="Node" parent="Attack" unique_id=1868925491]
+script = ExtResource("5_21sk8")
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Items" type="TextureButton" parent="." unique_id=509910815]
+custom_minimum_size = Vector2(32, 64)
+layout_mode = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("6_items_tex")
+stretch_mode = 5
+
+[node name="ItemsPrompt" type="Label" parent="Items" unique_id=546338478]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[X]"
+script = ExtResource("5_input_prompt")
+
+[node name="ActionLabel" type="Label" parent="Items" unique_id=340581399]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -30.0
+offset_top = -10.0
+offset_right = 30.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Items"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ButtonJuice" type="Node" parent="Items" unique_id=1210691270]
+script = ExtResource("5_21sk8")
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Run" type="TextureButton" parent="." unique_id=1881774870]
+custom_minimum_size = Vector2(32, 64)
+layout_mode = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("7_run_tex")
+stretch_mode = 5
+
+[node name="RunPrompt" type="Label" parent="Run" unique_id=616942743]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[Y]"
+script = ExtResource("5_input_prompt")
+
+[node name="ActionLabel" type="Label" parent="Run" unique_id=532319360]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -30.0
+offset_top = -10.0
+offset_right = 30.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Run"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ButtonJuice" type="Node" parent="Run" unique_id=674618582]
+script = ExtResource("5_21sk8")
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="EndTurnButton" type="TextureButton" parent="." unique_id=373611517]
+custom_minimum_size = Vector2(32, 64)
+layout_mode = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("8_end_tex")
+stretch_mode = 5
+
+[node name="EndTurnPrompt" type="Label" parent="EndTurnButton" unique_id=1512973937]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "[B]"
+script = ExtResource("5_input_prompt")
+
+[node name="ActionLabel" type="Label" parent="EndTurnButton" unique_id=2136818538]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -30.0
+offset_top = -10.0
+offset_right = 30.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "End Turn"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ButtonJuice" type="Node" parent="EndTurnButton" unique_id=615609777]
+script = ExtResource("5_21sk8")
+metadata/_custom_type_script = "uid://1mbdi00spy5j"

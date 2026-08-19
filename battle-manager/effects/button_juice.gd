@@ -6,21 +6,42 @@ class_name ButtonJuice
 
 var target_button: Control
 
-# Configurable parameters
-var press_scale: float = 0.9
-var press_duration: float = 0.1
-var bounce_scale: float = 1.1
-var bounce_duration: float = 0.15
-var hover_scale: float = 1.05
-var hover_duration: float = 0.2
-var rotation_amount: float = 5.0  # degrees
-var enable_rotation: bool = true
-var enable_brightness: bool = true
+# Press Animation Settings
+@export var press_scale: float = 0.9
+@export var press_duration: float = 0.1
+@export var press_rotation: float = 5.0  # degrees
+@export var press_brightness: float = 1.2  # multiplier
+@export var press_slide_offset: Vector2 = Vector2(0, 0)  # slide direction on press
+@export var press_slide_enabled: bool = true  # Now safe with container detection
+
+# Release/Bounce Animation Settings
+@export var bounce_scale: float = 1.1
+@export var bounce_duration: float = 0.15
+@export var bounce_rotation: float = -3.0  # degrees (negative for opposite direction)
+@export var bounce_slide_offset: Vector2 = Vector2(0, 0)  # slide direction on release
+@export var bounce_slide_enabled: bool = true  # Now safe with container detection
+
+# Hover Animation Settings
+@export var hover_scale: float = 1.05
+@export var hover_duration: float = 0.2
+@export var hover_rotation: float = 2.0  # degrees
+@export var hover_brightness: float = 1.1  # multiplier
+@export var hover_slide_offset: Vector2 = Vector2(-10, 0)  # slide left on hover
+@export var hover_slide_enabled: bool = true  # Now safe with container detection
+
+# General Settings
+@export var enable_rotation: bool = true
+@export var enable_brightness: bool = true
+@export var enable_sliding: bool = true
+@export var use_easing: bool = true
+@export var easing_type: Tween.EaseType = Tween.EASE_OUT
 
 # Original values for restoration
 var original_scale: Vector2
 var original_rotation: float
 var original_modulate: Color
+var original_position: Vector2
+var is_in_container: bool = false
 
 func _ready() -> void:
 	# Auto-setup with parent if it's a Control
@@ -31,10 +52,16 @@ func _ready() -> void:
 func setup(button: Control) -> void:
 	target_button = button
 	
+	# Check if button is in a container - if so, disable position modifications
+	is_in_container = button.get_parent() is Container
+	if is_in_container:
+		enable_sliding = false  # Force disable sliding for container buttons
+	
 	# Store original values
 	original_scale = button.scale
 	original_rotation = button.rotation_degrees if button.has_method("get_rotation_degrees") else 0.0
 	original_modulate = button.modulate
+	original_position = button.position
 	
 	# Connect signals
 	if button.has_signal("pressed"):
@@ -59,19 +86,27 @@ func animate_press(intensity: float = 1.0) -> void:
 	var tween = create_tween()
 	tween.set_parallel(true)
 	
+	if use_easing:
+		tween.set_ease(easing_type)
+	
 	# Scale down
 	var target_press_scale: Vector2 = original_scale * (press_scale * intensity)
 	tween.tween_property(target_button, "scale", target_press_scale, press_duration * intensity)
 	
 	# Rotation
 	if enable_rotation and target_button.has_method("set_rotation_degrees"):
-		var target_rotation: float = original_rotation + (rotation_amount * intensity)
+		var target_rotation: float = original_rotation + (press_rotation * intensity)
 		tween.tween_property(target_button, "rotation_degrees", target_rotation, press_duration * intensity)
 	
 	# Brightness
 	if enable_brightness:
-		var bright_modulate: Color = original_modulate * Color(1.2, 1.2, 1.2, 1.0)
+		var bright_modulate: Color = original_modulate * Color(press_brightness, press_brightness, press_brightness, 1.0)
 		tween.tween_property(target_button, "modulate", bright_modulate, press_duration * intensity)
+	
+	# Sliding - NEVER modify position for buttons in containers
+	if enable_sliding and press_slide_enabled and not is_in_container:
+		var target_position: Vector2 = original_position + (press_slide_offset * intensity)
+		tween.tween_property(target_button, "position", target_position, press_duration * intensity)
 
 func animate_release(intensity: float = 1.0) -> void:
 	if not target_button:
@@ -80,33 +115,83 @@ func animate_release(intensity: float = 1.0) -> void:
 	var tween = create_tween()
 	tween.set_parallel(true)
 	
+	if use_easing:
+		tween.set_ease(easing_type)
+	
 	# Bounce back
 	var target_bounce_scale: Vector2 = original_scale * (bounce_scale * intensity)
 	tween.tween_property(target_button, "scale", target_bounce_scale, bounce_duration * 0.5 * intensity)
 	tween.tween_property(target_button, "scale", original_scale, bounce_duration * 0.5 * intensity).set_delay(bounce_duration * 0.5 * intensity)
 	
-	# Rotation back
+	# Rotation back with bounce
 	if enable_rotation and target_button.has_method("set_rotation_degrees"):
-		tween.tween_property(target_button, "rotation_degrees", original_rotation, bounce_duration * intensity)
+		var bounce_rotation_target: float = original_rotation + (bounce_rotation * intensity)
+		tween.tween_property(target_button, "rotation_degrees", bounce_rotation_target, bounce_duration * 0.5 * intensity)
+		tween.tween_property(target_button, "rotation_degrees", original_rotation, bounce_duration * 0.5 * intensity).set_delay(bounce_duration * 0.5 * intensity)
 	
 	# Brightness back
 	if enable_brightness:
 		tween.tween_property(target_button, "modulate", original_modulate, bounce_duration * intensity)
+	
+	# Position back with bounce - NEVER modify position for buttons in containers
+	if enable_sliding and bounce_slide_enabled and not is_in_container:
+		var bounce_position_target: Vector2 = original_position + (bounce_slide_offset * intensity)
+		tween.tween_property(target_button, "position", bounce_position_target, bounce_duration * 0.5 * intensity)
+		tween.tween_property(target_button, "position", original_position, bounce_duration * 0.5 * intensity).set_delay(bounce_duration * 0.5 * intensity)
 
 func animate_hover(intensity: float = 1.0) -> void:
 	if not target_button:
 		return
 	
 	var tween = create_tween()
+	tween.set_parallel(true)
+	
+	if use_easing:
+		tween.set_ease(easing_type)
+	
+	# Scale up
 	var target_hover_scale: Vector2 = original_scale * (hover_scale * intensity)
 	tween.tween_property(target_button, "scale", target_hover_scale, hover_duration * intensity)
+	
+	# Rotation
+	if enable_rotation and target_button.has_method("set_rotation_degrees"):
+		var target_rotation: float = original_rotation + (hover_rotation * intensity)
+		tween.tween_property(target_button, "rotation_degrees", target_rotation, hover_duration * intensity)
+	
+	# Brightness
+	if enable_brightness:
+		var bright_modulate: Color = original_modulate * Color(hover_brightness, hover_brightness, hover_brightness, 1.0)
+		tween.tween_property(target_button, "modulate", bright_modulate, hover_duration * intensity)
+	
+	# Sliding - NEVER modify position for buttons in containers
+	if enable_sliding and hover_slide_enabled and not is_in_container:
+		var target_position: Vector2 = original_position + (hover_slide_offset * intensity)
+		tween.tween_property(target_button, "position", target_position, hover_duration * intensity)
 
 func animate_hover_exit(intensity: float = 1.0) -> void:
 	if not target_button:
 		return
 	
 	var tween = create_tween()
+	tween.set_parallel(true)
+	
+	if use_easing:
+		tween.set_ease(easing_type)
+	
+	# Scale back to original
 	tween.tween_property(target_button, "scale", original_scale, hover_duration * intensity)
+	
+	# Rotation back
+	if enable_rotation and target_button.has_method("set_rotation_degrees"):
+		tween.tween_property(target_button, "rotation_degrees", original_rotation, hover_duration * intensity)
+	
+	# Brightness back
+	if enable_brightness:
+		tween.tween_property(target_button, "modulate", original_modulate, hover_duration * intensity)
+	
+	# Position back - NEVER modify position for buttons in containers
+	if enable_sliding and hover_slide_enabled and not is_in_container:
+		tween.tween_property(target_button, "position", original_position, hover_duration * intensity)
 
 # Signal handlers
 func _on_button_down() -> void:
@@ -145,6 +230,45 @@ func animate_heavy_press() -> void:
 func animate_heavy_release() -> void:
 	animate_release(1.3)
 
+# Quick hover animation without delay
+func animate_quick_hover() -> void:
+	if not target_button:
+		return
+	
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	
+	var target_hover_scale: Vector2 = original_scale * hover_scale
+	tween.tween_property(target_button, "scale", target_hover_scale, 0.1)
+	
+	if enable_brightness:
+		var bright_modulate: Color = original_modulate * Color(hover_brightness, hover_brightness, hover_brightness, 1.0)
+		tween.tween_property(target_button, "modulate", bright_modulate, 0.1)
+	
+	# Only slide if enabled and NOT in a container
+	if enable_sliding and hover_slide_enabled and not is_in_container:
+		var target_position: Vector2 = original_position + hover_slide_offset
+		tween.tween_property(target_button, "position", target_position, 0.1)
+
+# Quick hover exit without delay
+func animate_quick_hover_exit() -> void:
+	if not target_button:
+		return
+	
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	
+	tween.tween_property(target_button, "scale", original_scale, 0.1)
+	
+	if enable_brightness:
+		tween.tween_property(target_button, "modulate", original_modulate, 0.1)
+	
+	# Only slide back if sliding was enabled and NOT in a container
+	if enable_sliding and hover_slide_enabled and not is_in_container:
+		tween.tween_property(target_button, "position", original_position, 0.1)
+
 func reset_to_original() -> void:
 	if not target_button:
 		return
@@ -153,3 +277,6 @@ func reset_to_original() -> void:
 	if target_button.has_method("set_rotation_degrees"):
 		target_button.rotation_degrees = original_rotation
 	target_button.modulate = original_modulate
+	# Only reset position if not in a container
+	if not is_in_container:
+		target_button.position = original_position
