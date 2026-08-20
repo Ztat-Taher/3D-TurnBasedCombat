@@ -18,7 +18,7 @@ extends Resource
 @export var doppler: float = 0.0                     ## Doppler effect strength
 
 ## Play this audio configuration
-func play_audio(parent_node: Node, position: Vector3 = Vector3.ZERO) -> AudioStreamPlayer:
+func play_audio(parent_node: Node, position: Vector3 = Vector3.ZERO) -> Node:
 	if audio_stream.is_empty():
 		push_warning("AudioConfig: No audio stream specified")
 		return null
@@ -35,43 +35,57 @@ func play_audio(parent_node: Node, position: Vector3 = Vector3.ZERO) -> AudioStr
 	
 	# Determine if we need 2D or 3D audio
 	var is_3d = position != Vector3.ZERO and max_distance > 0
-	var audio_player: AudioStreamPlayer
 	
 	if is_3d:
-		audio_player = AudioStreamPlayer3D.new()
-		_configure_3d_audio(audio_player as AudioStreamPlayer3D, position)
+		var audio_player_3d = AudioStreamPlayer3D.new()
+		_configure_3d_audio(audio_player_3d, position)
+		_configure_common_audio(audio_player_3d, audio_resource)
+		parent_node.add_child(audio_player_3d)
+		
+		if delay > 0:
+			var timer = Timer.new()
+			timer.wait_time = delay
+			timer.one_shot = true
+			timer.timeout.connect(func():
+				_play_audio_with_effects(audio_player_3d)
+				timer.queue_free()
+			)
+			parent_node.add_child(timer)
+			timer.start()
+		else:
+			_play_audio_with_effects(audio_player_3d)
+		
+		return audio_player_3d
 	else:
-		audio_player = AudioStreamPlayer2D.new()
-		_configure_2d_audio(audio_player as AudioStreamPlayer2D)
-	
-	# Configure common properties
-	_configure_common_audio(audio_player, audio_resource)
-	
-	# Add to scene tree
-	parent_node.add_child(audio_player)
-	
-	# Handle delay
-	if delay > 0:
-		var timer = Timer.new()
-		timer.wait_time = delay
-		timer.one_shot = true
-		timer.timeout.connect(func():
-			_play_audio_with_effects(audio_player)
-			timer.queue_free()
-		)
-		parent_node.add_child(timer)
-		timer.start()
-	else:
-		_play_audio_with_effects(audio_player)
-	
-	return audio_player
+		var audio_player_2d = AudioStreamPlayer2D.new()
+		_configure_2d_audio(audio_player_2d)
+		_configure_common_audio(audio_player_2d, audio_resource)
+		parent_node.add_child(audio_player_2d)
+		
+		if delay > 0:
+			var timer = Timer.new()
+			timer.wait_time = delay
+			timer.one_shot = true
+			timer.timeout.connect(func():
+				_play_audio_with_effects(audio_player_2d)
+				timer.queue_free()
+			)
+			parent_node.add_child(timer)
+			timer.start()
+		else:
+			_play_audio_with_effects(audio_player_2d)
+		
+		return audio_player_2d
 
 ## Configure 3D audio player
 func _configure_3d_audio(audio_player: AudioStreamPlayer3D, position: Vector3):
 	audio_player.global_position = position
 	audio_player.max_distance = max_distance
 	audio_player.attenuation = attenuation
-	audio_player.doppler_tracking = AudioStreamPlayer3D.DopplerTracking.DISABLED if doppler == 0.0 else AudioStreamPlayer3D.DopplerTracking.CAMERA_POSITION
+	if doppler > 0.0:
+		audio_player.doppler_tracking = 1 # ENABLED
+	else:
+		audio_player.doppler_tracking = 0 # DISABLED
 	audio_player.unit_db = _volume_to_db(volume)
 	audio_player.pitch_scale = _apply_random_pitch(pitch)
 
@@ -81,27 +95,35 @@ func _configure_2d_audio(audio_player: AudioStreamPlayer2D):
 	audio_player.pitch_scale = _apply_random_pitch(pitch)
 
 ## Configure common audio properties
-func _configure_common_audio(audio_player: AudioStreamPlayer, audio_resource: Resource):
-	audio_player.stream = audio_resource
-	audio_player.bus = bus
-	audio_player.autoplay = false
-	
-	if loop:
-		audio_player.loop = true
+func _configure_common_audio(audio_player: Node, audio_resource: Resource):
+	if audio_player is AudioStreamPlayer:
+		audio_player.stream = audio_resource
+		audio_player.bus = bus
+		audio_player.autoplay = false
+		
+		if loop:
+			audio_player.loop = true
 
 ## Play audio with effects
-func _play_audio_with_effects(audio_player: AudioStreamPlayer):
+func _play_audio_with_effects(audio_player: Node):
 	# Apply fade in
 	if fade_in_duration > 0:
-		audio_player.volume_db = -80.0
+		if audio_player.has_method("set_volume_db"):
+			audio_player.set("volume_db", -80.0)
 		var tween = audio_player.create_tween()
 		tween.tween_property(audio_player, "volume_db", _volume_to_db(volume), fade_in_duration)
 	
-	audio_player.play()
+	if audio_player.has_method("play"):
+		audio_player.play()
 	
 	# Handle fade out and cleanup
 	if not loop:
-		var duration = audio_player.stream.get_length() if audio_player.stream else 1.0
+		var duration = 1.0
+		if audio_player.has_method("get_stream"):
+			var stream = audio_player.get("stream")
+			if stream and stream.has_method("get_length"):
+				duration = stream.get_length()
+		
 		var total_duration = duration + fade_out_duration
 		
 		var cleanup_timer = Timer.new()
@@ -140,18 +162,20 @@ func _apply_random_pitch(base_pitch: float) -> float:
 	return base_pitch
 
 ## Stop audio playback
-func stop_audio(audio_player: AudioStreamPlayer):
+func stop_audio(audio_player: Node):
 	if audio_player and is_instance_valid(audio_player):
 		if fade_out_duration > 0:
 			var tween = audio_player.create_tween()
 			tween.tween_property(audio_player, "volume_db", -80.0, fade_out_duration)
 			tween.tween_callback(func():
 				if is_instance_valid(audio_player):
-					audio_player.stop()
+					if audio_player.has_method("stop"):
+						audio_player.stop()
 					audio_player.queue_free()
 			)
 		else:
-			audio_player.stop()
+			if audio_player.has_method("stop"):
+				audio_player.stop()
 			audio_player.queue_free()
 
 ## Create preset audio configurations

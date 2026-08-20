@@ -71,7 +71,8 @@ func _apply_shake(camera: Camera3D):
 	var original_position = camera.global_position
 	var shake_timer = 0.0
 	
-	while shake_timer < shake_duration:
+	var total_frames = int(shake_duration * 60) # Assuming 60 FPS
+	for i in range(total_frames):
 		var decay = 1.0 - (shake_timer / shake_duration) * shake_decay
 		var current_intensity = shake_intensity * decay
 		
@@ -94,8 +95,8 @@ func _apply_shake(camera: Camera3D):
 				)
 		
 		camera.global_position = original_position + shake_offset
-		await get_tree().process_frame
-		shake_timer += get_process_delta_time()
+		shake_timer += 1.0 / 60.0 # Assume 60 FPS
+		await camera.get_tree().process_frame
 	
 	camera.global_position = original_position
 
@@ -126,17 +127,18 @@ func _apply_tracking(camera: Node3D, actor: Node, target: Node, projectile: Node
 	var original_position = camera.global_position
 	var tracking_timer = 0.0
 	
-	while tracking_timer < tracking_duration:
+	var total_frames = int(tracking_duration * 60) # Assuming 60 FPS
+	for i in range(total_frames):
 		var target_position = track_target.global_position + tracking_offset
 		var direction = (target_position - camera.global_position).normalized()
 		var distance = camera.global_position.distance_to(target_position)
 		
 		if distance > 0.1:
-			var move_amount = min(distance, tracking_speed * get_process_delta_time())
+			var move_amount = min(distance, tracking_speed / 60.0)
 			camera.global_position += direction * move_amount
 		
-		await get_tree().process_frame
-		tracking_timer += get_process_delta_time()
+		tracking_timer += 1.0 / 60.0 # Assume 60 FPS
+		await camera.get_tree().process_frame
 	
 	# Return to original position if configured
 	if tracking_mode == TrackingMode.NONE:

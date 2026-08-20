@@ -601,7 +601,7 @@ func _execute_effects_channel_start(card_config: CardConfig, context: Dictionary
 	_execute_effects_immediate(card_config, context, qte_multiplier)
 	
 	# Store channel end time for later execution
-	var channel_duration = card_config.effect_conditions.size() > 0 ? 2.0 : 1.0 # Default channel duration
+	var channel_duration = 2.0 if card_config.effect_conditions.size() > 0 else 1.0 # Default channel duration
 	context["channel_end_time"] = Time.get_ticks_msec() / 1000.0 + channel_duration
 
 ## Execute effects at channel end

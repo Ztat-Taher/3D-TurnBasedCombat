@@ -6,18 +6,9 @@ extends Node
 var card_battle_manager: CardBattleManager
 var card_ui: CardUI
 var battle_manager: BattleManager
-var card_database: CardDatabase
-
-# Sample deck composition (which cards to include in deck)
-var deck_card_ids: Array[String] = ["strike", "fireball", "ice_shard", "thunder_strike", "heal", "poison", "berserk_rage"]
 
 func _ready():
 	print("CardIntegration _ready() called")
-	
-	# Load card database
-	card_database = CardDatabase.new()
-	print("CardDatabase loaded with ", card_database.cards.size(), " cards")
-	print("Available card IDs: ", card_database.cards.keys())
 	
 	# Find battle manager
 	battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -55,31 +46,27 @@ func _ready():
 	
 	print("Card integration initialized")
 
-func get_deck_cards() -> Array[CardData]:
-	if not card_database:
-		push_error("CardDatabase not loaded")
+func get_deck_cards(deck_resources: Array[CardData] = []) -> Array[CardData]:
+	if deck_resources.is_empty():
+		print("No deck resources provided")
 		return []
 	
-	print("Getting deck cards, looking for IDs: ", deck_card_ids)
-	print("Database has cards: ", card_database.cards.keys())
+	print("Getting deck cards from provided resources: ", deck_resources.size())
 	
 	var deck_cards: Array[CardData] = []
-	for card_id in deck_card_ids:
-		var card = card_database.get_card(card_id)
+	for card in deck_resources:
 		if card:
 			deck_cards.append(card)
-			print("Found card: ", card.name)
-		else:
-			print("Warning: Card not found in database: ", card_id)
+			print("Added card to deck: ", card.name)
 	
 	print("Created deck with ", deck_cards.size(), " cards")
 	return deck_cards
 
-func initialize_for_player(player_battler: Battler):
+func initialize_for_player(player_battler: Battler, deck_resources: Array[CardData] = []):
 	if not card_battle_manager or not player_battler:
 		return
 	
-	var deck_cards = get_deck_cards()
+	var deck_cards = get_deck_cards(deck_resources)
 	card_battle_manager.setup_card_combat(player_battler, deck_cards)
 	print("Card combat initialized for player: ", player_battler.character_name)
 
