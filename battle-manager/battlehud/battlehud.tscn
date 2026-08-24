@@ -6,10 +6,10 @@
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://battle-manager/battlehud/battleresults.tscn" id="6_g4nh0"]
 [ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="7_cardui"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="7_p32nk"]
-[ext_resource type="PackedScene" path="res://battle-manager/battlehud/BossBar.tscn" id="8_bossbar"]
+[ext_resource type="PackedScene" uid="uid://bsdjvwbf7iv4s" path="res://battle-manager/battlehud/BossBar.tscn" id="8_bossbar"]
 [ext_resource type="Script" uid="uid://igumddyitxrw" path="res://battle-manager/effects/screen_flash.gd" id="9_flash"]
 [ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="10_input"]
-[ext_resource type="PackedScene" path="res://battle-manager/battlehud/action_buttons.tscn" id="12_action_buttons"]
+[ext_resource type="PackedScene" uid="uid://c57p8obm33ioi" path="res://battle-manager/battlehud/action_buttons.tscn" id="12_action_buttons"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -145,11 +145,6 @@ alignment = 1
 
 [node name="ActionButtons" parent="Control" unique_id=1087849572 instance=ExtResource("12_action_buttons")]
 layout_mode = 1
-
-[connection signal="pressed" from="ActionButtons/Attack" to="." method="_on_attack_pressed"]
-[connection signal="pressed" from="ActionButtons/Items" to="." method="_on_items_pressed"]
-[connection signal="pressed" from="ActionButtons/Run" to="." method="_on_run_pressed"]
-[connection signal="pressed" from="ActionButtons/EndTurnButton" to="." method="_on_end_turn_button_pressed"]
 
 [node name="PartyStatusPanel" type="HBoxContainer" parent="Control" unique_id=2080000001]
 layout_mode = 1

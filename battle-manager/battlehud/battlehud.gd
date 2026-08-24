@@ -150,7 +150,7 @@ func _rebuild_party_status_panel() -> void:
 	
 	update_party_status()
 
-func _create_ally_status_card(ally: Battler) -> PanelContainer:
+func _create_ally_status_card(ally: Battler) -> Control:
 	if not party_status_card_scene:
 		push_error("Party status card scene not loaded!")
 		return null
@@ -543,13 +543,17 @@ func _on_global_back_pressed() -> void:
 @onready var turn_queue_container = $Control/TurnQueueUI/ScrollContainer/QueueContainer
 
 func update_turn_queue(turn_order: Array, current_turn_idx: int) -> void:
+	print("BattleHUD: update_turn_queue called - turn_order size: ", turn_order.size(), " current_turn_idx: ", current_turn_idx)
+	
 	if not turn_queue_container:
+		print("BattleHUD: turn_queue_container is null!")
 		return
 	
 	for child in turn_queue_container.get_children():
 		child.queue_free()
 	
 	if turn_order.is_empty():
+		print("BattleHUD: turn_order is empty!")
 		return
 	
 	if not turn_queue_card_scene:
@@ -561,13 +565,17 @@ func update_turn_queue(turn_order: Array, current_turn_idx: int) -> void:
 		var idx = (current_turn_idx + i) % total
 		var battler = turn_order[idx]
 		if not is_instance_valid(battler) or battler.is_defeated():
+			print("Skipping invalid/defeated battler: ", battler.character_name if battler else "null")
 			continue
 		
 		var is_current = (i == 0)
+		print("Creating card for: ", battler.character_name, " is_current: ", is_current)
 		var card = turn_queue_card_scene.instantiate()
+		print("Card instantiated: ", card, " is TurnQueueCard: ", card is TurnQueueCard)
 		if card is TurnQueueCard:
 			card.setup(battler, is_current)
 			turn_queue_container.add_child(card)
+			print("Card added to container")
 		else:
 			push_error("Instantiated node is not a TurnQueueCard!")
 

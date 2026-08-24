@@ -1,72 +1,276 @@
-[gd_scene format=3 uid="uid://party_status_card_scene"]
+[gd_scene format=3 uid="uid://qxuejk0vbumo"]
 
-[ext_resource type="Script" path="res://battle-manager/battlehud/party_status_card.gd" id="1_party_card"]
+[ext_resource type="Script" uid="uid://dn20wo7p3hv2u" path="res://battle-manager/battlehud/party_status_card.gd" id="1_party_card"]
+[ext_resource type="Texture2D" uid="uid://bgaroo2f20u6k" path="res://assets/images/ui/20251118darkDwellersBarG.png" id="2_fet43"]
+[ext_resource type="Texture2D" uid="uid://n0e72skevc4m" path="res://assets/images/ui/character_portrait.png" id="2_v33m0"]
+[ext_resource type="Texture2D" uid="uid://b8emafmm1qt03" path="res://assets/images/ui/20251124emptyFrameC1-Sheet.png" id="3_dw2lt"]
+[ext_resource type="Texture2D" uid="uid://b8wwuok5xbwkn" path="res://assets/images/ui/20251118darkDwellersBarD.png" id="3_pp2eq"]
+[ext_resource type="FontFile" uid="uid://ggllarrqs0ao" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-FineFantasyStrategies.ttf" id="4_font"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="5_lrais"]
+[ext_resource type="Shader" uid="uid://b1s4clrojg48e" path="res://assets/shaders/ui_background_shader.gdshader" id="5_shader"]
+[ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="6_k3ssm"]
+[ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="7_4w1pf"]
+[ext_resource type="Texture2D" uid="uid://c2s5al48qlhc2" path="res://assets/images/ui/bar_progress.png" id="8_nw4dt"]
 
-[node name="PartyStatusCard" type="PanelContainer"]
-custom_minimum_size = Vector2(160, 95)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bg"]
+shader = ExtResource("5_shader")
+shader_parameter/base_color = Color(0.1, 0.1, 0.15, 1)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dx4pq"]
+atlas = ExtResource("3_dw2lt")
+region = Rect2(1, 1, 30, 30)
+
+[node name="PartyStatusCard" type="Control" unique_id=676516311]
+clip_contents = true
+custom_minimum_size = Vector2(200, 100)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 200.0
+offset_bottom = 100.0
+mouse_filter = 2
 script = ExtResource("1_party_card")
 
-[node name="VBox" type="VBoxContainer" parent="."]
-layout_mode = 2
+[node name="CardFocus" type="NinePatchRect" parent="." unique_id=686705471]
+visible = false
+z_index = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_dw2lt")
+region_rect = Rect2(1, 1, 30, 30)
+patch_margin_left = 8
+patch_margin_top = 8
+patch_margin_right = 8
+patch_margin_bottom = 8
+modulate = Color(1, 1, 1, 0)
+
+[connection signal="mouse_entered" from="PartyStatusCard" to="PartyStatusCard" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="PartyStatusCard" to="PartyStatusCard" method="_on_mouse_exited"]
+
+[node name="BackgroundShader" type="ColorRect" parent="." unique_id=597839945]
+z_index = -1
+material = SubResource("ShaderMaterial_bg")
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 100.0
+color = Color(0.1, 0.1, 0.15, 1)
+
+[node name="MainVBox" type="HBoxContainer" parent="." unique_id=285564334]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 100.0
 theme_override_constants/separation = 4
 
-[node name="HeaderHBox" type="HBoxContainer" parent="VBox"]
-layout_mode = 2
-
-[node name="NameLabel" type="Label" parent="VBox/HeaderHBox"]
+[node name="PortraitContainer" type="Control" parent="MainVBox" unique_id=947583488]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Character Name"
-theme_override_font_sizes/font_size = 13
+
+[node name="PortraitBackground" type="TextureRect" parent="MainVBox/PortraitContainer" unique_id=829465550]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 13.0
+offset_top = -51.0
+offset_right = 93.0
+offset_bottom = 43.0
+grow_vertical = 2
+texture = ExtResource("2_v33m0")
+expand_mode = 4
+stretch_mode = 5
+
+[node name="Level" type="Control" parent="MainVBox/PortraitContainer" unique_id=386124056]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -40.0
+offset_right = 40.0
+grow_vertical = 0
+
+[node name="LevelDiamond" type="TextureRect" parent="MainVBox/PortraitContainer/Level" unique_id=796996271]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -15.000015
+offset_top = -15.0
+offset_right = 15.000015
+offset_bottom = 15.0
+grow_horizontal = 2
+grow_vertical = 2
+rotation = 0.785398
+pivot_offset = Vector2(15, 15)
+texture = SubResource("AtlasTexture_dx4pq")
+stretch_mode = 3
+
+[node name="LevelLabel" type="Label" parent="MainVBox/PortraitContainer/Level" unique_id=633566906]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 25.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("5_lrais")
+theme_override_font_sizes/font_size = 20
+text = "3"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BarsContainer" type="VBoxContainer" parent="MainVBox" unique_id=667422440]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+
+[node name="NameLabel" type="Label" parent="MainVBox/BarsContainer" unique_id=440534168]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("6_k3ssm")
+theme_override_font_sizes/font_size = 16
+text = "Character Name"
+vertical_alignment = 1
 
-[node name="ActiveTag" type="Label" parent="VBox/HeaderHBox"]
+[node name="HPContainer" type="Control" parent="MainVBox/BarsContainer" unique_id=2076493789]
+custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
-text = "●"
-theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(0.2, 0.9, 1, 1)
-visible = false
+size_flags_vertical = 3
 
-[node name="HPHBox" type="HBoxContainer" parent="VBox"]
+[node name="HPDamageBar" type="TextureProgressBar" parent="MainVBox/BarsContainer/HPContainer" unique_id=733566907]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_right = -7.0
+offset_bottom = -2.0
+grow_horizontal = 2
+grow_vertical = 2
+value = 100.0
+nine_patch_stretch = true
+stretch_margin_left = 9
+stretch_margin_top = 5
+stretch_margin_right = 20
+stretch_margin_bottom = 5
+texture_over = ExtResource("2_fet43")
+texture_progress = ExtResource("8_nw4dt")
+tint_progress = Color(0.8, 0.15, 0.18, 1)
+
+[node name="HPBar" type="TextureProgressBar" parent="MainVBox/BarsContainer/HPContainer" unique_id=633566907]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_right = -7.0
+offset_bottom = -2.0
+grow_horizontal = 2
+grow_vertical = 2
+value = 100.0
+nine_patch_stretch = true
+stretch_margin_left = 9
+stretch_margin_top = 5
+stretch_margin_right = 20
+stretch_margin_bottom = 5
+texture_over = ExtResource("2_fet43")
+texture_progress = ExtResource("8_nw4dt")
+tint_progress = Color(1, 0.23137255, 0.24705882, 1)
+
+[node name="HPNumLabel" type="Label" parent="MainVBox/BarsContainer/HPContainer" unique_id=540534169]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -19.0
+offset_right = 45.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.35686275, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("7_4w1pf")
+theme_override_font_sizes/font_size = 13
+text = "171/171"
+
+[node name="APContainer" type="Control" parent="MainVBox/BarsContainer" unique_id=1422137498]
+custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 
-[node name="HPTag" type="Label" parent="VBox/HPHBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(24, 0)
-text = "HP"
-theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(1, 0.35, 0.35, 1)
+[node name="APDamageBar" type="TextureProgressBar" parent="MainVBox/BarsContainer/APContainer" unique_id=414131510]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_right = -7.0
+offset_bottom = -2.0
+grow_horizontal = 2
+grow_vertical = 2
+value = 100.0
+nine_patch_stretch = true
+stretch_margin_left = 9
+stretch_margin_top = 5
+stretch_margin_right = 20
+stretch_margin_bottom = 5
+texture_over = ExtResource("3_pp2eq")
+texture_progress = ExtResource("8_nw4dt")
+tint_progress = Color(0, 0.3, 0.4, 1)
 
-[node name="HPBar" type="ProgressBar" parent="VBox/HPHBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 10)
-size_flags_horizontal = 3
-show_percentage = false
+[node name="HPBar" type="TextureProgressBar" parent="MainVBox/BarsContainer/APContainer" unique_id=314131510]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_right = -7.0
+offset_bottom = -2.0
+grow_horizontal = 2
+grow_vertical = 2
+value = 100.0
+nine_patch_stretch = true
+stretch_margin_left = 9
+stretch_margin_top = 5
+stretch_margin_right = 20
+stretch_margin_bottom = 5
+texture_over = ExtResource("3_pp2eq")
+texture_progress = ExtResource("8_nw4dt")
+tint_progress = Color(0, 0.41568628, 0.54509807, 1)
 
-[node name="HPNumLabel" type="Label" parent="VBox/HPHBox"]
-layout_mode = 2
-text = "100/100"
-theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1)
-
-[node name="APHBox" type="HBoxContainer" parent="VBox"]
-layout_mode = 2
-
-[node name="APTag" type="Label" parent="VBox/APHBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(24, 0)
-text = "AP"
-theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(0.35, 0.75, 1, 1)
-
-[node name="APBar" type="ProgressBar" parent="VBox/APHBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 8)
-size_flags_horizontal = 3
-show_percentage = false
-
-[node name="APNumLabel" type="Label" parent="VBox/APHBox"]
-layout_mode = 2
+[node name="APNumLabel" type="Label" parent="MainVBox/BarsContainer/APContainer" unique_id=586705470]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -19.0
+offset_right = 50.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0.19607843, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("7_4w1pf")
+theme_override_font_sizes/font_size = 13
 text = "3/3"
+
+[node name="ActiveTag" type="Label" parent="MainVBox" unique_id=786705469]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.9, 1, 1)
+theme_override_fonts/font = ExtResource("4_font")
 theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1)
+text = "●"

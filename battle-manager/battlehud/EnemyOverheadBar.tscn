@@ -1,57 +1,115 @@
-[gd_scene load_steps=3 format=3 uid="uid://enemy_overhead_bar"]
+[gd_scene format=3 uid="uid://dn2ev8cdq1ltm"]
 
-[ext_resource type="Script" path="res://battle-manager/battlehud/enemy_overhead_bar.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://cthhtd76g07uu" path="res://battle-manager/battlehud/enemy_overhead_bar.gd" id="1_script"]
+[ext_resource type="Shader" uid="uid://b1s4clrojg48e" path="res://assets/shaders/ui_background_shader.gdshader" id="2_72fot"]
+[ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="3_hey3j"]
+[ext_resource type="Texture2D" uid="uid://perm7xdy3rf4" path="res://assets/images/ui/20251118darkDwellersBarL.png" id="4_w53xi"]
+[ext_resource type="Texture2D" uid="uid://dy8paujgo1jsd" path="res://assets/images/ui/enemy_bar_progress.png" id="5_6rsgd"]
+[ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="6_0478o"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.05, 0.05, 0.1, 0.82)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
-content_margin_left = 6.0
-content_margin_right = 6.0
-content_margin_top = 4.0
-content_margin_bottom = 4.0
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_r3a75"]
+shader = ExtResource("2_72fot")
+shader_parameter/base_color = Color(0.1, 0.1, 0.15, 1)
 
-[node name="EnemyOverheadBar" type="Control"]
+[node name="EnemyOverheadBar" type="Control" unique_id=109527511]
 custom_minimum_size = Vector2(160, 44)
+layout_mode = 3
+anchors_preset = 0
 mouse_filter = 2
 script = ExtResource("1_script")
 
-[node name="BG" type="PanelContainer" parent="."]
+[node name="BackgroundShader" type="ColorRect" parent="." unique_id=1568274281]
+z_index = -1
+material = SubResource("ShaderMaterial_r3a75")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+color = Color(0.1, 0.1, 0.15, 1)
 
-[node name="VBox" type="VBoxContainer" parent="BG"]
-layout_mode = 2
+[node name="VBox" type="VBoxContainer" parent="." unique_id=174802602]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 154.0
+offset_bottom = 40.0
 theme_override_constants/separation = 3
 
-[node name="NameLabel" type="Label" parent="BG/VBox"]
-layout_mode = 2
-text = "Enemy"
-theme_override_font_sizes/font_size = 11
-theme_override_colors/font_color = Color(1.0, 0.75, 0.75, 1.0)
-horizontal_alignment = 1
-
-[node name="HPBarRow" type="HBoxContainer" parent="BG/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="HPBar" type="ProgressBar" parent="BG/VBox/HPBarRow"]
+[node name="NameLabel" type="Label" parent="VBox" unique_id=934402160]
 layout_mode = 2
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(0, 8)
-max_value = 100.0
-value = 100.0
-show_percentage = false
+theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("3_hey3j")
+theme_override_font_sizes/font_size = 16
+text = "Enemy"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="HPLabel" type="Label" parent="BG/VBox/HPBarRow"]
+[node name="HPBarRow" type="Control" parent="VBox" unique_id=1810864295]
 layout_mode = 2
-text = "100 / 100"
-theme_override_font_sizes/font_size = 9
-theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1.0)
+size_flags_vertical = 3
+
+[node name="HPDamageBar" type="TextureProgressBar" parent="VBox/HPBarRow" unique_id=2009045112]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = -8.5
+offset_bottom = 8.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+value = 100.0
+nine_patch_stretch = true
+stretch_margin_left = 12
+stretch_margin_top = 9
+stretch_margin_right = 13
+stretch_margin_bottom = 10
+texture_over = ExtResource("4_w53xi")
+texture_progress = ExtResource("5_6rsgd")
+tint_progress = Color(0.7, 0.15, 0.18, 1)
+
+[node name="HPBar" type="TextureProgressBar" parent="VBox/HPBarRow" unique_id=1009045112]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = -8.5
+offset_bottom = 8.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+value = 100.0
+nine_patch_stretch = true
+stretch_margin_left = 12
+stretch_margin_top = 9
+stretch_margin_right = 13
+stretch_margin_bottom = 10
+texture_over = ExtResource("4_w53xi")
+texture_progress = ExtResource("5_6rsgd")
+tint_progress = Color(1, 0.23137255, 0.24705882, 1)
+
+[node name="HPNumLabel" type="Label" parent="VBox/HPBarRow" unique_id=1334882622]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.35686275, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("6_0478o")
+theme_override_font_sizes/font_size = 10
+text = "100/100"
+horizontal_alignment = 1
+vertical_alignment = 1
