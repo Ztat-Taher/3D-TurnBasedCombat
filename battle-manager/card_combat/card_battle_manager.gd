@@ -294,6 +294,10 @@ func execute_animation_phase(card_config: CardConfig, context: Dictionary) -> vo
 		animation_name = card_config.fallback_animation
 	
 	if not animation_name.is_empty():
+		# Resolve animation name through character's animation mapping if available
+		if actor.has_method("get_resolved_animation"):
+			animation_name = actor.get_resolved_animation(animation_name)
+		
 		# Apply animation settings
 		if actor.has_method("_try_animation"):
 			actor._try_animation(animation_name)
@@ -310,7 +314,12 @@ func process_animation_events(card_config: CardConfig, context: Dictionary) -> v
 	if not actor or not actor.has_method("_get_animation_duration"):
 		return
 	
-	var animation_duration = actor._get_animation_duration(card_config.actor_animation)
+	# Resolve animation name through character's animation mapping if available
+	var animation_name = card_config.actor_animation
+	if actor.has_method("get_resolved_animation"):
+		animation_name = actor.get_resolved_animation(animation_name)
+	
+	var animation_duration = actor._get_animation_duration(animation_name)
 	var animation_time = 0.0
 	
 	while animation_time < animation_duration:
@@ -568,7 +577,12 @@ func _execute_effects_on_hit(card_config: CardConfig, context: Dictionary, qte_m
 		_execute_effects_immediate(card_config, context, qte_multiplier)
 		return
 	
-	var animation_duration = actor._get_animation_duration(card_config.actor_animation)
+	# Resolve animation name through character's animation mapping if available
+	var animation_name = card_config.actor_animation
+	if actor.has_method("get_resolved_animation"):
+		animation_name = actor.get_resolved_animation(animation_name)
+	
+	var animation_duration = actor._get_animation_duration(animation_name)
 	var hit_frame_delay = animation_duration * 0.55 # Typical hit frame at 55%
 	
 	print("Waiting for hit frame: ", hit_frame_delay, " seconds")
@@ -585,7 +599,12 @@ func _execute_effects_on_impact(card_config: CardConfig, context: Dictionary, qt
 		_execute_effects_immediate(card_config, context, qte_multiplier)
 		return
 	
-	var animation_duration = actor._get_animation_duration(card_config.actor_animation)
+	# Resolve animation name through character's animation mapping if available
+	var animation_name = card_config.actor_animation
+	if actor.has_method("get_resolved_animation"):
+		animation_name = actor.get_resolved_animation(animation_name)
+	
+	var animation_duration = actor._get_animation_duration(animation_name)
 	var impact_delay = animation_duration * 0.65 # Impact at 65%
 	
 	print("Waiting for impact: ", impact_delay, " seconds")

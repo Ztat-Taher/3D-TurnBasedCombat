@@ -54,7 +54,11 @@ var original_position: Vector3
 @export var stuck_movement_timeout: float = 5.0
 ## If true, fallback damage applies if animation callback doesn't fire
 @export var allow_animation_fallback: bool = true
-## 
+## Animation mapping resource for character-specific animation remapping
+## Maps generic animation names (from cards) to character-specific animations
+## Example: Card uses "magic_cast", Wizard maps it to "wizard_spell_cast"
+@export var animation_mapping: AnimationMapping = null
+##
 ## CUSTOM MOVEMENT SETTINGS EXPLAINED:
 ## -1.0 values mean "use the global setting from BattleManager"
 ## Set positive values to override global settings for this specific battler
@@ -356,7 +360,9 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 			if battle_manager.enemies.has(self):
 				battle_manager.enemies.erase(self)
 			# Update HUD turn queue immediately
-			if battle_manager.hud and battle_manager.hud.has_method("update_turn_queue"):
+			if battle_manager.hud and battle_manager.hud.turn_queue_ui:
+				battle_manager.hud.turn_queue_ui.update_queue(battle_manager.turn_order, battle_manager.current_turn)
+			elif battle_manager.hud and battle_manager.hud.has_method("update_turn_queue"):
 				battle_manager.hud.update_turn_queue(battle_manager.turn_order, battle_manager.current_turn)
 			await _fade_and_remove()
 		elif battle_manager and team == TEAM.ALLY:
@@ -366,7 +372,9 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 			if battle_manager.players.has(self):
 				battle_manager.players.erase(self)
 			# Update HUD turn queue immediately
-			if battle_manager.hud and battle_manager.hud.has_method("update_turn_queue"):
+			if battle_manager.hud and battle_manager.hud.turn_queue_ui:
+				battle_manager.hud.turn_queue_ui.update_queue(battle_manager.turn_order, battle_manager.current_turn)
+			elif battle_manager.hud and battle_manager.hud.has_method("update_turn_queue"):
 				battle_manager.hud.update_turn_queue(battle_manager.turn_order, battle_manager.current_turn)
 		else:
 			_is_despawning = false
@@ -630,6 +638,19 @@ func _resolve_state_animation_name(state_name: String) -> String:
 			return str(node.animation)
 	
 	return ""
+
+## Resolve a generic animation name to a character-specific animation using animation mapping
+## If no mapping exists, returns the original generic name
+func get_resolved_animation(generic_name: String) -> String:
+	if generic_name.is_empty():
+		return generic_name
+	
+	if animation_mapping:
+		var resolved = animation_mapping.resolve_animation(generic_name)
+		return resolved
+	
+	# No animation mapping, return original name
+	return generic_name
 
 func _on_advance_complete():
 	set_advancing(false)

@@ -8,15 +8,15 @@ signal end_turn_pressed
 
 @onready var item_button_scene: PackedScene = preload("res://battle-manager/battlehud/item-button-preset.tscn")
 @onready var item_container = $Control/Items/ScrollContainer/BoxContainer
-@onready var turn_queue_card_scene: PackedScene = preload("res://battle-manager/battlehud/turn_queue_card.tscn")
+@onready var turn_queue_ui: TurnQueueUI = $Control/TurnQueueUI
 @onready var party_status_card_scene: PackedScene = preload("res://battle-manager/battlehud/party_status_card.tscn")
 @onready var parry_window_scene: PackedScene = preload("res://battle-manager/battlehud/parry_window.tscn")
 
 @onready var action_buttons: ActionButtons = $Control/ActionButtons
-@onready var attack_button: TextureButton = $Control/ActionButtons.get_node("Attack")
-@onready var items_button: TextureButton = $Control/ActionButtons.get_node("Items")
-@onready var run_button: TextureButton = $Control/ActionButtons.get_node("Run")
-@onready var end_turn_button: TextureButton = $Control/ActionButtons.get_node("EndTurnButton")
+@onready var attack_button: TextureButton = $Control/ActionButtons.get_node("AttackWrapper/Attack")
+@onready var items_button: TextureButton = $Control/ActionButtons.get_node("ItemsWrapper/Items")
+@onready var run_button: TextureButton = $Control/ActionButtons.get_node("RunWrapper/Run")
+@onready var end_turn_button: TextureButton = $Control/ActionButtons.get_node("EndTurnWrapper/EndTurnButton")
 @onready var global_back_button: Button = $Control/BackButton
 @onready var battle_text_display: RichTextLabel = $Control/BattleTextDisplay/Text
 @onready var item_select: Control = $Control/Items
@@ -356,17 +356,12 @@ func _on_item_back_pressed() -> void:
 
 func _close_items_menu():
 	item_select.visible = false
-	# Show items button again when closing items menu with animation
 	if action_buttons and items_button:
 		action_buttons.show_button("Items")
-	if activeBattler:
-		show_action_buttons(activeBattler)
 	_update_back_button_visibility()
 
 func _close_card_menu():
 	close_card_ui()
-	if activeBattler:
-		show_action_buttons(activeBattler)
 	_update_back_button_visibility()
 
 func _on_item_selected(item: Item) -> void:
@@ -377,42 +372,31 @@ func _on_item_selected(item: Item) -> void:
 	_update_back_button_visibility()
 
 func _on_attack_pressed() -> void:
-	# Show card UI and hide attack button with animation
 	if card_ui:
 		card_ui.visible = true
-	if action_buttons and attack_button:
-		action_buttons.hide_button("Attack")
-	# Keep other action buttons visible
-	if action_buttons and items_button:
-		action_buttons.show_button("Items")
-	if action_buttons and run_button:
-		action_buttons.show_button("Run")
-	if action_buttons and end_turn_button:
-		action_buttons.show_button("EndTurnButton")
+	if action_buttons:
+		if attack_button:
+			action_buttons.hide_button("Attack")
+		if items_button:
+			action_buttons.show_button("Items")
 	_update_back_button_visibility()
 
 func close_card_ui() -> void:
-	# Hide card UI and show attack button again with animation
 	if card_ui:
 		card_ui.visible = false
 	if action_buttons and attack_button:
 		action_buttons.show_button("Attack")
 
 func _on_items_pressed() -> void:
-	# Show items and hide only items button, keep others visible
 	setup_item_list(activeBattler)
 	item_select.visible = true
-	if action_buttons and items_button:
-		action_buttons.hide_button("Items")
 	if card_ui:
 		card_ui.visible = false
-	# Keep other action buttons visible (including attack)
-	if action_buttons and attack_button:
-		action_buttons.show_button("Attack")
-	if action_buttons and run_button:
-		action_buttons.show_button("Run")
-	if action_buttons and end_turn_button:
-		action_buttons.show_button("EndTurnButton")
+	if action_buttons:
+		if items_button:
+			action_buttons.hide_button("Items")
+		if attack_button:
+			action_buttons.show_button("Attack")
 	_update_back_button_visibility()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -473,7 +457,6 @@ func set_targeting_mode(enabled: bool) -> void:
 	if enabled:
 		hide_action_buttons()
 	else:
-		close_card_ui()
 		if activeBattler:
 			show_action_buttons(activeBattler)
 	
@@ -539,45 +522,6 @@ func _on_global_back_pressed() -> void:
 		if battle_manager and battle_manager.has_method("exit_targeting_mode"):
 			battle_manager.exit_targeting_mode()
 		set_targeting_mode(false)
-
-@onready var turn_queue_container = $Control/TurnQueueUI/ScrollContainer/QueueContainer
-
-func update_turn_queue(turn_order: Array, current_turn_idx: int) -> void:
-	print("BattleHUD: update_turn_queue called - turn_order size: ", turn_order.size(), " current_turn_idx: ", current_turn_idx)
-	
-	if not turn_queue_container:
-		print("BattleHUD: turn_queue_container is null!")
-		return
-	
-	for child in turn_queue_container.get_children():
-		child.queue_free()
-	
-	if turn_order.is_empty():
-		print("BattleHUD: turn_order is empty!")
-		return
-	
-	if not turn_queue_card_scene:
-		push_error("Turn queue card scene not loaded!")
-		return
-	
-	var total = turn_order.size()
-	for i in range(total):
-		var idx = (current_turn_idx + i) % total
-		var battler = turn_order[idx]
-		if not is_instance_valid(battler) or battler.is_defeated():
-			print("Skipping invalid/defeated battler: ", battler.character_name if battler else "null")
-			continue
-		
-		var is_current = (i == 0)
-		print("Creating card for: ", battler.character_name, " is_current: ", is_current)
-		var card = turn_queue_card_scene.instantiate()
-		print("Card instantiated: ", card, " is TurnQueueCard: ", card is TurnQueueCard)
-		if card is TurnQueueCard:
-			card.setup(battler, is_current)
-			turn_queue_container.add_child(card)
-			print("Card added to container")
-		else:
-			push_error("Instantiated node is not a TurnQueueCard!")
 
 func update_ui():
 	update_character_info()

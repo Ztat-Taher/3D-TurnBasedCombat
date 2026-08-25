@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="AnimationMapping" load_steps=2 format=3 uid="uid://d3l8m5n6p7q8r"]
+
+[ext_resource type="Script" path="res://battle-manager/card_combat/resources/animation_mapping.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+animation_map = {
+	"attack": "ninja_quick_slash",
+	"heavy_attack": "ninja_combo_attack",
+	"magic_cast": "ninja_ninja_magic",
+	"heal": "ninja_meditate",
+	"defend": "ninja_dodge",
+	"hit": "ninja_hit",
+	"death": "ninja_vanish"
+}
+# Set this resource on a Ninja character's Battler node animation_mapping property
+# This maps generic card animation names to ninja-specific animations

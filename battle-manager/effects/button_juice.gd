@@ -58,9 +58,21 @@ func setup(button: Control) -> void:
 		enable_sliding = false  # Force disable sliding for container buttons
 	
 	# Store original values
-	original_scale = button.scale
+	# If button scale was squished or zeroed during pre-appear, fallback to Vector2.ONE
+	if button.scale.length_squared() < 0.1:
+		original_scale = Vector2.ONE
+	else:
+		original_scale = button.scale
+		
+	# Ensure pivot is centered for nice scaling without displacement
+	if button.pivot_offset == Vector2.ZERO and button.size != Vector2.ZERO:
+		button.pivot_offset = button.size / 2.0
+		
 	original_rotation = button.rotation_degrees if button.has_method("get_rotation_degrees") else 0.0
-	original_modulate = button.modulate
+	# Ensure original modulate color has alpha 1.0 so hover exit does not restore alpha 0.0
+	var mod = button.modulate
+	mod.a = 1.0
+	original_modulate = mod
 	original_position = button.position
 	
 	# Connect signals

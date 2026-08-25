@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://d1n1invd7ckr8"]
+
+[ext_resource type="Script" uid="uid://rwcygibspbd8" path="res://battle-manager/effects/container_juice.gd" id="1_container_juice"]
+[ext_resource type="Script" uid="uid://bxg8ygy0y0d3x" path="res://battle-manager/battlehud/turn_queue_ui.gd" id="2_turn_queue_ui_script"]
+
+[node name="TurnQueueUI" type="Control" unique_id=1680039568]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 120.0
+offset_bottom = 400.0
+script = ExtResource("2_turn_queue_ui_script")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="." unique_id=1927679574]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
+
+[node name="QueueContainer" type="VBoxContainer" parent="ScrollContainer" unique_id=1867797202]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="ContainerJuice" type="Node" parent="ScrollContainer/QueueContainer" unique_id=1199859079]
+script = ExtResource("1_container_juice")
+appear_slide_distance = 30.0
+appear_stagger_delay = 0.1
+disappear_slide_direction = 0
+disappear_slide_distance = 30.0
+disappear_duration = 0.2
+auto_appear_on_ready = true
+start_hidden = false

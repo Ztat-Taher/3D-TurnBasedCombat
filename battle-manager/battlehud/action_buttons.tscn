@@ -5,9 +5,11 @@
 [ext_resource type="Texture2D" uid="uid://yp7lgpib21q3" path="res://assets/images/ui/attack.png" id="3_attack_tex"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="5_21sk8"]
 [ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="5_input_prompt"]
+[ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="6_1ky24"]
 [ext_resource type="Texture2D" uid="uid://canwm08m3musu" path="res://assets/images/ui/items.png" id="6_items_tex"]
 [ext_resource type="Texture2D" uid="uid://bramr4vhhulsw" path="res://assets/images/ui/run.png" id="7_run_tex"]
 [ext_resource type="Texture2D" uid="uid://dmqu76l8ut0f4" path="res://assets/images/ui/end.png" id="8_end_tex"]
+[ext_resource type="Script" uid="uid://rwcygibspbd8" path="res://battle-manager/effects/container_juice.gd" id="9_container_juice"]
 
 [node name="ActionButtons" type="BoxContainer" unique_id=74957540]
 offset_right = 200.0
@@ -16,20 +18,38 @@ size_flags_horizontal = 0
 size_flags_vertical = 0
 theme = ExtResource("2_ui_theme")
 theme_override_constants/separation = 5
+alignment = 1
 vertical = true
 script = ExtResource("1_action_buttons_script")
-roll_in_duration = 0.1
-roll_out_duration = 0.01
-roll_delay_between_buttons = 0.01
 
-[node name="Attack" type="TextureButton" parent="." unique_id=1746743827]
+[node name="ContainerJuice" type="Node" parent="." unique_id=892341098]
+script = ExtResource("9_container_juice")
+appear_slide_distance = 50.0
+appear_duration = 0.22
+appear_stagger_delay = 0.1
+disappear_slide_distance = 50.0
+disappear_duration = 0.15
+auto_appear_on_ready = true
+start_hidden = false
+
+[node name="AttackWrapper" type="Control" parent="." unique_id=1118995834]
 custom_minimum_size = Vector2(32, 64)
 layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Attack" type="TextureButton" parent="AttackWrapper" unique_id=1746743827]
+custom_minimum_size = Vector2(32, 64)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_horizontal = 3
 texture_normal = ExtResource("3_attack_tex")
 stretch_mode = 5
 
-[node name="AttackPrompt" type="Label" parent="Attack" unique_id=1721489119]
+[node name="AttackPrompt" type="Label" parent="AttackWrapper/Attack" unique_id=1721489119]
 layout_mode = 1
 anchors_preset = 6
 anchor_left = 1.0
@@ -45,35 +65,44 @@ grow_vertical = 2
 text = "[A]"
 script = ExtResource("5_input_prompt")
 
-[node name="ActionLabel" type="Label" parent="Attack" unique_id=363918673]
+[node name="ActionLabel" type="Label" parent="AttackWrapper/Attack" unique_id=468924547]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 10.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("6_1ky24")
 text = "Attack"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="ButtonJuice" type="Node" parent="Attack" unique_id=1868925491]
+[node name="ButtonJuice" type="Node" parent="AttackWrapper/Attack" unique_id=1868925491]
 script = ExtResource("5_21sk8")
+hover_slide_enabled = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
-[node name="Items" type="TextureButton" parent="." unique_id=509910815]
+[node name="ItemsWrapper" type="Control" parent="." unique_id=2064134804]
 custom_minimum_size = Vector2(32, 64)
 layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Items" type="TextureButton" parent="ItemsWrapper" unique_id=509910815]
+custom_minimum_size = Vector2(32, 64)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_horizontal = 3
 texture_normal = ExtResource("6_items_tex")
 stretch_mode = 5
 
-[node name="ItemsPrompt" type="Label" parent="Items" unique_id=546338478]
+[node name="ItemsPrompt" type="Label" parent="ItemsWrapper/Items" unique_id=546338478]
 layout_mode = 1
 anchors_preset = 6
 anchor_left = 1.0
@@ -89,35 +118,44 @@ grow_vertical = 2
 text = "[X]"
 script = ExtResource("5_input_prompt")
 
-[node name="ActionLabel" type="Label" parent="Items" unique_id=340581399]
+[node name="ActionLabel" type="Label" parent="ItemsWrapper/Items" unique_id=677547519]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 10.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("6_1ky24")
 text = "Items"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="ButtonJuice" type="Node" parent="Items" unique_id=1210691270]
+[node name="ButtonJuice" type="Node" parent="ItemsWrapper/Items" unique_id=1210691270]
 script = ExtResource("5_21sk8")
+hover_slide_enabled = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
-[node name="Run" type="TextureButton" parent="." unique_id=1881774870]
+[node name="RunWrapper" type="Control" parent="." unique_id=441753648]
 custom_minimum_size = Vector2(32, 64)
 layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Run" type="TextureButton" parent="RunWrapper" unique_id=1881774870]
+custom_minimum_size = Vector2(32, 64)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_horizontal = 3
 texture_normal = ExtResource("7_run_tex")
 stretch_mode = 5
 
-[node name="RunPrompt" type="Label" parent="Run" unique_id=616942743]
+[node name="RunPrompt" type="Label" parent="RunWrapper/Run" unique_id=616942743]
 layout_mode = 1
 anchors_preset = 6
 anchor_left = 1.0
@@ -133,35 +171,44 @@ grow_vertical = 2
 text = "[Y]"
 script = ExtResource("5_input_prompt")
 
-[node name="ActionLabel" type="Label" parent="Run" unique_id=532319360]
+[node name="ActionLabel" type="Label" parent="RunWrapper/Run" unique_id=761610378]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 10.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("6_1ky24")
 text = "Run"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="ButtonJuice" type="Node" parent="Run" unique_id=674618582]
+[node name="ButtonJuice" type="Node" parent="RunWrapper/Run" unique_id=674618582]
 script = ExtResource("5_21sk8")
+hover_slide_enabled = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
-[node name="EndTurnButton" type="TextureButton" parent="." unique_id=373611517]
+[node name="EndTurnWrapper" type="Control" parent="." unique_id=1348201994]
 custom_minimum_size = Vector2(32, 64)
 layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="EndTurnButton" type="TextureButton" parent="EndTurnWrapper" unique_id=373611517]
+custom_minimum_size = Vector2(32, 64)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_horizontal = 3
 texture_normal = ExtResource("8_end_tex")
 stretch_mode = 5
 
-[node name="EndTurnPrompt" type="Label" parent="EndTurnButton" unique_id=1512973937]
+[node name="EndTurnPrompt" type="Label" parent="EndTurnWrapper/EndTurnButton" unique_id=1512973937]
 layout_mode = 1
 anchors_preset = 6
 anchor_left = 1.0
@@ -177,23 +224,22 @@ grow_vertical = 2
 text = "[B]"
 script = ExtResource("5_input_prompt")
 
-[node name="ActionLabel" type="Label" parent="EndTurnButton" unique_id=2136818538]
+[node name="ActionLabel" type="Label" parent="EndTurnWrapper/EndTurnButton" unique_id=1121213683]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -30.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 10.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("6_1ky24")
 text = "End Turn"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="ButtonJuice" type="Node" parent="EndTurnButton" unique_id=615609777]
+[node name="ButtonJuice" type="Node" parent="EndTurnWrapper/EndTurnButton" unique_id=615609777]
 script = ExtResource("5_21sk8")
+hover_slide_enabled = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"

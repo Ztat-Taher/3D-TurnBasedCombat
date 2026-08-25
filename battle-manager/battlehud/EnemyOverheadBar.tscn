@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://dn2ev8cdq1ltm"]
 
 [ext_resource type="Script" uid="uid://cthhtd76g07uu" path="res://battle-manager/battlehud/enemy_overhead_bar.gd" id="1_script"]
-[ext_resource type="Shader" uid="uid://b1s4clrojg48e" path="res://assets/shaders/ui_background_shader.gdshader" id="2_72fot"]
+[ext_resource type="Shader" path="res://assets/shaders/ui_background_shader.gdshader" id="2_72fot"]
 [ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="3_hey3j"]
-[ext_resource type="Texture2D" uid="uid://perm7xdy3rf4" path="res://assets/images/ui/20251118darkDwellersBarL.png" id="4_w53xi"]
+[ext_resource type="Texture2D" uid="uid://dfkkycfn3xtaf" path="res://assets/images/ui/enemy_bar_over.png" id="4_w53xi"]
 [ext_resource type="Texture2D" uid="uid://dy8paujgo1jsd" path="res://assets/images/ui/enemy_bar_progress.png" id="5_6rsgd"]
 [ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="6_0478o"]
 

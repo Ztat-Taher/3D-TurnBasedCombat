@@ -635,6 +635,8 @@ func start_next_turn():
 	
 	if hud and hud.has_method("update_turn_queue"):
 		hud.update_turn_queue(turn_order, current_turn)
+	elif hud and hud.turn_queue_ui:
+		hud.turn_queue_ui.update_queue(turn_order, current_turn)
 	
 	if current_character in players:
 		print("Player's turn")

@@ -9,7 +9,7 @@ var is_player: bool = false
 var is_current: bool = false
 
 var normal_size: Vector2 = Vector2(60, 70)
-var active_size: Vector2 = Vector2(80, 90)
+var active_size: Vector2 = Vector2(80, 70)  # Only width increases, height stays same
 
 var card_shader: Shader = null
 
@@ -71,8 +71,13 @@ func apply_style() -> void:
 					target_color = Color(0.8, 0.2, 0.3, 0.95)  # Bright red for active enemy
 					print("Setting active enemy color: red")
 			else:
-				target_color = Color(0.3, 0.3, 0.35, 0.85)  # Gray for inactive
-				print("Setting inactive color: gray")
+				# Non-active cards show team color but grayed out and translucent
+				if is_player:
+					target_color = Color(0.3, 0.4, 0.5, 0.6)  # Desaturated blue, translucent
+					print("Setting inactive ally color: desaturated blue")
+				else:
+					target_color = Color(0.5, 0.3, 0.35, 0.6)  # Desaturated red, translucent
+					print("Setting inactive enemy color: desaturated red")
 			
 			# Set the shader uniform
 			background_shader.material.set_shader_parameter("base_color", target_color)
@@ -83,16 +88,13 @@ func apply_style() -> void:
 		print("ERROR: background_shader is null!")
 	
 	# Update size based on active state
-	if is_current:
-		custom_minimum_size = active_size
-		var t := create_tween()
-		t.tween_property(self, "custom_minimum_size", active_size, 0.2).set_ease(Tween.EASE_OUT)
-		print("Setting active size: ", active_size)
-	else:
-		custom_minimum_size = normal_size
-		var t := create_tween()
-		t.tween_property(self, "custom_minimum_size", normal_size, 0.2).set_ease(Tween.EASE_OUT)
-		print("Setting normal size: ", normal_size)
+	var target_size = active_size if is_current else normal_size
+	custom_minimum_size = target_size
+	var t := create_tween()
+	t.parallel()
+	t.tween_property(self, "custom_minimum_size", target_size, 0.2).set_ease(Tween.EASE_OUT)
+	t.tween_property(self, "size", target_size, 0.2).set_ease(Tween.EASE_OUT)
+	print("Setting size: ", target_size, " is_current: ", is_current)
 
 func set_current_turn(is_current_turn: bool) -> void:
 	is_current = is_current_turn

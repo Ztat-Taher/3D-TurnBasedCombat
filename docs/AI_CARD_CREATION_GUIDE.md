@@ -64,13 +64,88 @@ script = ExtResource("1")
 
 **Required Fields:**
 - `actor_animation`: Animation name (string)
-  - Common values: "attack", "kick", "skill-animations/strong-attack"
-  - Check battler animation tree for available animations
+  - Use generic animation names for multi-character support (e.g., "attack", "magic_cast", "heal")
+  - Common generic values: "attack", "kick", "magic_cast", "heal", "defend", "heavy_attack"
+  - These will be resolved through character-specific animation mapping if available
 - `animation_priority`: Integer (0-10, higher = more important)
 - `animation_blend_time`: Float (0.0-1.0 seconds)
 - `animation_speed`: Float (0.5-2.0 multiplier)
 - `fallback_animation`: Animation name if primary not found
 - `animation_layer`: "full_body", "upper_body", or "additive"
+
+### Animation Mapping System
+
+**Overview:** The animation mapping system allows cards to use generic animation names that are automatically remapped to character-specific animations. This eliminates the need to add every animation to every character.
+
+**How It Works:**
+1. Cards specify generic animation names (e.g., "magic_cast", "heavy_attack")
+2. Each character can have an AnimationMapping resource that maps generic names to their specific animations
+3. When a card is played, the system resolves the animation name through the character's mapping
+4. If no mapping exists, the original generic name is used (backward compatible)
+
+**AnimationMapping Resource:**
+
+**File Location:** `database/animation_mappings/[character_name]_mapping.tres`
+
+**Required Script:**
+```
+[ext_resource type="Script" path="res://battle-manager/card_combat/resources/animation_mapping.gd" id="1"]
+script = ExtResource("1")
+```
+
+**Required Fields:**
+- `animation_map`: Dictionary mapping generic names to character-specific animations
+
+**Example AnimationMapping for Wizard:**
+```gdscript
+animation_map = {
+    "attack": "wizard_staff_bash",
+    "magic_cast": "wizard_spell_cast",
+    "heal": "wizard_heal_cast",
+    "defend": "wizard_barrier",
+    "heavy_attack": "wizard_fireball_cast"
+}
+```
+
+**Example AnimationMapping for Ninja:**
+```gdscript
+animation_map = {
+    "attack": "ninja_quick_slash",
+    "magic_cast": "ninja_ninja_magic",
+    "heal": "ninja_meditate",
+    "defend": "ninja_dodge",
+    "heavy_attack": "ninja_combo_attack"
+}
+```
+
+**Assigning AnimationMapping to Characters:**
+1. Create AnimationMapping resource in `database/animation_mappings/`
+2. In the Godot Editor, select the character's Battler node
+3. Set the `animation_mapping` property to the created resource
+4. Characters without animation_mapping will use generic names directly
+
+**Benefits:**
+- Cards work across different character types without modification
+- New characters only need their own animations, not every card animation
+- Easy to change a character's animation style by updating one resource
+- Backward compatible with existing characters without mapping
+
+**Best Practices:**
+- Use descriptive generic names (e.g., "magic_cast" instead of "anim1")
+- Keep generic names consistent across cards
+- Document the generic animation names used in your card system
+- Test cards with different character types to ensure mappings work correctly
+
+**Available Preset Mappings:**
+The following example animation mapping resources have been created:
+- `database/animation_mappings/wizard_mapping.tres` - Wizard character animations
+- `database/animation_mappings/warrior_mapping.tres` - Warrior character animations
+- `database/animation_mappings/ninja_mapping.tres` - Ninja character animations
+
+These can be used as templates or directly assigned to character Battler nodes.
+- Keep generic names consistent across cards
+- Document the generic animation names used in your card system
+- Test cards with different character types to ensure mappings work correctly
 
 **Animation Events (Optional):**
 - `animation_events`: Array of AnimationEvent resources
@@ -470,10 +545,10 @@ After file creation, resources must be linked in the Godot Editor:
    - Configure targeting as SINGLE_ENEMY (1)
    - Set base_damage to 40
    - Configure QTE as TIMING (1) with difficulty 0.5
-   - Set appropriate animation
+   - Set actor_animation to a generic name (e.g., "magic_cast" for a spell)
    - Set primary_effect to null with comment
    - Set vfx_on_target to null with comment
-   - Add fire element and rarity
+   - Add lightning element and rarity
    - Set applies_states to null with comment for stun state
 
 3. **Create CardEffect resource** (`database/card_effects/lightning_damage_effect.tres`)
@@ -603,10 +678,40 @@ AI agents must ensure:
 ### Debuff Card
 - Target: SINGLE_ENEMY or ALL_ENEMIES
 - Effect: DEBUFF + State application
-- Animation: "debuff" or "cast"
+- Animation: "magic_cast" or "attack" (use generic names)
 - QTE: Optional timing QTE
 - States: Apply poison/slow/etc.
 - State chance: 0.5-0.75
+
+## Animation Mapping Best Practices
+
+### Generic Animation Names
+Use consistent, descriptive generic animation names across your card system:
+- `"attack"` - Basic attack animation
+- `"heavy_attack"` - Stronger attack animation
+- `"magic_cast"` - Spell casting animation
+- `"heal"` - Healing animation
+- `"defend"` - Defensive stance/animation
+- `"buff"` - Buff application animation
+- `"debuff"` - Debuff application animation
+- `"hit"` - Being hit reaction
+- `"death"` - Death animation
+
+### Character-Specific Mapping
+When creating a new character:
+1. Identify which generic animations they need
+2. Create or find character-specific animations
+3. Create AnimationMapping resource in `database/animation_mappings/`
+4. Map generic names to character-specific animations
+5. Assign the mapping to the character's Battler node
+
+### Testing Animation Mapping
+After setting up animation mapping:
+1. Test cards with different character types
+2. Verify each character plays their specific animations
+3. Test cards with characters that have no mapping (should use generic names)
+4. Check console output for animation resolution messages
+5. Validate that animation timing and effects work correctly
 
 ## Validation and Testing
 
@@ -680,6 +785,13 @@ Use AnimationEvent resources for precise timing:
 - VFX triggered at animation milestones
 - Camera effects timed to animation beats
 
+### Animation Mapping
+Use AnimationMapping resources for character-specific animations:
+- Map generic card animations to character-specific ones
+- Create different animation styles for different character types
+- Maintain backward compatibility with characters without mapping
+- Easy to update character animations without modifying cards
+
 ### State Combinations
 Apply multiple states for complex debuffs:
 - Poison + damage reduction
@@ -701,6 +813,7 @@ database/
 ├── card_effects/
 ├── vfx_configs/
 ├── audio_configs/
+├── animation_mappings/  # Character-specific animation remapping
 ├── camera_effects/ (optional - can be embedded in CardConfig)
 ├── screen_effects/ (optional - can be embedded in CardConfig)
 └── state_configs/ (optional - can be embedded in CardConfig)
@@ -711,6 +824,7 @@ database/
 **Current Database State:**
 - `database/cards/` - Empty (needs creation)
 - `database/card_configs/` - Empty (needs creation)
+- `database/animation_mappings/` - Empty (create as needed for characters)
 - `database/card_effects/` - Empty (needs creation)
 - `database/vfx_configs/` - Empty (needs creation)
 - `database/audio_configs/` - Empty (needs creation)

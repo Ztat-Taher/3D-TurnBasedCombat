@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="AnimationMapping" load_steps=2 format=3 uid="uid://bq8n4xj3k2m5p"]
+
+[ext_resource type="Script" path="res://battle-manager/card_combat/resources/animation_mapping.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+animation_map = {
+	"attack": "wizard_staff_bash",
+	"heavy_attack": "wizard_fireball_cast",
+	"magic_cast": "wizard_spell_cast",
+	"heal": "wizard_heal_cast",
+	"defend": "wizard_barrier",
+	"hit": "wizard_hit",
+	"death": "wizard_death"
+}
+# Set this resource on a Wizard character's Battler node animation_mapping property
+# This maps generic card animation names to wizard-specific animations

@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://brk8oam2p4k7l"]
+
+[node name="TurnQueueCardWrapper" type="Control"]
+custom_minimum_size = Vector2(60, 70)
+layout_mode = 2
+size_flags_horizontal = 3

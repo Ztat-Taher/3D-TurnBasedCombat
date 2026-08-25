@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="AnimationMapping" load_steps=2 format=3 uid="uid://c9k5m7n2p4q6r"]
+
+[ext_resource type="Script" path="res://battle-manager/card_combat/resources/animation_mapping.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+animation_map = {
+	"attack": "warrior_slash",
+	"heavy_attack": "warrior_heavy_slash",
+	"magic_cast": "warrior_shout",
+	"heal": "warrior_rally",
+	"defend": "warrior_shield_raise",
+	"hit": "warrior_hit",
+	"death": "warrior_death"
+}
+# Set this resource on a Warrior character's Battler node animation_mapping property
+# This maps generic card animation names to warrior-specific animations

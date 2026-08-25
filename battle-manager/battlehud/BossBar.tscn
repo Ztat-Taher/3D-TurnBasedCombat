@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://bsdjvwbf7iv4s"]
 
 [ext_resource type="Script" uid="uid://ddc5b88r6h5rt" path="res://battle-manager/battlehud/boss_bar.gd" id="1_script"]
-[ext_resource type="Shader" uid="uid://b1s4clrojg48e" path="res://assets/shaders/ui_background_shader.gdshader" id="2_wxggt"]
+[ext_resource type="Shader" path="res://assets/shaders/ui_background_shader.gdshader" id="2_wxggt"]
 [ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="3_uds32"]
-[ext_resource type="Texture2D" uid="uid://eu6aeqvmnn43" path="res://assets/images/ui/20251118darkDwellersBarC.png" id="3_yunph"]
+[ext_resource type="Texture2D" uid="uid://qxkfeymmevwl" path="res://assets/images/ui/boss_bar_over.png" id="3_yunph"]
 [ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="4_uds32"]
 [ext_resource type="Texture2D" uid="uid://c41c7p4ystmlc" path="res://assets/images/ui/boss_bar_progress.png" id="5_uds32"]
 
