@@ -21,7 +21,7 @@ func gather_battlers():
 # Load Methods
 func load_game():
 	var game_save = ResourceLoader.load(save_path + save_folder + save_file) as SavedGame
-	if game_save == null: print("No save file found."); return # exit function if no save
+	if game_save == null: return # exit function if no save
 	
 	load_all_data(game_save)
 
@@ -29,7 +29,7 @@ func load_all_data(game_save: SavedGame):
 	load_battler_data(game_save)
 
 func load_battler_data(game_save: SavedGame):
-	if (game_save.char_data == null): print("No save data found."); return # exit function if no save
+	if (game_save.char_data == null): return # exit function if no save
 	
 	battler_group(game_save)
 	

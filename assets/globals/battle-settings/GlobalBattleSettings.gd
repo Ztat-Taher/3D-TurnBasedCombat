@@ -95,8 +95,7 @@ func set_active_battler(character):
 ## Set the current battle configuration
 func set_battle_config(config: BattleConfig) -> void:
 	current_battle_config = config
-	if config:
-		print("Battle config set: ", config.battle_name)
+
 
 ## Get the current battle configuration
 func get_battle_config() -> BattleConfig:
@@ -104,20 +103,5 @@ func get_battle_config() -> BattleConfig:
 
 ## Clear battle configuration after battle ends
 func clear_battle_config() -> void:
-	if current_battle_config:
-		print("Clearing battle config: ", current_battle_config.battle_name)
-	current_battle_config = null
 
-## Explain the battle config system (for documentation)
-func explain_battle_config_usage() -> void:
-	print("\n=== BATTLE CONFIGURATION SYSTEM ===")
-	print("Script Location: Look for 'battle_config.gd' in assets/globals/battle-settings/")
-	print("Creation: Right-click in Godot file browser > New Resource > BattleConfig")
-	print("Usage:")
-	print("  1. Create a .tres file from BattleConfig resource")
-	print("  2. Configure battle properties (starting states, multipliers, difficulty, etc.)")
-	print("  3. In your scene script, call: GlobalBattleSettings.set_battle_config(your_config)")
-	print("  4. Start the battle normally")
-	print("  5. After battle, retrieve data: GlobalBattleSettings.get_battle_config()")
-	print("  6. Call clear_battle_config() when done")
-	print("==================================\n")
+	current_battle_config = null

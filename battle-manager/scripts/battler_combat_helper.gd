@@ -73,15 +73,12 @@ static func get_battle_manager() -> Node:
 ## Includes error checking and fallback behavior.
 static func try_play_animation(battler: Battler, anim_name: String) -> bool:
 	if not anim_name or anim_name.is_empty():
-		print("[AnimError] Empty animation name provided")
 		return false
 	
 	if not battler.state_machine:
-		print("[AnimError] state_machine not initialized on ", battler.character_name)
 		return false
 	
 	battler.state_machine.travel(anim_name)
-	print("[Anim] Playing: ", anim_name, " on ", battler.character_name)
 	
 	return true
 
@@ -98,10 +95,7 @@ static func apply_fallback_damage(attacker: Battler, target: Battler) -> void:
 	
 	# Check if this battler allows fallback
 	if not attacker.allow_animation_fallback:
-		print("[Fallback] Damage fallback disabled for ", attacker.character_name)
 		return
-	
-	print("[Fallback] Animation didn't trigger damage, applying fallback for ", attacker.character_name)
 	
 	var damage = attacker.get_attack_damage(target)
 	
@@ -115,7 +109,6 @@ static func apply_fallback_damage(attacker: Battler, target: Battler) -> void:
 ## Initialize the states dictionary and subscribe to state changes.
 static func initialize_states(battler: Battler) -> void:
 	battler.active_states = {}
-	print("[State] Initialized state system for ", battler.character_name)
 
 ## Process all active states for a battler.
 ## Handles DOT/HOT, duration tracking, and cleanup.
@@ -139,12 +132,10 @@ static func tick_states(battler: Battler) -> void:
 				if battler.current_health < 0:
 					battler.current_health = 0
 				battler.health_changed.emit(battler.current_health, battler.max_health)
-				print("[State] %s takes %d damage from %s" % [battler.character_name, actual_damage, state_name])
 			else:
 				var healing = abs(actual_damage)
 				battler.current_health = min(battler.current_health + healing, battler.max_health)
 				battler.health_changed.emit(battler.current_health, battler.max_health)
-				print("[State] %s recovers %d health from %s" % [battler.character_name, healing, state_name])
 		
 		# Handle duration
 		if state.turns_active > 0:
@@ -160,11 +151,9 @@ static func tick_states(battler: Battler) -> void:
 static func remove_state(battler: Battler, state_name: String) -> void:
 	if battler.active_states.has(state_name):
 		battler.active_states.erase(state_name)
-		print("[State] %s is no longer affected by %s" % [battler.character_name, state_name])
 
 ## Apply a state to a battler.
 static func apply_state(battler: Battler, state: State) -> void:
 	if state == null:
 		return
 	battler.active_states[state.state_name] = state.duplicate()
-	print("[State] %s was afflicted with %s!" % [battler.character_name, state.state_name])

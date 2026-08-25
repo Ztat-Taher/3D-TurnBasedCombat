@@ -25,15 +25,12 @@ var queued_cards: Array = []
 func _ready():
 	# Add to group for easy access
 	add_to_group("card_battle_manager")
-	print("CardBattleManager added to group card_battle_manager")
 	
 	# Find the battle manager
 	battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if not battle_manager:
 		push_error("CardBattleManager: Could not find BattleManager")
 		return
-	else:
-		print("CardBattleManager found BattleManager")
 	
 	# Create AP system
 	ap_system = APSystem.new()
@@ -92,8 +89,6 @@ func setup_card_combat(player_battler: Battler, card_data_resources: Array[CardD
 		deck.card_played.connect(_on_card_played)
 	if not deck.mana_changed.is_connected(_on_mana_changed):
 		deck.mana_changed.connect(_on_mana_changed)
-	
-	print("Card combat setup complete for player: ", player_battler.character_name)
 
 func create_combat_config() -> CombatConfig:
 	var config = CombatConfig.new()
@@ -117,15 +112,10 @@ func get_hand() -> Array[CardData]:
 
 func can_play_card(card: CardData) -> bool:
 	if not _get_current_deck():
-		print("Cannot play card: No player deck")
 		return false
 	
 	# Use our own AP system for cost validation
 	var ap_can_spend = ap_system.can_spend_ap(card.cost)
-	print("AP can spend: ", ap_can_spend, " (card cost: ", card.cost, ")")
-	
-	var ap_info = get_ap_info()
-	print("Current AP: ", ap_info.get("current_ap", 0), " / ", ap_info.get("max_ap", 0))
 	
 	return ap_can_spend
 
@@ -133,7 +123,6 @@ var is_executing_card: bool = false
 
 func play_card(card: CardData, target: Battler = null) -> bool:
 	if is_executing_card or not can_play_card(card):
-		print("Cannot play card: ", card.name, " (is_executing: ", is_executing_card, ")")
 		return false
 	
 	is_executing_card = true
@@ -141,11 +130,6 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 		battle_manager.is_animating = true
 		if battle_manager.hud:
 			battle_manager.hud.hide_action_buttons()
-	
-	print("=== PLAYING CARD ===")
-	print("Card: ", card.name)
-	print("Target: ", target.character_name if target else "None")
-	print("Battle manager enemies before play: ", battle_manager.enemies.size() if battle_manager else "No battle manager")
 	
 	# Camera choreography: wider view for player attack cards only
 	var card_type = card.metadata.get("card_type", "attack")
@@ -175,15 +159,11 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 				battle_manager.hud.card_ui.visible = true
 			battle_manager.hud.show_action_buttons(current_player_battler)
 	
-	print("Card executed: ", card.name, " targeting: ", target.character_name if target else "None")
-	print("Battle manager enemies after play: ", battle_manager.enemies.size() if battle_manager else "No battle manager")
 	card_played.emit(card, target)
 	
 	return true
 
 func execute_queued_cards() -> void:
-	print("Executing ", queued_cards.size(), " queued cards")
-	
 	for card_action in queued_cards:
 		var card: CardData = card_action["card"]
 		var target: Battler = card_action["target"]
@@ -196,14 +176,10 @@ func execute_queued_cards() -> void:
 	turn_ended.emit()
 
 func execute_card_effect(card: CardData, target: Battler) -> void:
-	print("Executing card effect: ", card.name)
-	
 	if not target:
-		print("No target for card: ", card.name)
 		return
 	
 	if not current_player_battler:
-		print("No player battler for card execution")
 		return
 	
 	# Apply state effects BEFORE execution (to avoid target being freed)
@@ -233,8 +209,6 @@ func execute_card_effect(card: CardData, target: Battler) -> void:
 				execute_buff_card(card, target, is_aoe)
 			"debuff":
 				await execute_debuff_card(card, target, is_aoe)
-			_:
-				print("Unknown card type: ", card_type)
 
 ## Execute card using the new CardConfig system
 func execute_card_with_config(card: CardData, target: Battler) -> void:
@@ -242,8 +216,6 @@ func execute_card_with_config(card: CardData, target: Battler) -> void:
 	if not card_config:
 		push_error("Card has_card_config() returned true but card_config is null")
 		return
-	
-	print("Executing card with config: ", card.name)
 	
 	# Build execution context
 	var context = {
@@ -280,8 +252,6 @@ func execute_card_with_config(card: CardData, target: Battler) -> void:
 	
 	# Phase 7: Audio Phase
 	execute_audio_phase(card_config, context)
-	
-	print("Card execution with config complete: ", card.name)
 
 ## Execute animation phase
 func execute_animation_phase(card_config: CardConfig, context: Dictionary) -> void:
@@ -305,8 +275,6 @@ func execute_animation_phase(card_config: CardConfig, context: Dictionary) -> vo
 			# Handle animation events
 			if not card_config.animation_events.is_empty():
 				await process_animation_events(card_config, context)
-	else:
-		print("No animation specified for card")
 
 ## Process animation events
 func process_animation_events(card_config: CardConfig, context: Dictionary) -> void:
@@ -330,7 +298,6 @@ func process_animation_events(card_config: CardConfig, context: Dictionary) -> v
 			if event.should_trigger(animation_progress, animation_duration):
 				if event.check_condition(actor, context["target"]):
 					var event_result = event.execute(actor, context["target"], context)
-					print("Animation event executed: ", event.get_description(), " Result: ", event_result)
 		
 		await get_tree().process_frame
 		animation_time += get_process_delta_time()
@@ -348,8 +315,6 @@ func execute_qte_phase(card_config: CardConfig, context: Dictionary) -> void:
 			await execute_button_mash_qte(card_config, context)
 		CardConfig.QTEType.SEQUENCE:
 			await execute_sequence_qte(card_config, context)
-		_:
-			print("No QTE to execute")
 
 ## Execute timing-based QTE
 func execute_timing_qte(card_config: CardConfig, context: Dictionary) -> void:
@@ -365,7 +330,6 @@ func execute_timing_qte(card_config: CardConfig, context: Dictionary) -> void:
 		var qte_success = await await_qte_completion()
 		var multiplier = card_config.qte_success_multiplier if qte_success else card_config.qte_failure_multiplier
 		context["qte_multiplier"] = multiplier
-		print("Timing QTE result: ", qte_success, " Multiplier: ", multiplier)
 
 ## Execute button mash QTE
 func execute_button_mash_qte(card_config: CardConfig, context: Dictionary) -> void:
@@ -374,23 +338,18 @@ func execute_button_mash_qte(card_config: CardConfig, context: Dictionary) -> vo
 	var current_presses = 0
 	var start_time = Time.get_ticks_msec() / 1000.0
 	
-	print("Button mash QTE: Press ", required_presses, " times in ", time_window, " seconds")
-	
 	while current_presses < required_presses:
 		var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
 		if elapsed >= time_window:
-			print("Button mash QTE failed - time expired")
 			context["qte_multiplier"] = card_config.qte_failure_multiplier
 			return
 		
 		# Check for button press (would need input system integration)
 		if Input.is_action_just_pressed("ui_accept"):
 			current_presses += 1
-			print("Button mash progress: ", current_presses, "/", required_presses)
 		
 		await get_tree().process_frame
 	
-	print("Button mash QTE succeeded!")
 	context["qte_multiplier"] = card_config.qte_success_multiplier
 
 ## Execute sequence QTE
@@ -403,12 +362,9 @@ func execute_sequence_qte(card_config: CardConfig, context: Dictionary) -> void:
 	var current_index = 0
 	var start_time = Time.get_ticks_msec() / 1000.0
 	
-	print("Sequence QTE: Input sequence: ", sequence)
-	
 	while current_index < sequence.size():
 		var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
 		if elapsed >= time_window:
-			print("Sequence QTE failed - time expired")
 			context["qte_multiplier"] = card_config.qte_failure_multiplier
 			return
 		
@@ -417,15 +373,12 @@ func execute_sequence_qte(card_config: CardConfig, context: Dictionary) -> void:
 		# Check for correct button input (would need input system integration)
 		if Input.is_action_just_pressed(required_button):
 			current_index += 1
-			print("Sequence progress: ", current_index, "/", sequence.size())
 		elif Input.is_action_just_pressed("ui_accept"):
-			print("Sequence QTE failed - wrong button")
 			context["qte_multiplier"] = card_config.qte_failure_multiplier
 			return
 		
 		await get_tree().process_frame
 	
-	print("Sequence QTE succeeded!")
 	context["qte_multiplier"] = card_config.qte_success_multiplier
 
 ## Execute effect phase
@@ -437,7 +390,6 @@ func execute_effect_phase(card_config: CardConfig, context: Dictionary) -> void:
 	
 	# Check all conditions before executing effects
 	if not check_card_conditions(card_config, context):
-		print("Card conditions not met, skipping effect execution")
 		return
 	
 	# Apply QTE multiplier if present
@@ -472,42 +424,35 @@ func check_card_conditions(card_config: CardConfig, context: Dictionary) -> bool
 	# Check effect conditions
 	for condition in card_config.effect_conditions:
 		if not condition.evaluate(actor, target):
-			print("Card condition failed: ", condition.get_description())
 			return false
 	
 	# Check primary effect conditions
 	if card_config.primary_effect:
 		for condition in card_config.primary_effect.conditions:
 			if not condition.evaluate(actor, target):
-				print("Primary effect condition failed: ", condition.get_description())
 				return false
 	
 	# Check secondary effect conditions
 	for effect in card_config.secondary_effects:
 		for condition in effect.conditions:
 			if not condition.evaluate(actor, target):
-				print("Secondary effect condition failed: ", condition.get_description())
 				return false
 	
 	# Check state application conditions
 	for state_config in card_config.applies_states:
 		if not check_state_conditions(state_config, actor, target):
-			print("State condition failed for: ", state_config.state_name)
 			return false
 	
-	print("All card conditions passed")
 	return true
 
 ## Check conditions for state application
 func check_state_conditions(state_config: StateConfig, actor: Node, target: Node) -> bool:
 	# Check application chance
 	if randf() > state_config.chance:
-		print("State application failed (chance check): ", state_config.chance)
 		return false
 	
 	# Check if target is immune
 	if _is_immune_to_state(target, state_config.state_id):
-		print("Target is immune to state: ", state_config.state_id)
 		return false
 	
 	return true
@@ -535,13 +480,11 @@ func _execute_effects_immediate(card_config: CardConfig, context: Dictionary, qt
 	# Execute primary effect
 	if card_config.primary_effect:
 		var effect_result = card_config.primary_effect.apply_effect(actor, target, enemies, allies)
-		print("Primary effect result: ", effect_result)
 		
 		# Apply damage/healing with QTE multiplier
 		if effect_result["success"] and qte_multiplier != 1.0:
 			var original_value = effect_result["total_value"]
 			var modified_value = int(original_value * qte_multiplier)
-			print("Effect value modified by QTE: ", original_value, " -> ", modified_value)
 	
 	# Execute secondary effects
 	for effect in card_config.secondary_effects:
@@ -549,25 +492,21 @@ func _execute_effects_immediate(card_config: CardConfig, context: Dictionary, qt
 		var conditions_met = true
 		for condition in effect.conditions:
 			if not condition.evaluate(actor, target):
-				print("Secondary effect condition failed: ", condition.get_description())
 				conditions_met = false
 				break
 		
 		if conditions_met:
 			var effect_result = effect.apply_effect(actor, target, enemies, allies)
-			print("Secondary effect result: ", effect_result)
 	
 	# Apply states
 	for state_config in card_config.applies_states:
 		if check_state_conditions(state_config, actor, target):
 			var state_result = state_config.apply_state(target, actor)
-			print("State application result: ", state_result)
 	
 	# Apply self states
 	for state_config in card_config.applies_self_states:
 		if check_state_conditions(state_config, actor, actor):
 			var state_result = state_config.apply_state(actor, actor)
-			print("Self state application result: ", state_result)
 
 ## Execute effects on hit frame
 func _execute_effects_on_hit(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
@@ -585,10 +524,8 @@ func _execute_effects_on_hit(card_config: CardConfig, context: Dictionary, qte_m
 	var animation_duration = actor._get_animation_duration(animation_name)
 	var hit_frame_delay = animation_duration * 0.55 # Typical hit frame at 55%
 	
-	print("Waiting for hit frame: ", hit_frame_delay, " seconds")
 	await get_tree().create_timer(hit_frame_delay).timeout
 	
-	print("Hit frame reached, executing effects")
 	_execute_effects_immediate(card_config, context, qte_multiplier)
 
 ## Execute effects on impact
@@ -607,16 +544,13 @@ func _execute_effects_on_impact(card_config: CardConfig, context: Dictionary, qt
 	var animation_duration = actor._get_animation_duration(animation_name)
 	var impact_delay = animation_duration * 0.65 # Impact at 65%
 	
-	print("Waiting for impact: ", impact_delay, " seconds")
 	await get_tree().create_timer(impact_delay).timeout
 	
-	print("Impact reached, executing effects")
 	_execute_effects_immediate(card_config, context, qte_multiplier)
 
 ## Execute effects at channel start
 func _execute_effects_channel_start(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
 	# Apply channeling effects immediately
-	print("Channel start effects")
 	_execute_effects_immediate(card_config, context, qte_multiplier)
 	
 	# Store channel end time for later execution
@@ -630,10 +564,8 @@ func _execute_effects_channel_end(card_config: CardConfig, context: Dictionary, 
 	
 	if channel_end_time > current_time:
 		var wait_time = channel_end_time - current_time
-		print("Waiting for channel end: ", wait_time, " seconds")
 		await get_tree().create_timer(wait_time).timeout
 	
-	print("Channel end, executing delayed effects")
 	_execute_effects_immediate(card_config, context, qte_multiplier)
 
 ## Execute VFX phase
@@ -692,10 +624,7 @@ func execute_audio_phase(card_config: CardConfig, context: Dictionary) -> void:
 		card_config.impact_sound.play_audio(self, target.global_position)
 
 func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
-	print("Executing attack card: ", card.name, " AOE: ", is_aoe)
-	
 	if not current_player_battler or not target:
-		print("Missing player battler or target for attack card")
 		return
 	
 	# Calculate damage based on card stats and battler stats
@@ -723,18 +652,13 @@ func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) 
 	
 	if qte_manager and qte_manager.start_card_qte(card):
 		var qte_success = await await_qte_completion()
-		print("QTE result: ", qte_success)
 		damage_multiplier = qte_manager.get_damage_multiplier("CARD_ATTACK", qte_success)
-		print("Damage multiplier: ", damage_multiplier)
-	else:
-		print("No QTE for this card or QTE disabled")
 	
 	# Wait for attack animation to reach hit point
 	await get_tree().create_timer(0.5).timeout
 	
 	# Apply damage with the calculated multiplier
 	var final_damage = int(total_damage * damage_multiplier)
-	print("Final damage to apply: ", final_damage)
 	
 	# Trigger AOE effect if applicable
 	if is_aoe and battle_manager and battle_manager.effect_manager:
@@ -748,28 +672,22 @@ func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) 
 	
 	# Return to position (only for single target)
 	if not is_aoe:
-		print("Returning to original position: ", current_player_battler.original_position)
 		current_player_battler.return_to_original_position()
 		if current_player_battler.is_advancing:
 			while current_player_battler.is_advancing:
 				await get_tree().create_timer(0.1).timeout
 	
 	current_player_battler.battle_idle()
-	print("Attack execution complete")
 
 func execute_skill_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
-	print("Executing skill card: ", card.name, " AOE: ", is_aoe)
 	await execute_attack_card(card, target, is_aoe)
 
 func execute_defense_card(card: CardData) -> void:
-	print("Executing defense card: ", card.name)
 	current_player_battler.defend()
 	if card.metadata.has("defense_boost"):
 		var boost = card.metadata["defense_boost"]
-		print("Defense boost: ", boost)
 
 func execute_heal_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
-	print("Executing heal card: ", card.name, " AOE: ", is_aoe)
 	var heal_amount = card.health
 	target.take_healing(heal_amount)
 	
@@ -777,25 +695,20 @@ func execute_heal_card(card: CardData, target: Battler, is_aoe: bool = false) ->
 		battle_manager.hud.update_health_bars()
 
 func execute_buff_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
-	print("Executing buff card: ", card.name, " AOE: ", is_aoe)
 	# Handle buff effects like damage multipliers, speed boosts, etc.
 	if card.metadata.has("damage_multiplier"):
 		var multiplier = card.metadata["damage_multiplier"]
-		print("Applying damage multiplier: ", multiplier)
 		# This would need a buff system integration
 	
 	if card.metadata.has("speed_multiplier"):
 		var multiplier = card.metadata["speed_multiplier"]
-		print("Applying speed multiplier: ", multiplier)
 		# This would need a buff system integration
 	
 	if card.metadata.has("damage_reduction"):
 		var reduction = card.metadata["damage_reduction"]
-		print("Applying damage reduction: ", reduction)
 		# This would need a buff system integration
 
 func execute_debuff_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
-	print("Executing debuff card: ", card.name, " AOE: ", is_aoe)
 	# Deal initial damage
 	if card.attack > 0:
 		await execute_attack_card(card, target, is_aoe)
@@ -808,15 +721,11 @@ func apply_card_states(card: CardData, target: Battler) -> void:
 	var state_chance = card.metadata.get("state_chance", 1.0)
 	var state_duration = card.metadata.get("state_duration", 0)
 	
-	print("Applying state: ", state_name, " with chance: ", state_chance)
-	
 	# Check if state should be applied
 	if randf() > state_chance:
-		print("State application failed (chance check)")
 		return
 	
 	# Apply the state to the target
-	print("State applied: ", state_name, " for ", state_duration, " turns")
 	# This would need integration with the existing state system
 	# For now, just log the application
 
@@ -831,12 +740,9 @@ func draw_card_for_deck(deck: CombatDeck) -> CardData:
 	return deck.draw_card()
 
 func start_player_turn() -> void:
-	print("Starting player turn")
-	
 	# Always sync to the currently acting player from battle_manager
 	if battle_manager and is_instance_valid(battle_manager.current_character):
 		current_player_battler = battle_manager.current_character
-		print("Player turn for: ", current_player_battler.character_name)
 	
 	# Refresh AP
 	ap_system.regen_ap()
@@ -853,8 +759,6 @@ func start_player_turn() -> void:
 		var hand_size = card_config.initial_hand_size if card_config else 3
 		for i in range(hand_size):
 			draw_card_for_deck(deck)
-		
-		print("Hand refreshed for ", current_player_battler.character_name, ": ", deck.get_hand().size(), " cards")
 	
 	# Clear queued cards from previous turn
 	queued_cards.clear()
@@ -875,7 +779,6 @@ func start_player_turn() -> void:
 			battle_manager.hud.set_activebattler(current_player_battler)
 
 func end_player_turn() -> void:
-	print("Ending player turn")
 	# If a card is currently playing out, wait for it to finish first
 	while is_executing_card:
 		await get_tree().process_frame
@@ -889,12 +792,12 @@ func end_player_turn() -> void:
 		battle_manager.end_turn()
 
 func _on_card_played(_card_instance: CardInstance) -> void:
-	print("Card played in deck system")
+	pass
 	# Card is already handled in play_card()
 
 func _on_mana_changed(new_mana: int) -> void:
+	pass
 	# Mana in card system maps to our AP system
-	print("Deck mana changed: ", new_mana)
 
 func _on_ap_changed(current_ap: int, max_ap: int) -> void:
 	# Forward AP changes to UI
@@ -918,7 +821,6 @@ func await_qte_completion() -> bool:
 		var completion_handler = func(s: bool, _type = ""):
 			state["completed"] = true
 			state["success"] = s
-			print("QTE completion handler called with success: ", s)
 		
 		if not qte_manager.qte_completed.is_connected(completion_handler):
 			qte_manager.qte_completed.connect(completion_handler)
@@ -930,7 +832,6 @@ func await_qte_completion() -> bool:
 		while not state["completed"]:
 			var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
 			if elapsed > timeout:
-				print("WARNING: QTE completion timed out after ", timeout, " seconds")
 				state["completed"] = true
 				state["success"] = false # Default to failure on timeout
 				# Force cancel the QTE if it's still active
@@ -942,7 +843,6 @@ func await_qte_completion() -> bool:
 		if qte_manager.qte_completed.is_connected(completion_handler):
 			qte_manager.qte_completed.disconnect(completion_handler)
 	
-	print("QTE final result: ", state["success"])
 	return state["success"]
 
 func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler = null) -> int:
@@ -953,7 +853,6 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 	if not card_config.reactive_defense_enabled:
 		return damage
 	
-	print("Triggering reactive defense window for defender: ", target_defender.character_name)
 	player_attacked.emit(attacker, damage)
 	
 	var outcome = await qte_manager.await_reactive_defense(target_defender)
@@ -961,7 +860,6 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 	
 	match outcome:
 		"perfect_parry":
-			print("PERFECT PARRY by %s against %s! Triggering counterattack." % [target_defender.character_name, attacker.character_name])
 			if hud and hud.battle_text_display:
 				hud.battle_text_display.show_perfect_parry(target_defender)
 			
@@ -974,7 +872,6 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			return 0 # Complete damage avoidance on defender
 			
 		"dodge":
-			print("DODGE by %s! No damage taken." % target_defender.character_name)
 			if hud and hud.battle_text_display:
 				hud.battle_text_display.show_dodge(target_defender)
 			
@@ -992,7 +889,6 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			var reduction = card_config.parry_damage_reduction
 			var reduced_damage = int(damage * (1.0 - reduction))
 			var amount_reduced = damage - reduced_damage
-			print("PARRY by %s! Damage reduced from %d to %d" % [target_defender.character_name, damage, reduced_damage])
 			if hud and hud.battle_text_display:
 				hud.battle_text_display.show_parry(target_defender, amount_reduced)
 			
@@ -1003,15 +899,12 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			return reduced_damage
 			
 		_:
-			print("Reactive defense missed or timed out. Full damage: ", damage)
 			return damage
 
 ## Executes a counterattack animation & damage from defender to attacker on Perfect Parry
 func _execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> void:
 	if not is_instance_valid(defender) or not is_instance_valid(attacker):
 		return
-	
-	print("[Counterattack] %s counterattacks %s!" % [defender.character_name, attacker.character_name])
 	
 	# Stun the attacker momentarily so they don't return before taking counter damage
 	attacker.is_counter_stunned = true
@@ -1042,7 +935,6 @@ func _execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> voi
 	
 	# Check if attacker was defeated by counter attack
 	if attacker.is_defeated():
-		print("[Counterattack] Attacker %s was defeated by counter attack!" % attacker.character_name)
 		# Clean up defeated enemy
 		if battle_manager:
 			battle_manager._cleanup_defeated_from_turn_order()

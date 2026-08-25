@@ -54,9 +54,6 @@ func do_level_up():
 	char_level += 1
 	exp_to_level *= exp_to_level_multiplier
 
-	print("%s gains a level!" % [get_parent().character_name])
-	print("%s is now level %d."% [get_parent().character_name, char_level])
-
 	if char_level > exp_reduce_start_level:
 		exp_to_level_multiplier -= exp_multi_reduction
 	if exp_to_level_multiplier < 1:

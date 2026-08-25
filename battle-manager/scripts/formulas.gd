@@ -95,8 +95,6 @@ static func apply_revive(target: Battler, hp_percent: int = 50) -> int:
 	# Apply healing
 	target.current_health = hp_restored
 	
-	print("[Revive] %s revived with %d/%d HP" % [target.character_name, target.current_health, target.max_health])
-	
 	return hp_restored
 
 

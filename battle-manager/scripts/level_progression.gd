@@ -91,8 +91,6 @@ static func level_up(battler: Battler) -> void:
 	battler.stats.level += 1
 	apply_level_stats(battler, battler.stats.level)
 	
-	print("%s leveled up to %d!" % [battler.character_name, battler.stats.level])
-	
 	# Restore full HP on level up (optional, can be toggled)
 	if battler.stats.has_meta("restore_on_level_up") and battler.stats.get_meta("restore_on_level_up"):
 		battler.current_health = battler.max_health

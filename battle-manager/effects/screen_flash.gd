@@ -33,7 +33,6 @@ func critical_flash(duration: float = 0.15, intensity: float = 0.8) -> void:
 
 # Damage flash (red)
 func damage_flash(duration: float = 0.1, intensity: float = 0.5) -> void:
-	print("ScreenFlash: damage_flash - duration: ", duration, " intensity: ", intensity, " visible: ", visible, " modulate: ", modulate)
 	var flash_color: Color = Color(1.0, 0.2, 0.2, intensity)
 	_start_flash(flash_color, duration)
 
@@ -57,7 +56,6 @@ func custom_flash(flash_color: Color, duration: float) -> void:
 	_start_flash(flash_color, duration)
 
 func _start_flash(flash_color: Color, duration: float) -> void:
-	print("ScreenFlash: _start_flash called - color: ", flash_color, " duration: ", duration)
 	# Cancel any existing flash
 	if flash_tween and flash_tween.is_valid():
 		flash_tween.kill()
@@ -67,7 +65,6 @@ func _start_flash(flash_color: Color, duration: float) -> void:
 	
 	visible = true
 	modulate = flash_color
-	print("ScreenFlash: After setting visible and modulate - visible: ", visible, " modulate: ", modulate)
 	
 	flash_tween = create_tween()
 	

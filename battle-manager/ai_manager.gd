@@ -9,14 +9,6 @@ extends Node
 
 # Pulled from Enemy (deprecated/removed class)
 func choose_action(character:Battler, available_targets: Array, _all_enemies: Array, battle_manager:BattleManager) -> void:
-	print("=== AI TARGET SELECTION ===")
-	print("AI Character: ", character.character_name)
-	print("AI Intelligence: ", character.intelligence)
-	print("Available targets: ", available_targets.size())
-	for target in available_targets:
-		if target is Battler:
-			print("  - ", target.character_name, " (HP: ", target.current_health, "/", target.max_health, ")")
-	
 	# Choose action based on AI type
 	match character.ai_type:
 		Battler.AIType.AGGRESSIVE:
@@ -68,8 +60,7 @@ func aggressive_action(character:Battler, players: Array, battle_manager:BattleM
 		# STEP 4: Execution
 		# attack_anim handles movement, turns, contact-frame damage at hit_moment, and return-to-origin
 		await character.attack_anim(target)
-	else:
-		print("AI has no valid targets")
+
 
 func defensive_action(character:Battler, players: Array, battle_manager:BattleManager) -> void:
 	var all_enemies = battle_manager.enemies if battle_manager else []
@@ -79,7 +70,6 @@ func defensive_action(character:Battler, players: Array, battle_manager:BattleMa
 	if health_percent < 0.4 and character.inventory and !character.inventory.collection.is_empty():
 		var healing_item = find_best_healing_item(character.inventory)
 		if healing_item:
-			print("AI %s using healing item: %s" % [character.character_name, healing_item.item_name])
 			battle_manager.current_target = character
 			battle_manager.current_character = character
 			battle_manager.battler_attacking = true
@@ -108,14 +98,6 @@ func defensive_action(character:Battler, players: Array, battle_manager:BattleMa
 	await aggressive_action(character, players, battle_manager)
 
 func choose_target(character:Battler, targets: Array) -> Node:
-	print("=== AI TARGET SELECTION ===")
-	print("AI Character: ", character.character_name)
-	print("AI Intelligence: ", character.intelligence)
-	print("Available targets: ", targets.size())
-	for target in targets:
-		if target is Battler:
-			print("  - ", target.character_name, " (HP: ", target.current_health, "/", target.max_health, ")")
-	
 	# Filter out defeated targets
 	var valid_targets = []
 	for target:Battler in targets:
@@ -123,24 +105,19 @@ func choose_target(character:Battler, targets: Array) -> Node:
 			valid_targets.append(target)
 	
 	if valid_targets.is_empty():
-		print("No valid targets found!")
 		return null
 	
 	# Use intelligence to determine targeting strategy
 	var intelligence = character.intelligence
 	var rand_value = randi() % 100
 	
-	print("Random value: ", rand_value, " vs Intelligence: ", intelligence)
-	
 	if rand_value < intelligence:
 		# Smart targeting - choose based on strategy
 		var chosen = get_weakest_target(valid_targets)
-		print("Smart targeting chose: ", chosen.character_name if chosen else "NULL")
 		return chosen
 	else:
 		# Random targeting - choose any valid target
 		var chosen = valid_targets[randi() % valid_targets.size()]
-		print("Random targeting chose: ", chosen.character_name if chosen else "NULL")
 		return chosen
 
 func get_weakest_target(targets: Array) -> Node:

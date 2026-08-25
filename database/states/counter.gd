@@ -37,34 +37,28 @@ func perform_counter(defender: Battler, attacker: Battler) -> void:
 	
 	# Safety: Don't counter allies
 	if attacker.team == defender.team:
-		print("[COUNTER] Prevented counter against teammate: ", attacker.character_name)
 		return
 	
 	# Check usage limit
 	if counters_used_this_turn >= max_counters_per_turn:
-		print("[COUNTER] Counter already used ", counters_used_this_turn, "/", max_counters_per_turn, " times this turn. Skipping.")
 		return
 	
 	counters_used_this_turn += 1
-	print("[COUNTER] %s counters %s's attack! (%d/%d)" % [defender.character_name, attacker.character_name, counters_used_this_turn, max_counters_per_turn])
 	
 	# Delay slightly for visual feedback
 	await defender.get_tree().create_timer(0.2).timeout
 	
 	if interrupt_attacker:
 		# INTERRUPT mode: Counter happens immediately while attacker is in position
-		print("[COUNTER] INTERRUPT mode - countering in place")
 		await _execute_counter_attack(defender, attacker)
 	else:
 		# DELAYED mode: Let attacker return first, then counter
-		print("[COUNTER] DELAYED mode - waiting for attacker to return")
 		await _wait_for_attacker_return(attacker)
 		await _execute_counter_attack(defender, attacker)
 
 ## Execute the actual counter attack
 func _execute_counter_attack(defender: Battler, attacker: Battler) -> void:
 	# Default counter attack (basic attack with multiplier)
-	print("[COUNTER] Using default counter attack")
 	attacker.is_counter_stunned = true  # Stun attacker
 
 	defender._try_animation("basic_attacks/attack")
@@ -85,5 +79,3 @@ func _wait_for_attacker_return(attacker: Battler) -> void:
 	while attacker.is_advancing and elapsed < timeout:
 		await attacker.get_tree().create_timer(0.1).timeout
 		elapsed += 0.1
-	
-	print("[COUNTER] Attacker returned (or timeout), proceeding with counter")

@@ -20,10 +20,6 @@ var hover_offset: float = -30.0
 func setup(card: CardData) -> void:
 	card_data = card
 	
-	print("Setting up card button for: ", card.name)
-	print("Has CardPanel: ", has_node("CardPanel"))
-	print("Has Glow: ", has_node("Glow"))
-	
 	# Force refresh node references
 	card_panel = get_node_or_null("CardPanel")
 	name_label = get_node_or_null("CardPanel/Content/VBox/CardName")
@@ -33,15 +29,9 @@ func setup(card: CardData) -> void:
 	
 	if name_label:
 		name_label.text = card.name
-		print("Name label set to: ", card.name)
-	else:
-		print("ERROR: name_label not found!")
 	
 	if cost_label:
 		cost_label.text = str(card.cost)
-		print("Cost label set to: ", card.cost)
-	else:
-		print("ERROR: cost_label not found!")
 	
 	if description_label:
 		# Build description from card stats and metadata
@@ -71,9 +61,6 @@ func setup(card: CardData) -> void:
 			description += card.metadata["description"]
 		
 		description_label.text = description
-		print("Description label set to: ", description)
-	else:
-		print("ERROR: description_label not found!")
 	
 	# Set card type styling
 	_set_card_type_color()

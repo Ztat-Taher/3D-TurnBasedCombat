@@ -25,8 +25,6 @@ enum EffectPriority {
 }
 
 func _ready() -> void:
-	print("EffectManager _ready() called")
-	
 	# Initialize effect systems
 	# Don't create ScreenFlash - it should be in the HUD
 	# We'll get a reference to it via setup_screen_flash()
@@ -49,13 +47,11 @@ func setup_screen_flash(flash: ScreenFlash) -> void:
 	if screen_flash:
 		screen_flash.flash_started.connect(_on_effect_started.bind("screen_flash"))
 		screen_flash.flash_finished.connect(_on_effect_finished.bind("screen_flash"))
-		print("EffectManager: ScreenFlash reference set")
 
 # Combined effect presets for common combat events
 
 # Normal hit
 func trigger_normal_hit() -> void:
-	print("EffectManager: trigger_normal_hit")
 	if screen_flash:
 		screen_flash.damage_flash(0.5, 1.0)  # Increased duration and intensity for testing
 	if impact_frame:
@@ -63,7 +59,6 @@ func trigger_normal_hit() -> void:
 
 # Critical hit
 func trigger_critical_hit() -> void:
-	print("EffectManager: trigger_critical_hit")
 	if screen_flash:
 		screen_flash.critical_flash(0.15, 0.8)
 	if time_slow:
@@ -112,7 +107,6 @@ func trigger_dodge() -> void:
 
 # Hit stop - combines time slow and impact freeze for maximum impact
 func trigger_hit_stop(duration: float = 0.1, time_scale: float = 0.1) -> void:
-	print("EffectManager: trigger_hit_stop - duration: ", duration, " time_scale: ", time_scale)
 	if time_slow:
 		time_slow.custom_slow(duration, time_scale)
 	if impact_frame:

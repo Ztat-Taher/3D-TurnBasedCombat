@@ -91,42 +91,32 @@ func await_reactive_defense(defender: Battler) -> String:
 		if InputMap.has_action(dodge_action):
 			if Input.is_action_just_pressed(dodge_action):
 				dodge_pressed = true
-				print("[Reactive Defense] Dodge action pressed (controller)")
 		if not dodge_pressed:
 			if Input.is_key_pressed(KEY_E) or Input.is_physical_key_pressed(KEY_E):
 				dodge_pressed = true
-				print("[Reactive Defense] Dodge key pressed (keyboard)")
 		
 		# Check for Parry input (Q key or LB button)
 		var parry_pressed = false
 		if InputMap.has_action(parry_action):
 			if Input.is_action_just_pressed(parry_action):
 				parry_pressed = true
-				print("[Reactive Defense] Parry action pressed (controller)")
 		if not parry_pressed:
 			if Input.is_key_pressed(KEY_Q) or Input.is_physical_key_pressed(KEY_Q):
 				parry_pressed = true
-				print("[Reactive Defense] Parry key pressed (keyboard)")
-		
-		print("[Reactive Defense] Input check - dodge: ", dodge_pressed, " parry: ", parry_pressed)
 		
 		if parry_pressed:
 			if elapsed <= perfect_duration:
 				outcome = "perfect_parry"
-				print("[Reactive Defense] PERFECT PARRY! (elapsed: %.3fs <= %.3fs)" % [elapsed, perfect_duration])
 			else:
 				outcome = "parry"
-				print("[Reactive Defense] Normal Parry (elapsed: %.3fs > %.3fs)" % [elapsed, perfect_duration])
 			break
 		
 		if dodge_pressed:
 			outcome = "dodge"
-			print("[Reactive Defense] Dodge! (elapsed: %.3fs)" % elapsed)
 			break
 		
 		if elapsed >= window_duration:
 			outcome = "none"
-			print("[Reactive Defense] Defense window expired. Missed.")
 			break
 		
 		await get_tree().process_frame
@@ -154,7 +144,6 @@ var qte_ui_panel: Control = null
 
 func start_qte(qte_type: QTEType, difficulty: float) -> bool:
 	if is_qte_active:
-		print("QTE already active, cannot start new QTE")
 		return false
 	
 	is_qte_active = true
@@ -173,7 +162,6 @@ func start_qte(qte_type: QTEType, difficulty: float) -> bool:
 	_create_qte_ui(input_key, time_limit)
 	
 	qte_started.emit(current_qte_type)
-	print("QTE started: ", current_qte_type, " with difficulty: ", difficulty, " time_limit: ", time_limit)
 	
 	return true
 
@@ -200,7 +188,6 @@ func _create_qte_ui(input_key: String, time_limit: float) -> void:
 				target_parent = bm.hud.get_node_or_null("Control")
 	
 	if not target_parent:
-		print("QTE Manager: Could not find valid parent for QTE overlay")
 		return
 	
 	qte_ui_panel = qte_overlay_scene.instantiate()
@@ -233,7 +220,6 @@ func _remove_qte_ui() -> void:
 
 func _on_qte_overlay_completed(success: bool) -> void:
 	# Handle completion from the new self-contained QTE overlay
-	print("QTE overlay completed: ", success)
 	
 	# Emit the appropriate signals
 	if success:
@@ -246,8 +232,6 @@ func _on_qte_overlay_completed(success: bool) -> void:
 	
 	is_qte_active = false
 	# Note: UI cleanup is handled by the overlay itself (queue_free)
-
-
 
 func get_damage_multiplier(qte_type: String, success: bool) -> float:
 	if not qte_config:
@@ -266,7 +250,6 @@ func cancel_qte() -> void:
 	if is_qte_active:
 		_remove_qte_ui()
 		is_qte_active = false
-		print("QTE cancelled")
 
 func is_active() -> bool:
 	return is_qte_active

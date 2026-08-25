@@ -136,9 +136,6 @@ func _update_highlight() -> void:
 		shader_mat.set_shader_parameter("thickness", 0.025)
 		shader_mat.set_shader_parameter("alpha", 1.0)
 		material.next_pass = shader_mat
-		
-		# Add debug info to confirm which battler is highlighted
-		print("Highlighting battler: ", character_name, " with cyan outline")
 
 @export_group("Special Dependencies")
 @onready var basic_attack_animation = "attack"
@@ -200,7 +197,6 @@ func _ready():
 		add_to_group("enemies")
 	elif team == TEAM.ALLY:
 		add_to_group("players")
-	print("Current Element: ", stats.element)
 
 func _input_event(_camera: Camera3D, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -263,7 +259,6 @@ func select_target() -> void:
 	is_default_target = false
 	is_mouse_selected = true
 	is_targeted = true
-	print("Emitting select_target signal for: ", character_name)
 	SignalBus.select_target.emit(self)
 
 func deselect_as_target() -> void:
@@ -305,7 +300,6 @@ func is_defeated() -> bool:
 	return current_health <= 0
 
 func get_attack_damage(target) -> int:
-	print("PLAYER: calculating damage for target: ", target.character_name)
 	var damage = attack + randi() % 5
 	return Formulas.physical_damage(self, target, damage)
 
@@ -320,7 +314,6 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 	var weakness_multiplier = 1.0
 	if active_states.has("Weakness"):
 		weakness_multiplier = 1.5  # Takes 50% more damage
-		print("[WEAKNESS] %s is afflicted with weakness, damage increased by 50%%" % character_name)
 	
 	damage_taken = int(float(damage_taken) * weakness_multiplier)
 	
@@ -332,12 +325,10 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 		current_health = 0
 	
 	health_changed.emit(current_health, max_health)
-	print("%s took %d damage. Health: %d/%d" % [character_name, damage_taken, current_health, max_health])
 	
 	# WAKE UP FROM SLEEP WHEN ATTACKED
 	if active_states.has("Sleep"):
 		remove_state("Sleep")
-		print("%s woke up from sleep after being hit!" % character_name)
 	
 	# TRIGGER COUNTER IF ACTIVE - await so attacker stays in place during counter
 	if attacker and active_states.has("Counter"):
@@ -354,7 +345,6 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 		if battle_manager and battle_manager.has_method("register_enemy_defeat_reward"):
 			battle_manager.register_enemy_defeat_reward(self)
 		if battle_manager and battle_manager.remove_defeated_enemies and team == TEAM.ENEMY:
-			print("Removing defeated enemy: ", character_name)
 			if battle_manager.turn_order.has(self):
 				battle_manager.turn_order.erase(self)
 			if battle_manager.enemies.has(self):
@@ -384,26 +374,20 @@ func take_healing(amount: int):
 
 	current_health += healing
 	health_changed.emit(current_health, max_health)
-	print("%s received %d healing. Health: %d/%d" % [character_name, healing, current_health, max_health])
 	return healing
 
 func defend():
 	is_defending = true
 	# FORCE use idle1, not the dictionary
 	_try_animation("idle1")
-	print("%s is defending. Defense doubled for the next attack." % character_name)
 
 func battle_item(item: Item, target: Battler) -> void:
-	print("Using item: ", item.item_name, " on target: ", target.character_name)
-	
 	# Apply item effects
 	if item.damage_amount > 0:
 		var damage = item.damage_amount
 		target.take_damage(damage, self)
-		print("Item dealt %d damage to %s" % [damage, target.character_name])
 	elif item.heal_amount > 0:
 		var healing = target.take_healing(item.heal_amount)
-		print("Item healed %s for %d health" % [target.character_name, healing])
 	
 	# Remove item from inventory
 	if inventory and inventory.collection.has(item):
@@ -412,16 +396,12 @@ func battle_item(item: Item, target: Battler) -> void:
 			inventory.collection[item] = quantity - 1
 		else:
 			inventory.collection.erase(item)
-		print("Item consumed. Remaining quantity: ", inventory.collection.get(item, 0))
 
 ## Switch to a different AnimationTree
 ## Returns true if switch successful, false otherwise
 func attack_anim(target) -> void:
-	print("PLAYER: Starting attack sequence for target: ", target.character_name)
-	
 	# SAFETY: Prevent self-attacks
 	if target == self:
-		print("[Safety] Prevented self-attack on ", character_name)
 		return
 	
 	current_target = target
@@ -504,7 +484,6 @@ func advance_to_target(target: Battler) -> bool:
 	
 	# SAFETY: Prevent overlapping advances
 	if is_advancing:
-		print("[Safety] Movement already in progress on ", character_name)
 		return false
 		
 	var movement_distance = custom_movement_distance if custom_movement_distance > 0 else battle_manager.movement_distance_threshold
@@ -520,8 +499,6 @@ func advance_to_target(target: Battler) -> bool:
 	original_position = global_position
 	var direction = (target.global_position - global_position).normalized()
 	advance_target_position = target.global_position - direction * movement_distance
-	
-	print("[WALK DEBUG] %s advancing toward %s - setting is_walking=true, direction=%v" % [character_name, target.character_name, direction])
 	
 	set_advancing(true)
 	var tween = create_tween()
@@ -580,7 +557,6 @@ func _schedule_hit_moment(duration: float, ratio_override: float = -1.0) -> void
 	var captured_duration = duration
 	_hit_moment_timer = get_tree().create_timer(hit_delay)
 	_hit_moment_timer.timeout.connect(func():
-		print("[HitMoment] Contact frame reached for %s (delay: %.2fs / total: %.2fs)" % [character_name, hit_delay, captured_duration])
 		hit_moment.emit(self)
 		anim_damage.emit()
 	)
@@ -655,7 +631,6 @@ func get_resolved_animation(generic_name: String) -> String:
 func _on_advance_complete():
 	set_advancing(false)
 	# NOTE: Do NOT travel to idle1 here - it fights whatever the caller triggers next
-	print("Movement completed, is_advancing set to false")
 
 ## Start movement timeout to prevent stuck advancing state
 func _start_movement_timeout() -> void:
@@ -664,13 +639,11 @@ func _start_movement_timeout() -> void:
 		return
 	
 	var timeout = stuck_movement_timeout
-	print("[Movement Timeout] Started (%.1fs) on %s" % [timeout, character_name])
 	
 	await get_tree().create_timer(timeout / battle_manager.speed_multiplier).timeout
 	
 	# Check if still advancing (means it got stuck)
 	if is_advancing:
-		print("[Movement Timeout] WARNING: Movement stuck on %s! Force-returning." % character_name)
 		set_advancing(false)
 		return_to_original_position()
 
@@ -697,7 +670,6 @@ func return_to_original_position():
 ## Performs a fixed dash backwards when dodging
 func perform_dodge_dash() -> void:
 	if is_advancing:
-		print("[Dodge] Movement already in progress on ", character_name)
 		return
 	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -714,8 +686,6 @@ func perform_dodge_dash() -> void:
 	var dodge_distance = 2.0
 	var dodge_target_position = global_position + backward_direction * dodge_distance
 	
-	print("[Dodge] %s dashing backwards from %v to %v" % [character_name, global_position, dodge_target_position])
-	
 	set_advancing(true)
 	_try_animation("walk")
 	
@@ -729,7 +699,6 @@ func perform_dodge_dash() -> void:
 	tween.tween_callback(_on_dodge_dash_complete.bind(dodge_start_position))
 
 func _on_dodge_dash_complete(original_position: Vector3):
-	print("[Dodge] Dash complete for %s, returning to original position" % character_name)
 	
 	# Small pause at the end of dodge
 	await get_tree().create_timer(0.15).timeout
@@ -762,7 +731,6 @@ func get_exp_stat():
 # # #
 ## Called when animation reaches the hit point (either via animation event track or timer) - applies damage and any attached states
 func apply_animation_effects():
-	print("Animation hit point reached on %s" % character_name)
 	hit_moment.emit(self)
 	anim_damage.emit()
 
@@ -780,7 +748,6 @@ func _on_anim_damage():
 	
 	# This function will be replaced by the card combat system
 	# For now, keeping it for compatibility with existing animations
-	print("Animation damage callback - will be handled by card system")
 	pass
 
 # # #
@@ -798,7 +765,6 @@ func on_save_game(save_data):
 func on_load_game(load_data):
 	var save_data = load_data["charNameOrID"] as BattlerData
 	if save_data == null: 
-		print("Battler data is empty.")
 		return
 	
 	current_health = save_data.current_health  # Using consistent property name
@@ -817,12 +783,10 @@ func apply_state(state: State) -> void:
 	state_copy.state_name = state.state_name
 	var key = state_copy.state_name
 	active_states[key] = state_copy
-	print("[STATE] %s was afflicted with %s!" % [character_name, key])
 
 func remove_state(state_name: String) -> void:
 	if active_states.has(state_name):
 		active_states.erase(state_name)
-		print("[STATE] %s is no longer affected by %s" % [character_name, state_name])
 
 func process_states() -> void:
 	var states_to_remove = []
@@ -845,12 +809,10 @@ func process_states() -> void:
 				current_health -= actual_damage
 				if current_health < 0:
 					current_health = 0
-				print("[STATE] %s takes %d damage from %s (base: %d, power: %.2f, defense_mult: %.2f)" % [character_name, actual_damage, state_name, state.damage_per_turn, state.power_multiplier, defense_multiplier])
 			else:
 				# Healing state (negative damage)
 				var healing = abs(actual_damage)
 				current_health = min(current_health + healing, max_health)
-				print("[STATE] %s recovers %d health from %s" % [character_name, healing, state_name])
 		
 		# Handle duration
 		if state.turns_active > 0:
@@ -897,7 +859,6 @@ func gain_experience(amount: int) -> void:
 		return
 	
 	exp_node.add_exp(amount)
-	print("%s gained %d EXP" % [character_name, amount])
 	
 	# Check if level up occurred
 	while LevelProgression.check_level_up(self):

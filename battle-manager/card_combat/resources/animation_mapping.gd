@@ -14,7 +14,6 @@ func resolve_animation(generic_name: String) -> String:
 	
 	if animation_map.has(generic_name):
 		var mapped_name = animation_map[generic_name]
-		print("AnimationMapping: Resolved '%s' to '%s'" % [generic_name, mapped_name])
 		return mapped_name
 	
 	# No mapping found, return original name

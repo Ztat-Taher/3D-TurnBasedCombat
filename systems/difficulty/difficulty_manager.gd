@@ -62,4 +62,3 @@ static func apply_difficulty_to_reward(amount: int, reward_type: String) -> int:
 static func set_difficulty(new_difficulty: int) -> void:
 	if "Global_Difficulty" in GlobalBattleSettings:
 		GlobalBattleSettings.Global_Difficulty = new_difficulty
-		print("Difficulty set to: ", new_difficulty)

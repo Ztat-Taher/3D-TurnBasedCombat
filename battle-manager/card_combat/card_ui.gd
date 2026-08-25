@@ -30,8 +30,6 @@ func _ready():
 	# Load card button scene
 	if ResourceLoader.exists("res://battle-manager/card_combat/card_button.tscn"):
 		card_button_scene = preload("res://battle-manager/card_combat/card_button.tscn")
-	else:
-		print("Card button scene not found, will use simple buttons")
 	
 	# Defer to ensure scene tree is ready
 	call_deferred("_deferred_ready")
@@ -42,11 +40,8 @@ func _deferred_ready():
 	if not card_battle_manager:
 		retry_count += 1
 		if retry_count < MAX_RETRIES:
-			print("CardUI: Could not find CardBattleManager, will try again later (attempt ", retry_count, ")")
 			# Retry in a moment
 			call_deferred("_deferred_ready")
-		else:
-			print("CardUI: Failed to find CardBattleManager after ", MAX_RETRIES, " attempts")
 		return
 	
 	# Connect signals
@@ -264,21 +259,17 @@ func update_ap_display():
 func _on_card_button_pressed(card: CardData):
 	if card_battle_manager:
 		if card_battle_manager.is_executing_card:
-			print("Card action in progress, ignoring click for: ", card.name)
 			return
 		var ap_info = card_battle_manager.get_ap_info()
 		if ap_info.get("current_ap", 0) < card.cost:
-			print("Not enough AP to play: ", card.name)
 			return
 			
-	print("Card selected: ", card.name)
 	card_selected.emit(card)
 
 func set_end_turn_button_visible(_p_visible: bool) -> void:
 	pass
 
 func _on_end_turn_pressed():
-	print("End turn pressed in UI")
 	end_turn_pressed.emit()
 
 func _on_ap_changed(_current_ap: int, _max_ap: int):
@@ -288,8 +279,5 @@ func _on_card_played(_card = null, _target = null):
 	update_hand_display()
 
 func set_card_targeting_mode(enabled: bool):
+	pass
 	# Enable/disable card targeting UI
-	if enabled:
-		print("Card targeting mode enabled")
-	else:
-		print("Card targeting mode disabled")

@@ -24,7 +24,6 @@ func update_queue(turn_order: Array, turn_idx: int) -> void:
 	current_turn_idx = turn_idx
 	
 	if not queue_container:
-		print("TurnQueueUI: queue_container is null!")
 		return
 	
 	if turn_order.is_empty():

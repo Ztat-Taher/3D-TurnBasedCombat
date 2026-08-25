@@ -55,6 +55,5 @@ static func check_level_up_skills(battler: Battler) -> Array[Skill]:
 		if skill and skill not in battler.skill_list:
 			battler.skill_list.append(skill)
 			new_skills.append(skill)
-			print("%s learned %s!" % [battler.character_name, skill.skill_name])
 	
 	return new_skills
