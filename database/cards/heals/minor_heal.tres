@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://ba1bu5kyx2n8s"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+[ext_resource type="Resource" path="res://database/card_configs/minor_heal_config.tres" id="2"]
+[ext_resource type="Script" path="res://addons/card_combat/spell_effect.gd" id="3_qy008"]
+
+[resource]
+script = ExtResource("1")
+card_id = "minor_heal"
+name = "Minor Heal"
+cost = 2
+health = 15
+metadata = {
+"card_type": "heal"
+}
+card_config = ExtResource("2")

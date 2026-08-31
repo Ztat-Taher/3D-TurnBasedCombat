@@ -32,7 +32,7 @@ enum EffectTargeting {
 @export var value: int = 0                          ## Base effect value
 @export var targeting: EffectTargeting = EffectTargeting.TARGET
 @export var scaling: Dictionary = {}                ## Stat scaling configuration
-@export var conditions: Array[EffectCondition] = [] ## Conditions for effect execution
+@export var conditions: Array[Resource] = [] ## Conditions for effect execution
 @export var is_percentage: bool = false             ## If true, value is percentage (0-100)
 @export var delay: float = 0.0                      ## Delay before effect triggers (seconds)
 @export var duration: float = 0.0                   ## Effect duration for temporary effects (seconds)
@@ -69,7 +69,7 @@ func apply_effect(actor: Node, target: Node, all_enemies: Array, all_allies: Arr
 	
 	# Apply effect to each target
 	for single_target in targets:
-		var target_result = _apply_to_target(single_target, calculated_value, is_critical)
+		var target_result = _apply_to_target(single_target, calculated_value, is_critical, actor)
 		result["targets_hit"].append(single_target)
 		result["total_value"] += target_result.get("value", 0)
 		result["effects_applied"].append(target_result)
@@ -115,11 +115,15 @@ func _calculate_value(actor: Node) -> int:
 		if actor and actor.has_method("get_stat"):
 			var stat_value = actor.get_stat(stat_name)
 			final_value += int(stat_value * scaling_value)
+		elif actor and stat_name in actor:
+			# Try direct property access as fallback
+			var stat_value = actor.get(stat_name)
+			final_value += int(stat_value * scaling_value)
 	
 	return final_value
 
 ## Apply effect to a single target
-func _apply_to_target(target: Node, calculated_value: int, is_critical: bool) -> Dictionary:
+func _apply_to_target(target: Node, calculated_value: int, is_critical: bool, actor: Node = null) -> Dictionary:
 	var result = {
 		"target": target,
 		"value": 0,
@@ -131,7 +135,7 @@ func _apply_to_target(target: Node, calculated_value: int, is_critical: bool) ->
 	
 	match effect_type:
 		EffectType.DAMAGE:
-			result["value"] = _apply_damage(target, calculated_value, is_critical)
+			result["value"] = _apply_damage(target, calculated_value, is_critical, actor)
 		EffectType.HEAL:
 			result["value"] = _apply_heal(target, calculated_value)
 		EffectType.SHIELD:
@@ -154,9 +158,9 @@ func _apply_to_target(target: Node, calculated_value: int, is_critical: bool) ->
 	
 	return result
 
-func _apply_damage(target: Node, damage: int, is_critical: bool) -> int:
+func _apply_damage(target: Node, damage: int, _is_critical: bool, attacker: Node = null) -> int:
 	if target.has_method("take_damage"):
-		target.take_damage(damage)
+		target.take_damage(damage, attacker)
 		return damage
 	return 0
 
@@ -172,11 +176,11 @@ func _apply_shield(target: Node, shield_amount: int) -> int:
 		return shield_amount
 	return 0
 
-func _apply_buff(target: Node, buff_amount: int) -> int:
+func _apply_buff(_target: Node, buff_amount: int) -> int:
 	# Would need buff system integration
 	return buff_amount
 
-func _apply_debuff(target: Node, debuff_amount: int) -> int:
+func _apply_debuff(_target: Node, debuff_amount: int) -> int:
 	# Would need debuff system integration
 	return debuff_amount
 

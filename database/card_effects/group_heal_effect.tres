@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardEffect" format=3 uid="uid://carbfxsljpxm6" load_steps=2]
+
+[ext_resource type="Script" path="res://battle-manager/card_combat/resources/card_effect.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+effect_type = 1
+value = 10
+targeting = 3
+scaling = {}
+conditions = []
+is_percentage = false
+delay = 0.0
+duration = 0.0
+stack_count = 0
+can_crit = false
+crit_multiplier = 1.0

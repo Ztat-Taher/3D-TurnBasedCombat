@@ -25,12 +25,12 @@ func _ready() -> void:
 	add_child(qte_timer)
 	qte_timer.timeout.connect(_on_timer_timeout)
 
-func setup(input_key: String, time_limit: float) -> void:
+func setup(p_input_key: String, p_time_limit: float) -> void:
 	if not title_label:
 		await ready
 	
-	self.input_key = input_key
-	self.time_limit = time_limit
+	self.input_key = p_input_key
+	self.time_limit = p_time_limit
 	
 	# Set the UI text
 	title_label.text = "ATTACK QTE!"

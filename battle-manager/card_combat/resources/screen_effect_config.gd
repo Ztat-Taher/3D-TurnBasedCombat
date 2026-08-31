@@ -63,22 +63,22 @@ func _apply_time_slow(effect_manager: EffectManager):
 			time_slow.custom_slow(effect_duration, time_scale)
 
 ## Apply chromatic aberration effect
-func _apply_chromatic(effect_manager: EffectManager):
+func _apply_chromatic(_effect_manager: EffectManager):
 	# Would need implementation with screen shaders
 	pass
 
 ## Apply vignette effect
-func _apply_vignette(effect_manager: EffectManager):
+func _apply_vignette(_effect_manager: EffectManager):
 	# Would need implementation with screen shaders
 	pass
 
 ## Apply grain effect
-func _apply_grain(effect_manager: EffectManager):
+func _apply_grain(_effect_manager: EffectManager):
 	# Would need implementation with screen shaders
 	pass
 
 ## Apply blur effect
-func _apply_blur(effect_manager: EffectManager):
+func _apply_blur(_effect_manager: EffectManager):
 	# Would need implementation with screen shaders
 	pass
 

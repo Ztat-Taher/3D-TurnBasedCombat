@@ -75,7 +75,7 @@ enum Element {
 @export var animation_priority: int = 0               ## Priority for animation selection
 @export var animation_blend_time: float = 0.2          ## Transition time for animation blending
 @export var animation_speed: float = 1.0              ## Playback speed multiplier
-@export var animation_events: Array[AnimationEvent] = [] ## Callback points during animation
+@export var animation_events: Array[Resource] = [] ## Callback points during animation
 @export var fallback_animation: String = ""           ## Fallback animation if primary not found
 @export var animation_layer: String = "full_body"     ## Animation layer for blending
 
@@ -86,17 +86,17 @@ enum Element {
 @export var requires_los: bool = false                ## Whether line of sight is required
 
 # Effect Configuration
-@export var primary_effect: CardEffect                 ## Main effect configuration
-@export var secondary_effects: Array[CardEffect] = [] ## Additional effects
+@export var primary_effect: Resource                 ## Main effect configuration
+@export var secondary_effects: Array[Resource] = [] ## Additional effects
 @export var effect_timing: EffectTiming = EffectTiming.ON_HIT
-@export var effect_conditions: Array[EffectCondition] = [] ## Conditions for effect execution
+@export var effect_conditions: Array[Resource] = [] ## Conditions for effect execution
 
 # Visual Effect Configuration
-@export var vfx_on_actor: VFXConfig                   ## Visual effects on the actor
-@export var vfx_on_target: VFXConfig                  ## Visual effects on target(s)
-@export var vfx_on_projectile: VFXConfig              ## Projectile visual effects
-@export var camera_effects: CameraEffectConfig        ## Camera shake, zoom, etc.
-@export var screen_effects: ScreenEffectConfig        ## Screen flash, time slow, etc.
+@export var vfx_on_actor: Resource                   ## Visual effects on the actor
+@export var vfx_on_target: Resource                  ## Visual effects on target(s)
+@export var vfx_on_projectile: Resource              ## Projectile visual effects
+@export var camera_effects: Resource        ## Camera shake, zoom, etc.
+@export var screen_effects: Resource        ## Screen flash, time slow, etc.
 
 # Projectile Configuration
 @export var projectile_enabled: bool = false           ## Whether card uses a projectile
@@ -107,16 +107,26 @@ enum Element {
 @export var projectile_spawn_point: String = "actor"  ## Where projectile spawns
 
 # Audio Configuration
-@export var cast_sound: AudioConfig                    ## Sound when card is cast
-@export var hit_sound: AudioConfig                     ## Sound when effect hits target
-@export var impact_sound: AudioConfig                 ## Sound on impact/damage
-@export var loop_sound: AudioConfig                   ## Looping sound during channel/projectile
+@export var cast_sound: Resource                    ## Sound when card is cast
+@export var hit_sound: Resource                     ## Sound when effect hits target
+@export var impact_sound: Resource                 ## Sound on impact/damage
+@export var loop_sound: Resource                   ## Looping sound during channel/projectile
 @export var voice_line: String = ""                    ## Character voice line to play
 
 # QTE Configuration
-@export var qte_type: QTEType = QTEType.NONE
+@export var qte_type_string: String = "none"           ## String storage for enum (workaround for .tres loading)
+var qte_type: QTEType = QTEType.NONE:
+	get:
+		return _parse_qte_type(qte_type_string)
+	set(value):
+		qte_type_string = QTEType.keys()[value]
 @export var qte_difficulty: float = 0.5                ## Difficulty level (0.0-1.0)
-@export var qte_timing: QTETiming = QTETiming.BEFORE_ATTACK
+@export var qte_timing_string: String = "before_attack" ## String storage for enum
+var qte_timing: QTETiming = QTETiming.BEFORE_ATTACK:
+	get:
+		return _parse_qte_timing(qte_timing_string)
+	set(value):
+		qte_timing_string = QTETiming.keys()[value]
 @export var qte_window_duration: float = 2.0           ## Time window for QTE input
 @export var qte_success_multiplier: float = 1.5        ## Damage/effect multiplier on success
 @export var qte_failure_multiplier: float = 1.0        ## Damage/effect multiplier on failure
@@ -133,8 +143,8 @@ enum Element {
 @export var stat_modifiers: Dictionary = {}           ## Temporary stat changes
 
 # State and Debuff Configuration
-@export var applies_states: Array[StateConfig] = []   ## States to apply to targets
-@export var applies_self_states: Array[StateConfig] = [] ## States to apply to self
+@export var applies_states: Array[Resource] = []   ## States to apply to targets
+@export var applies_self_states: Array[Resource] = [] ## States to apply to self
 @export var state_chance: float = 1.0                  ## Chance to apply states (0.0-1.0)
 @export var state_duration: int = 1                    ## Duration in turns
 
@@ -158,22 +168,54 @@ func get_scaled_damage(actor_stats: Dictionary) -> int:
 
 ## Helper function to check if card should trigger QTE
 func should_trigger_qte() -> bool:
-	return qte_type != QTEType.NONE
+	# Primary check: QTE type is not NONE
+	if qte_type != QTEType.NONE:
+		return true
+	
+	# Fallback: Check if card is attack type and has QTE difficulty configured
+	# This handles cases where enum loading fails
+	if card_tags.has("attack") and qte_difficulty > 0.0:
+		return true
+	
+	return false
+
+## Parse QTE type from string
+func _parse_qte_type(type_string: String) -> QTEType:
+	match type_string.to_lower():
+		"none": return QTEType.NONE
+		"timing": return QTEType.TIMING
+		"button_mash": return QTEType.BUTTON_MASH
+		"sequence": return QTEType.SEQUENCE
+		_: return QTEType.NONE
+
+## Parse QTE timing from string
+func _parse_qte_timing(timing_string: String) -> QTETiming:
+	match timing_string.to_lower():
+		"before_attack": return QTETiming.BEFORE_ATTACK
+		"on_hit_frame": return QTETiming.ON_HIT_FRAME
+		"after_attack": return QTETiming.AFTER_ATTACK
+		_: return QTETiming.BEFORE_ATTACK
 
 ## Helper function to get target list based on target type
 func get_targets(actor: Node, all_enemies: Array, all_allies: Array) -> Array:
 	match target_type:
 		TargetScope.SELF:
-			return [actor]
+			return [actor] if actor else []
 		TargetScope.SINGLE_ENEMY:
+			if target_selection_mode == SelectionMode.MANUAL:
+				return all_enemies
 			return _get_single_target(all_enemies)
 		TargetScope.ALL_ENEMIES:
 			return all_enemies
 		TargetScope.SINGLE_ALLY:
+			if target_selection_mode == SelectionMode.MANUAL:
+				return all_allies
 			return _get_single_target(all_allies)
 		TargetScope.ALL_ALLIES:
 			return all_allies
 		TargetScope.SINGLE_TARGET:
+			if target_selection_mode == SelectionMode.MANUAL:
+				return all_enemies + all_allies
 			return _get_single_target(all_enemies + all_allies)
 		TargetScope.ALL_UNITS:
 			return all_enemies + all_allies

@@ -37,7 +37,7 @@ enum PlayKind { UNIT, EFFECT, PERSISTENT }
 @export var spell_effects: Array[SpellEffect] = []
 ## Extended card configuration for modular behavior
 ## When set, this overrides the metadata-based configuration system
-@export var card_config: CardConfig = null
+@export var card_config: Resource = null
 
 
 func get_total_cost() -> int:
@@ -72,60 +72,23 @@ func targets_enemies() -> bool:
 		return true
 	return spell_effects[0].is_damage()
 
-## Check if this card uses the new card config system
+## Check if this card uses the card config system
 func has_card_config() -> bool:
 	return card_config != null
 
-## Get card type from either config or metadata (backward compatibility)
+## Get card type from config (for UI display purposes)
 func get_card_type() -> String:
-	if has_card_config():
-		return CardConfig.TargetScope.keys()[card_config.target_type]
-	return metadata.get("card_type", "attack")
+	if not has_card_config():
+		push_error("Card '%s' does not have a CardConfig assigned." % name)
+		return "unknown"
+	return metadata.get("card_type", "unknown")
 
-## Get target scope from either config or metadata (backward compatibility)
-func get_target_scope() -> String:
-	if has_card_config():
-		return CardConfig.TargetScope.keys()[card_config.target_type]
-	return metadata.get("target_scope", "single_enemy")
-
-## Get QTE difficulty from either config or metadata (backward compatibility)
-func get_qte_difficulty() -> float:
-	if has_card_config():
-		return card_config.qte_difficulty
-	return metadata.get("qte_difficulty", 0.5)
-
-## Check if card should trigger QTE
-func should_trigger_qte() -> bool:
-	if has_card_config():
-		return card_config.should_trigger_qte()
-	return metadata.get("card_type", "attack") == "attack"
-
-## Get animation from card config or fallback to metadata
+## Get animation from card config
 func get_animation() -> String:
-	if has_card_config() and not card_config.actor_animation.is_empty():
-		return card_config.actor_animation
-	return metadata.get("animation", "attack")
-
-## Get the appropriate target scope enum value
-func get_target_scope_enum() -> CardConfig.TargetScope:
-	if has_card_config():
-		return card_config.target_type
-	
-	# Convert metadata string to enum
-	var scope_string = metadata.get("target_scope", "single_enemy")
-	match scope_string:
-		"single_enemy":
-			return CardConfig.TargetScope.SINGLE_ENEMY
-		"all_enemies":
-			return CardConfig.TargetScope.ALL_ENEMIES
-		"single_ally":
-			return CardConfig.TargetScope.SINGLE_ALLY
-		"all_allies":
-			return CardConfig.TargetScope.ALL_ALLIES
-		"self":
-			return CardConfig.TargetScope.SELF
-		_:
-			return CardConfig.TargetScope.SINGLE_ENEMY
+	if not has_card_config():
+		push_error("Card '%s' does not have a CardConfig assigned." % name)
+		return "attack"
+	return card_config.actor_animation if not card_config.actor_animation.is_empty() else "attack"
 
 
 func can_afford(player_mana: int) -> bool:

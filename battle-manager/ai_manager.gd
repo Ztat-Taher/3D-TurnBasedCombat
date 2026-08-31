@@ -91,7 +91,7 @@ func defensive_action(character:Battler, players: Array, battle_manager:BattleMa
 			if battle_manager.hud and battle_manager.hud.has_method("hide_move_announcement"):
 				battle_manager.hud.hide_move_announcement()
 			
-			await character.battle_item(healing_item, character)
+			character.battle_item(healing_item, character)
 			return
 	
 	# Default to attacking

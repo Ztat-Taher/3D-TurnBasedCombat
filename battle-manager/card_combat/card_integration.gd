@@ -48,6 +48,25 @@ func initialize_for_player(player_battler: Battler, deck_resources: Array[CardDa
 	if not card_battle_manager or not player_battler:
 		return
 	
+	# If no deck resources provided, load from default player deck
+	if deck_resources.is_empty():
+		var deck_path = "res://database/decks/player_deck.tres"
+		if ResourceLoader.exists(deck_path):
+			var deck_resource = load(deck_path)
+			if deck_resource:
+				# Try to get cards from the deck resource
+				if deck_resource.get("cards") != null:
+					deck_resources = deck_resource.cards
+					var deck_name = deck_resource.get("deck_name")
+					if deck_name == null:
+						deck_name = "Unknown Deck"
+				else:
+					pass
+			else:
+				pass
+		else:
+			pass
+	
 	var deck_cards = get_deck_cards(deck_resources)
 	card_battle_manager.setup_card_combat(player_battler, deck_cards)
 
@@ -79,18 +98,13 @@ func _on_card_selected(card: CardData):
 	if battle_manager and battle_manager.hud and battle_manager.hud.has_method("_update_back_button_visibility"):
 		battle_manager.hud._update_back_button_visibility()
 	
-	# Use CardConfig if available, otherwise fall back to metadata
-	var target_scope_enum: CardConfig.TargetScope
-	var target_selection_mode: CardConfig.SelectionMode
+	# Use CardConfig system (primary system)
+	if not card.has_card_config():
+		push_error("Card '%s' does not have a CardConfig assigned. All cards must use the CardConfig system." % card.name)
+		return
 	
-	if card.has_card_config():
-		target_scope_enum = card.card_config.target_type
-		target_selection_mode = card.card_config.target_selection_mode
-	else:
-		# Convert metadata string to enum (backward compatibility)
-		var target_scope_string = card.metadata.get("target_scope", "single_enemy")
-		target_scope_enum = _string_to_target_scope(target_scope_string)
-		target_selection_mode = CardConfig.SelectionMode.MANUAL
+	var target_scope_enum = card.card_config.target_type
+	var target_selection_mode = card.card_config.target_selection_mode
 	
 	# Get targets based on card configuration
 	var targets = get_targets_for_card(card, target_scope_enum, target_selection_mode)
@@ -143,54 +157,18 @@ func _on_card_selected(card: CardData):
 				var target = available_enemies[0]
 				card_battle_manager.play_card(card, target)
 
-## Convert string target scope to enum (backward compatibility)
-func _string_to_target_scope(scope_string: String) -> CardConfig.TargetScope:
-	match scope_string:
-		"self":
-			return CardConfig.TargetScope.SELF
-		"single_enemy":
-			return CardConfig.TargetScope.SINGLE_ENEMY
-		"all_enemies":
-			return CardConfig.TargetScope.ALL_ENEMIES
-		"single_ally":
-			return CardConfig.TargetScope.SINGLE_ALLY
-		"all_allies":
-			return CardConfig.TargetScope.ALL_ALLIES
-		"all_allies_self":
-			return CardConfig.TargetScope.ALL_ALLIES_SELF
-		_:
-			return CardConfig.TargetScope.SINGLE_ENEMY
-
 ## Get targets based on card configuration
 func get_targets_for_card(card: CardData, target_scope: CardConfig.TargetScope, selection_mode: CardConfig.SelectionMode) -> Array:
 	var available_enemies = get_alive_enemies()
 	var available_allies = get_alive_allies()
 	var actor = card_battle_manager.current_player_battler if card_battle_manager else null
 	
-	# If card has config, use its targeting system
-	if card.has_card_config():
-		return card.card_config.get_targets(actor, available_enemies, available_allies)
+	# Use CardConfig targeting system
+	if not card.has_card_config():
+		push_error("Card '%s' does not have a CardConfig assigned." % card.name)
+		return []
 	
-	# Otherwise, use the legacy system
-	match target_scope:
-		CardConfig.TargetScope.SELF:
-			return [actor] if actor else []
-		CardConfig.TargetScope.SINGLE_ENEMY:
-			return available_enemies
-		CardConfig.TargetScope.ALL_ENEMIES:
-			return available_enemies
-		CardConfig.TargetScope.SINGLE_ALLY:
-			return available_allies
-		CardConfig.TargetScope.ALL_ALLIES:
-			return available_allies
-		CardConfig.TargetScope.ALL_ALLIES_SELF:
-			return available_allies
-		CardConfig.TargetScope.SINGLE_TARGET:
-			return available_enemies + available_allies
-		CardConfig.TargetScope.ALL_UNITS:
-			return available_enemies + available_allies
-		_:
-			return available_enemies
+	return card.card_config.get_targets(actor, available_enemies, available_allies)
 
 func start_targeting_mode(card: CardData, target_type: String = "enemy", provided_targets: Array = []):
 	if not battle_manager:
@@ -220,6 +198,26 @@ func start_targeting_mode(card: CardData, target_type: String = "enemy", provide
 	battle_manager.current_character = card_battle_manager.current_player_battler
 	battle_manager.valid_targets = available_targets
 	battle_manager.set_meta("target_type", target_type)  # Track target type
+	battle_manager.current_target_type = target_type  # Sync target type to battle manager variable
+	
+	# Reset keyboard target index for cycling
+	battle_manager.keyboard_target_index = 0
+	battle_manager.current_target = null
+	battle_manager.current_controller_target = null
+	battle_manager.current_default_selector = null
+	
+	# Clear all targets first to avoid conflicts
+	for battler in get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("players"):
+		if battler is Battler:
+			battler.deselect_as_target()
+			battler.is_valid_target = false
+			battler.is_selectable = false
+			battler.is_targeted = false
+	
+	if available_targets.size() > 0:
+		battle_manager.current_controller_target = available_targets[0]
+		battle_manager.current_default_selector = available_targets[0]
+		battle_manager.current_controller_target.set_as_keyboard_target()
 	
 	for target in available_targets:
 		if target is Battler:

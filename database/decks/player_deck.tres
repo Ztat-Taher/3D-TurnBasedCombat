@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="DeckResource" load_steps=5 format=3 uid="uid://d4e5f6g7h8i9j"]
+
+[ext_resource type="Script" path="res://battle-manager/card_combat/resources/deck_resource.gd" id="1"]
+[ext_resource type="Resource" path="res://database/cards/attacks/basic_attack.tres" id="2"]
+[ext_resource type="Resource" path="res://database/cards/heals/minor_heal.tres" id="3"]
+[ext_resource type="Resource" path="res://database/cards/heals/group_heal.tres" id="4"]
+
+[resource]
+script = ExtResource("1")
+deck_name = "Player Starter Deck"
+cards = [ExtResource("2"), ExtResource("3"), ExtResource("4")]

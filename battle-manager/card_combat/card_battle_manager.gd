@@ -16,7 +16,7 @@ var ap_system: APSystem
 
 var battle_manager: BattleManager
 var current_player_battler: Battler
-var card_config: CardBattleConfig
+var card_battle_config: CardBattleConfig
 var qte_manager: QTEManager
 
 # Cards played this turn (to be executed when turn ends)
@@ -41,9 +41,9 @@ func _ready():
 	add_child(qte_manager)
 	
 	# Load configuration
-	card_config = load_card_config()
-	if card_config:
-		ap_system.setup(card_config.ap_per_turn, card_config.max_ap)
+	card_battle_config = load_card_config()
+	if card_battle_config:
+		ap_system.setup(card_battle_config.ap_per_turn, card_battle_config.max_ap)
 		ap_system.ap_changed.connect(_on_ap_changed)
 
 func load_card_config() -> CardBattleConfig:
@@ -92,10 +92,10 @@ func setup_card_combat(player_battler: Battler, card_data_resources: Array[CardD
 
 func create_combat_config() -> CombatConfig:
 	var config = CombatConfig.new()
-	if card_config:
-		config.initial_hand_size = card_config.initial_hand_size
-		config.max_hand_size = card_config.max_hand_size
-		config.max_board_size = card_config.max_board_size
+	if card_battle_config:
+		config.initial_hand_size = card_battle_config.initial_hand_size
+		config.max_hand_size = card_battle_config.max_hand_size
+		config.max_board_size = card_battle_config.max_board_size
 	return config
 
 ## Returns the current player's active deck. Null if not set up.
@@ -136,7 +136,7 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 	if (card_type == "attack" or card_type == "skill") and battle_manager and battle_manager.battle_camera:
 		battle_manager.battle_camera.set_default_camera()
 	
-	# Execute card effect first (attack animation, damage, heal, defense)
+	# Execute card effect
 	await execute_card_effect(card, target)
 	
 	# Spend AP and discard card systematically only AFTER effect resolves
@@ -189,79 +189,98 @@ func execute_card_effect(card: CardData, target: Battler) -> void:
 	if card.has_card_config():
 		await execute_card_with_config(card, target)
 	else:
-		# Handle different card types based on metadata (backward compatibility)
-		var card_type = card.metadata.get("card_type", "attack")
-		var target_scope = card.metadata.get("target_scope", "single_enemy")
-		
-		# Skip camera setup for AOE cards (camera is set by integration layer)
-		var is_aoe = target_scope in ["all_enemies", "all_allies", "all_allies_self"]
-		
-		match card_type:
-			"attack":
-				await execute_attack_card(card, target, is_aoe)
-			"skill":
-				await execute_skill_card(card, target, is_aoe)
-			"defense":
-				execute_defense_card(card)
-			"heal":
-				execute_heal_card(card, target, is_aoe)
-			"buff":
-				execute_buff_card(card, target, is_aoe)
-			"debuff":
-				await execute_debuff_card(card, target, is_aoe)
+		# Error: All cards must use CardConfig system
+		push_error("Card '%s' does not have a CardConfig assigned. All cards must use the CardConfig system." % card.name)
 
 ## Execute card using the new CardConfig system
 func execute_card_with_config(card: CardData, target: Battler) -> void:
-	var card_config = card.card_config
-	if not card_config:
+	var card_cfg = card.card_config
+	if not card_cfg:
 		push_error("Card has_card_config() returned true but card_config is null")
 		return
 	
 	# Build execution context
+	var allies_array = []
+	if battle_manager and battle_manager.players:
+		for player in battle_manager.players:
+			if is_instance_valid(player) and player is Battler and not player.is_defeated():
+				allies_array.append(player)
+	
+	# Ensure current player is included in allies for self-targeting
+	if current_player_battler and current_player_battler not in allies_array:
+		allies_array.append(current_player_battler)
+	
 	var context = {
 		"card_data": card,
-		"card_config": card_config,
+		"card_config": card_cfg,
 		"actor": current_player_battler,
 		"target": target,
 		"enemies": battle_manager.enemies if battle_manager else [],
-		"allies": battle_manager.allies if battle_manager else [],
+		"allies": allies_array,
 		"effect_manager": battle_manager.effect_manager if battle_manager else null,
 		"qte_manager": qte_manager,
 		"camera": battle_manager.battle_camera if battle_manager else null,
 		"parent_node": self
 	}
 	
-	# Phase 1: Animation Phase
-	await execute_animation_phase(card_config, context)
+	# Determine if this is an AOE effect
+	var is_aoe = card_cfg.target_type in [CardConfig.TargetScope.ALL_ENEMIES, CardConfig.TargetScope.ALL_ALLIES, CardConfig.TargetScope.ALL_UNITS, CardConfig.TargetScope.ALL_ALLIES_SELF]
 	
-	# Phase 2: QTE Phase
-	if card_config.should_trigger_qte():
-		await execute_qte_phase(card_config, context)
+	# Phase 0: Movement Phase (for non-AOE enemy targeting)
+	if not is_aoe and card_cfg.target_type == CardConfig.TargetScope.SINGLE_ENEMY and target:
+		if current_player_battler.advance_to_target(target):
+			current_player_battler._try_animation("walk")
+			while current_player_battler.is_advancing:
+				await get_tree().create_timer(0.016).timeout
 	
-	# Phase 3: Effect Phase
-	await execute_effect_phase(card_config, context)
+	# Phase 1: QTE Phase (If BEFORE_ATTACK)
+	var qte_run = false
+	if card_cfg.should_trigger_qte() and card_cfg.qte_timing == CardConfig.QTETiming.BEFORE_ATTACK:
+		await execute_qte_phase(card_cfg, context)
+		qte_run = true
 	
-	# Phase 4: VFX Phase
-	execute_vfx_phase(card_config, context)
+	# Phase 2: Animation Phase
+	await execute_animation_phase(card_cfg, context)
 	
-	# Phase 5: Camera Phase
-	execute_camera_phase(card_config, context)
+	# Phase 3: QTE Phase (If NOT BEFORE_ATTACK / ON_HIT_FRAME / AFTER_ATTACK)
+	if card_cfg.should_trigger_qte() and not qte_run:
+		await execute_qte_phase(card_cfg, context)
 	
-	# Phase 6: Screen Phase
-	execute_screen_phase(card_config, context)
+	# Phase 4: Effect Phase
+	await execute_effect_phase(card_cfg, context)
 	
-	# Phase 7: Audio Phase
-	execute_audio_phase(card_config, context)
+	# Phase 5: VFX Phase
+	if card_cfg.vfx_on_actor or card_cfg.vfx_on_target or card_cfg.vfx_on_projectile:
+		execute_vfx_phase(card_cfg, context)
+	
+	# Phase 6: Return Movement (for non-AOE enemy targeting)
+	if not is_aoe and card_cfg.target_type == CardConfig.TargetScope.SINGLE_ENEMY and target:
+		if current_player_battler.has_method("return_to_original_position"):
+			current_player_battler.return_to_original_position()
+			while current_player_battler.is_advancing:
+				await get_tree().create_timer(0.016).timeout
+	
+	# Phase 7: Camera Phase
+	if card_cfg.camera_effects:
+		execute_camera_phase(card_cfg, context)
+	
+	# Phase 8: Screen Phase
+	if card_cfg.screen_effects:
+		execute_screen_phase(card_cfg, context)
+	
+	# Phase 9: Audio Phase
+	if card_cfg.cast_sound or card_cfg.hit_sound or card_cfg.impact_sound:
+		execute_audio_phase(card_cfg, context)
 
 ## Execute animation phase
-func execute_animation_phase(card_config: CardConfig, context: Dictionary) -> void:
+func execute_animation_phase(card_cfg: CardConfig, context: Dictionary) -> void:
 	var actor = context["actor"]
 	if not actor:
 		return
 	
-	var animation_name = card_config.actor_animation
+	var animation_name = card_cfg.actor_animation
 	if animation_name.is_empty():
-		animation_name = card_config.fallback_animation
+		animation_name = card_cfg.fallback_animation
 	
 	if not animation_name.is_empty():
 		# Resolve animation name through character's animation mapping if available
@@ -273,17 +292,17 @@ func execute_animation_phase(card_config: CardConfig, context: Dictionary) -> vo
 			actor._try_animation(animation_name)
 			
 			# Handle animation events
-			if not card_config.animation_events.is_empty():
-				await process_animation_events(card_config, context)
+			if not card_cfg.animation_events.is_empty():
+				await process_animation_events(card_cfg, context)
 
 ## Process animation events
-func process_animation_events(card_config: CardConfig, context: Dictionary) -> void:
+func process_animation_events(card_cfg: CardConfig, context: Dictionary) -> void:
 	var actor = context["actor"]
 	if not actor or not actor.has_method("_get_animation_duration"):
 		return
 	
 	# Resolve animation name through character's animation mapping if available
-	var animation_name = card_config.actor_animation
+	var animation_name = card_cfg.actor_animation
 	if actor.has_method("get_resolved_animation"):
 		animation_name = actor.get_resolved_animation(animation_name)
 	
@@ -294,54 +313,56 @@ func process_animation_events(card_config: CardConfig, context: Dictionary) -> v
 		var animation_progress = animation_time / animation_duration
 		
 		# Check each animation event
-		for event in card_config.animation_events:
+		for event in card_cfg.animation_events:
 			if event.should_trigger(animation_progress, animation_duration):
 				if event.check_condition(actor, context["target"]):
-					var event_result = event.execute(actor, context["target"], context)
+					var _event_result = event.execute(actor, context["target"], context)
 		
 		await get_tree().process_frame
 		animation_time += get_process_delta_time()
 
 ## Execute QTE phase
-func execute_qte_phase(card_config: CardConfig, context: Dictionary) -> void:
-	var qte_manager = context["qte_manager"]
-	if not qte_manager:
+func execute_qte_phase(card_cfg: CardConfig, context: Dictionary) -> void:
+	var qte_mgr = context["qte_manager"]
+	if not qte_mgr:
 		return
 	
-	match card_config.qte_type:
+	# Use the configured QTE type from CardConfig
+	match card_cfg.qte_type:
 		CardConfig.QTEType.TIMING:
-			await execute_timing_qte(card_config, context)
+			await execute_timing_qte(card_cfg, context)
 		CardConfig.QTEType.BUTTON_MASH:
-			await execute_button_mash_qte(card_config, context)
+			await execute_button_mash_qte(card_cfg, context)
 		CardConfig.QTEType.SEQUENCE:
-			await execute_sequence_qte(card_config, context)
+			await execute_sequence_qte(card_cfg, context)
 
 ## Execute timing-based QTE
-func execute_timing_qte(card_config: CardConfig, context: Dictionary) -> void:
-	var qte_manager = context["qte_manager"]
-	if not qte_manager.has_method("start_qte"):
+func execute_timing_qte(card_cfg: CardConfig, context: Dictionary) -> void:
+	var qte_mgr = context["qte_manager"]
+	if not qte_mgr:
 		return
 	
-	var difficulty = card_config.qte_difficulty
-	var time_limit = card_config.qte_window_duration
+	var _difficulty = card_cfg.qte_difficulty
+	var _time_limit = card_cfg.qte_window_duration
 	
-	var qte_started = qte_manager.start_qte(QTEManager.QTEType.CARD_ATTACK, difficulty)
+	# Use the QTEManager's card attack method
+	var qte_started = qte_mgr.start_card_qte(context["card_data"])
 	if qte_started:
 		var qte_success = await await_qte_completion()
-		var multiplier = card_config.qte_success_multiplier if qte_success else card_config.qte_failure_multiplier
+		var multiplier = card_cfg.qte_success_multiplier if qte_success else card_cfg.qte_failure_multiplier
 		context["qte_multiplier"] = multiplier
 
 ## Execute button mash QTE
-func execute_button_mash_qte(card_config: CardConfig, context: Dictionary) -> void:
-	var required_presses = card_config.qte_mash_count
-	var time_window = card_config.qte_window_duration
+func execute_button_mash_qte(card_cfg: CardConfig, context: Dictionary) -> void:
+	var required_presses = card_cfg.qte_mash_count
+	var time_window = card_cfg.qte_window_duration
 	var current_presses = 0
 	var start_time = Time.get_ticks_msec() / 1000.0
 	
 	while current_presses < required_presses:
 		var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
 		if elapsed >= time_window:
-			context["qte_multiplier"] = card_config.qte_failure_multiplier
+			context["qte_multiplier"] = card_cfg.qte_failure_multiplier
 			return
 		
 		# Check for button press (would need input system integration)
@@ -350,22 +371,22 @@ func execute_button_mash_qte(card_config: CardConfig, context: Dictionary) -> vo
 		
 		await get_tree().process_frame
 	
-	context["qte_multiplier"] = card_config.qte_success_multiplier
+	context["qte_multiplier"] = card_cfg.qte_success_multiplier
 
 ## Execute sequence QTE
-func execute_sequence_qte(card_config: CardConfig, context: Dictionary) -> void:
-	var sequence = card_config.qte_sequence
+func execute_sequence_qte(card_cfg: CardConfig, context: Dictionary) -> void:
+	var sequence = card_cfg.qte_sequence
 	if sequence.is_empty():
 		return
 	
-	var time_window = card_config.qte_window_duration
+	var time_window = card_cfg.qte_window_duration
 	var current_index = 0
 	var start_time = Time.get_ticks_msec() / 1000.0
 	
 	while current_index < sequence.size():
 		var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
 		if elapsed >= time_window:
-			context["qte_multiplier"] = card_config.qte_failure_multiplier
+			context["qte_multiplier"] = card_cfg.qte_failure_multiplier
 			return
 		
 		var required_button = sequence[current_index]
@@ -374,79 +395,76 @@ func execute_sequence_qte(card_config: CardConfig, context: Dictionary) -> void:
 		if Input.is_action_just_pressed(required_button):
 			current_index += 1
 		elif Input.is_action_just_pressed("ui_accept"):
-			context["qte_multiplier"] = card_config.qte_failure_multiplier
+			context["qte_multiplier"] = card_cfg.qte_failure_multiplier
 			return
 		
 		await get_tree().process_frame
 	
-	context["qte_multiplier"] = card_config.qte_success_multiplier
+	context["qte_multiplier"] = card_cfg.qte_success_multiplier
 
 ## Execute effect phase
-func execute_effect_phase(card_config: CardConfig, context: Dictionary) -> void:
+func execute_effect_phase(card_cfg: CardConfig, context: Dictionary) -> void:
 	var actor = context["actor"]
 	var target = context["target"]
-	var enemies = context["enemies"]
-	var allies = context["allies"]
+	var _enemies = context["enemies"]
+	var _allies = context["allies"]
 	
 	# Check all conditions before executing effects
-	if not check_card_conditions(card_config, context):
+	if not check_card_conditions(card_cfg, context):
 		return
 	
 	# Apply QTE multiplier if present
 	var qte_multiplier = context.get("qte_multiplier", 1.0)
 	
 	# Handle effect timing
-	match card_config.effect_timing:
+	match card_cfg.effect_timing:
 		CardConfig.EffectTiming.IMMEDIATE:
-			_execute_effects_immediate(card_config, context, qte_multiplier)
+			_execute_effects_immediate(card_cfg, context, qte_multiplier)
 		CardConfig.EffectTiming.AFTER_ANIMATION:
-			# Effects are handled after animation completes (already in animation phase)
-			_execute_effects_immediate(card_config, context, qte_multiplier)
+			_execute_effects_immediate(card_cfg, context, qte_multiplier)
 		CardConfig.EffectTiming.ON_HIT:
-			# Wait for hit frame timing
-			await _execute_effects_on_hit(card_config, context, qte_multiplier)
+			await _execute_effects_on_hit(card_cfg, context, qte_multiplier)
 		CardConfig.EffectTiming.ON_IMPACT:
-			# Wait for impact timing
-			await _execute_effects_on_impact(card_config, context, qte_multiplier)
+			await _execute_effects_on_impact(card_cfg, context, qte_multiplier)
 		CardConfig.EffectTiming.CHANNEL_START:
-			_execute_effects_channel_start(card_config, context, qte_multiplier)
+			_execute_effects_channel_start(card_cfg, context, qte_multiplier)
 		CardConfig.EffectTiming.CHANNEL_END:
-			await _execute_effects_channel_end(card_config, context, qte_multiplier)
+			await _execute_effects_channel_end(card_cfg, context, qte_multiplier)
 		_:
 			# Default to immediate
-			_execute_effects_immediate(card_config, context, qte_multiplier)
+			_execute_effects_immediate(card_cfg, context, qte_multiplier)
 
 ## Check all conditions for card execution
-func check_card_conditions(card_config: CardConfig, context: Dictionary) -> bool:
+func check_card_conditions(card_cfg: CardConfig, context: Dictionary) -> bool:
 	var actor = context["actor"]
 	var target = context["target"]
 	
 	# Check effect conditions
-	for condition in card_config.effect_conditions:
+	for condition in card_cfg.effect_conditions:
 		if not condition.evaluate(actor, target):
 			return false
 	
 	# Check primary effect conditions
-	if card_config.primary_effect:
-		for condition in card_config.primary_effect.conditions:
+	if card_cfg.primary_effect:
+		for condition in card_cfg.primary_effect.conditions:
 			if not condition.evaluate(actor, target):
 				return false
 	
 	# Check secondary effect conditions
-	for effect in card_config.secondary_effects:
+	for effect in card_cfg.secondary_effects:
 		for condition in effect.conditions:
 			if not condition.evaluate(actor, target):
 				return false
 	
 	# Check state application conditions
-	for state_config in card_config.applies_states:
-		if not check_state_conditions(state_config, actor, target):
+	for state_cfg in card_cfg.applies_states:
+		if not check_state_conditions(state_cfg, actor, target):
 			return false
 	
 	return true
 
 ## Check conditions for state application
-func check_state_conditions(state_config: StateConfig, actor: Node, target: Node) -> bool:
+func check_state_conditions(state_config: StateConfig, _actor: Node, target: Node) -> bool:
 	# Check application chance
 	if randf() > state_config.chance:
 		return false
@@ -471,23 +489,32 @@ func _is_immune_to_state(target: Node, state_id: String) -> bool:
 	return false
 
 ## Execute effects immediately
-func _execute_effects_immediate(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
 	var actor = context["actor"]
 	var target = context["target"]
 	var enemies = context["enemies"]
 	var allies = context["allies"]
 	
 	# Execute primary effect
-	if card_config.primary_effect:
-		var effect_result = card_config.primary_effect.apply_effect(actor, target, enemies, allies)
+	if card_cfg.primary_effect:
+		var final_multiplier = qte_multiplier
 		
-		# Apply damage/healing with QTE multiplier
-		if effect_result["success"] and qte_multiplier != 1.0:
-			var original_value = effect_result["total_value"]
-			var modified_value = int(original_value * qte_multiplier)
+		# For DAMAGE and HEAL types, route through BattleManager if possible
+		if battle_manager:
+			var calculated_val = card_cfg.primary_effect._calculate_value(actor)
+			var final_val = int(calculated_val * final_multiplier)
+			
+			if card_cfg.primary_effect.effect_type == CardEffect.EffectType.DAMAGE:
+				battle_manager.damage_calculation(actor, target, final_val)
+			elif card_cfg.primary_effect.effect_type == CardEffect.EffectType.HEAL:
+				battle_manager.heal_calculation(actor, target, final_val)
+			else:
+				card_cfg.primary_effect.apply_effect(actor, target, enemies, allies)
+		else:
+			card_cfg.primary_effect.apply_effect(actor, target, enemies, allies)
 	
 	# Execute secondary effects
-	for effect in card_config.secondary_effects:
+	for effect in card_cfg.secondary_effects:
 		# Check individual effect conditions
 		var conditions_met = true
 		for condition in effect.conditions:
@@ -496,28 +523,39 @@ func _execute_effects_immediate(card_config: CardConfig, context: Dictionary, qt
 				break
 		
 		if conditions_met:
-			var effect_result = effect.apply_effect(actor, target, enemies, allies)
+			if battle_manager and effect.effect_type == CardEffect.EffectType.DAMAGE:
+				battle_manager.damage_calculation(actor, target, effect._calculate_value(actor))
+			elif battle_manager and effect.effect_type == CardEffect.EffectType.HEAL:
+				battle_manager.heal_calculation(actor, target, effect._calculate_value(actor))
+			else:
+				effect.apply_effect(actor, target, enemies, allies)
 	
 	# Apply states
-	for state_config in card_config.applies_states:
-		if check_state_conditions(state_config, actor, target):
-			var state_result = state_config.apply_state(target, actor)
+	for state_cfg in card_cfg.applies_states:
+		if check_state_conditions(state_cfg, actor, target):
+			state_cfg.apply_state(target, actor)
 	
 	# Apply self states
-	for state_config in card_config.applies_self_states:
-		if check_state_conditions(state_config, actor, actor):
-			var state_result = state_config.apply_state(actor, actor)
+	for self_state_cfg in card_cfg.applies_self_states:
+		if check_state_conditions(self_state_cfg, actor, actor):
+			self_state_cfg.apply_state(actor, actor)
+			
+	# Update HUD and health bars
+	if battle_manager:
+		if battle_manager.hud:
+			battle_manager.hud.update_health_bars()
+		battle_manager.update_hud()
 
 ## Execute effects on hit frame
-func _execute_effects_on_hit(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+func _execute_effects_on_hit(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
 	var actor = context["actor"]
 	if not actor or not actor.has_method("_get_animation_duration"):
 		# Fallback to immediate execution
-		_execute_effects_immediate(card_config, context, qte_multiplier)
+		_execute_effects_immediate(card_cfg, context, qte_multiplier)
 		return
 	
 	# Resolve animation name through character's animation mapping if available
-	var animation_name = card_config.actor_animation
+	var animation_name = card_cfg.actor_animation
 	if actor.has_method("get_resolved_animation"):
 		animation_name = actor.get_resolved_animation(animation_name)
 	
@@ -526,18 +564,18 @@ func _execute_effects_on_hit(card_config: CardConfig, context: Dictionary, qte_m
 	
 	await get_tree().create_timer(hit_frame_delay).timeout
 	
-	_execute_effects_immediate(card_config, context, qte_multiplier)
+	_execute_effects_immediate(card_cfg, context, qte_multiplier)
 
 ## Execute effects on impact
-func _execute_effects_on_impact(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+func _execute_effects_on_impact(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
 	# Wait slightly longer than hit frame for impact
 	var actor = context["actor"]
 	if not actor or not actor.has_method("_get_animation_duration"):
-		_execute_effects_immediate(card_config, context, qte_multiplier)
+		_execute_effects_immediate(card_cfg, context, qte_multiplier)
 		return
 	
 	# Resolve animation name through character's animation mapping if available
-	var animation_name = card_config.actor_animation
+	var animation_name = card_cfg.actor_animation
 	if actor.has_method("get_resolved_animation"):
 		animation_name = actor.get_resolved_animation(animation_name)
 	
@@ -546,19 +584,19 @@ func _execute_effects_on_impact(card_config: CardConfig, context: Dictionary, qt
 	
 	await get_tree().create_timer(impact_delay).timeout
 	
-	_execute_effects_immediate(card_config, context, qte_multiplier)
+	_execute_effects_immediate(card_cfg, context, qte_multiplier)
 
 ## Execute effects at channel start
-func _execute_effects_channel_start(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+func _execute_effects_channel_start(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
 	# Apply channeling effects immediately
-	_execute_effects_immediate(card_config, context, qte_multiplier)
+	_execute_effects_immediate(card_cfg, context, qte_multiplier)
 	
 	# Store channel end time for later execution
-	var channel_duration = 2.0 if card_config.effect_conditions.size() > 0 else 1.0 # Default channel duration
+	var channel_duration = 2.0 if card_cfg.effect_conditions.size() > 0 else 1.0 # Default channel duration
 	context["channel_end_time"] = Time.get_ticks_msec() / 1000.0 + channel_duration
 
 ## Execute effects at channel end
-func _execute_effects_channel_end(card_config: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+func _execute_effects_channel_end(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
 	var channel_end_time = context.get("channel_end_time", 0.0)
 	var current_time = Time.get_ticks_msec() / 1000.0
 	
@@ -566,10 +604,10 @@ func _execute_effects_channel_end(card_config: CardConfig, context: Dictionary, 
 		var wait_time = channel_end_time - current_time
 		await get_tree().create_timer(wait_time).timeout
 	
-	_execute_effects_immediate(card_config, context, qte_multiplier)
+	_execute_effects_immediate(card_cfg, context, qte_multiplier)
 
 ## Execute VFX phase
-func execute_vfx_phase(card_config: CardConfig, context: Dictionary) -> void:
+func execute_vfx_phase(card_cfg: CardConfig, context: Dictionary) -> void:
 	var effect_manager = context["effect_manager"]
 	if not effect_manager:
 		return
@@ -578,50 +616,50 @@ func execute_vfx_phase(card_config: CardConfig, context: Dictionary) -> void:
 	var target = context["target"]
 	
 	# Spawn VFX on actor
-	if card_config.vfx_on_actor:
-		var vfx_instance = card_config.vfx_on_actor.spawn_vfx(actor.global_position, actor)
+	if card_cfg.vfx_on_actor:
+		var vfx_instance = card_cfg.vfx_on_actor.spawn_vfx(actor.global_position, actor)
 		if vfx_instance:
 			get_tree().current_scene.add_child(vfx_instance)
 	
 	# Spawn VFX on target
-	if card_config.vfx_on_target and target:
-		var vfx_instance = card_config.vfx_on_target.spawn_vfx(target.global_position, target)
+	if card_cfg.vfx_on_target and target:
+		var vfx_instance = card_cfg.vfx_on_target.spawn_vfx(target.global_position, target)
 		if vfx_instance:
 			get_tree().current_scene.add_child(vfx_instance)
 
 ## Execute camera phase
-func execute_camera_phase(card_config: CardConfig, context: Dictionary) -> void:
+func execute_camera_phase(card_cfg: CardConfig, context: Dictionary) -> void:
 	var camera = context["camera"]
-	if not camera or not card_config.camera_effects:
+	if not camera or not card_cfg.camera_effects:
 		return
 	
-	card_config.camera_effects.apply_camera_effects(camera, context["actor"], context["target"])
+	card_cfg.camera_effects.apply_camera_effects(camera, context["actor"], context["target"])
 
 ## Execute screen phase
-func execute_screen_phase(card_config: CardConfig, context: Dictionary) -> void:
+func execute_screen_phase(card_cfg: CardConfig, context: Dictionary) -> void:
 	var effect_manager = context["effect_manager"]
-	if not effect_manager or not card_config.screen_effects:
+	if not effect_manager or not card_cfg.screen_effects:
 		return
 	
-	card_config.screen_effects.apply_screen_effect(effect_manager)
+	card_cfg.screen_effects.apply_screen_effect(effect_manager)
 
 ## Execute audio phase
-func execute_audio_phase(card_config: CardConfig, context: Dictionary) -> void:
+func execute_audio_phase(card_cfg: CardConfig, context: Dictionary) -> void:
 	var actor = context["actor"]
 	var target = context["target"]
 	
 	# Play cast sound
-	if card_config.cast_sound:
-		card_config.cast_sound.play_audio(self, actor.global_position)
+	if card_cfg.cast_sound:
+		card_cfg.cast_sound.play_audio(self, actor.global_position)
 	
 	# Play hit sound
-	if card_config.hit_sound and target:
-		card_config.hit_sound.play_audio(self, target.global_position)
+	if card_cfg.hit_sound and target:
+		card_cfg.hit_sound.play_audio(self, target.global_position)
 	
 	# Play impact sound
-	if card_config.impact_sound and target:
+	if card_cfg.impact_sound and target:
 		await get_tree().create_timer(0.3).timeout # Delay for impact
-		card_config.impact_sound.play_audio(self, target.global_position)
+		card_cfg.impact_sound.play_audio(self, target.global_position)
 
 func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
 	if not current_player_battler or not target:
@@ -633,8 +671,8 @@ func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) 
 	var total_damage = base_damage + attacker_stat
 	
 	# Apply config multiplier if available
-	if card_config:
-		total_damage = int(total_damage * card_config.attack_damage_multiplier)
+	if card_battle_config:
+		total_damage = int(total_damage * card_battle_config.attack_damage_multiplier)
 	
 	# For AOE, skip movement animation - just play attack animation from current position
 	if not is_aoe:
@@ -685,27 +723,27 @@ func execute_skill_card(card: CardData, target: Battler, is_aoe: bool = false) -
 func execute_defense_card(card: CardData) -> void:
 	current_player_battler.defend()
 	if card.metadata.has("defense_boost"):
-		var boost = card.metadata["defense_boost"]
+		var _boost = card.metadata["defense_boost"]
 
-func execute_heal_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+func execute_heal_card(card: CardData, target: Battler, _is_aoe: bool = false) -> void:
 	var heal_amount = card.health
 	target.take_healing(heal_amount)
 	
 	if battle_manager and battle_manager.hud:
 		battle_manager.hud.update_health_bars()
 
-func execute_buff_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+func execute_buff_card(card: CardData, _target: Battler, _is_aoe: bool = false) -> void:
 	# Handle buff effects like damage multipliers, speed boosts, etc.
 	if card.metadata.has("damage_multiplier"):
-		var multiplier = card.metadata["damage_multiplier"]
+		var _multiplier = card.metadata["damage_multiplier"]
 		# This would need a buff system integration
 	
 	if card.metadata.has("speed_multiplier"):
-		var multiplier = card.metadata["speed_multiplier"]
+		var _multiplier2 = card.metadata["speed_multiplier"]
 		# This would need a buff system integration
 	
 	if card.metadata.has("damage_reduction"):
-		var reduction = card.metadata["damage_reduction"]
+		var _reduction = card.metadata["damage_reduction"]
 		# This would need a buff system integration
 
 func execute_debuff_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
@@ -713,13 +751,13 @@ func execute_debuff_card(card: CardData, target: Battler, is_aoe: bool = false) 
 	if card.attack > 0:
 		await execute_attack_card(card, target, is_aoe)
 	
-func apply_card_states(card: CardData, target: Battler) -> void:
+func apply_card_states(card: CardData, _target: Battler) -> void:
 	if not card.metadata.has("applies_state"):
 		return
 	
-	var state_name = card.metadata["applies_state"]
+	var _state_name = card.metadata["applies_state"]
 	var state_chance = card.metadata.get("state_chance", 1.0)
-	var state_duration = card.metadata.get("state_duration", 0)
+	var _state_duration = card.metadata.get("state_duration", 0)
 	
 	# Check if state should be applied
 	if randf() > state_chance:
@@ -756,7 +794,7 @@ func start_player_turn() -> void:
 			deck.discard_card(card)
 		
 		# Draw a fresh hand up to initial_hand_size
-		var hand_size = card_config.initial_hand_size if card_config else 3
+		var hand_size = card_battle_config.initial_hand_size if card_battle_config else 3
 		for i in range(hand_size):
 			draw_card_for_deck(deck)
 	
@@ -795,7 +833,7 @@ func _on_card_played(_card_instance: CardInstance) -> void:
 	pass
 	# Card is already handled in play_card()
 
-func _on_mana_changed(new_mana: int) -> void:
+func _on_mana_changed(_new_mana: int) -> void:
 	pass
 	# Mana in card system maps to our AP system
 
@@ -847,10 +885,10 @@ func await_qte_completion() -> bool:
 
 func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler = null) -> int:
 	var target_defender = defender if defender else current_player_battler
-	if not target_defender or not qte_manager or not card_config:
+	if not target_defender or not qte_manager or not card_battle_config:
 		return damage
 	
-	if not card_config.reactive_defense_enabled:
+	if not card_battle_config.reactive_defense_enabled:
 		return damage
 	
 	player_attacked.emit(attacker, damage)
@@ -886,7 +924,7 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			return 0 # Complete damage avoidance
 			
 		"parry":
-			var reduction = card_config.parry_damage_reduction
+			var reduction = card_battle_config.parry_damage_reduction
 			var reduced_damage = int(damage * (1.0 - reduction))
 			var amount_reduced = damage - reduced_damage
 			if hud and hud.battle_text_display:

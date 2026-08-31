@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://ipjdvqjhnvk4"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+[ext_resource type="Resource" path="res://database/card_configs/group_heal_config.tres" id="2"]
+[ext_resource type="Script" path="res://addons/card_combat/spell_effect.gd" id="3_stlja"]
+
+[resource]
+script = ExtResource("1")
+card_id = "group_heal"
+name = "Group Heal"
+cost = 4
+health = 10
+metadata = {
+"card_type": "heal"
+}
+card_config = ExtResource("2")

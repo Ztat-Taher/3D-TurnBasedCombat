@@ -32,6 +32,7 @@ script = ExtResource("1_party_card")
 
 [node name="CardFocus" type="NinePatchRect" parent="." unique_id=686705471]
 visible = false
+modulate = Color(1, 1, 1, 0)
 z_index = 1
 layout_mode = 1
 anchors_preset = 15
@@ -45,10 +46,6 @@ patch_margin_left = 8
 patch_margin_top = 8
 patch_margin_right = 8
 patch_margin_bottom = 8
-modulate = Color(1, 1, 1, 0)
-
-[connection signal="mouse_entered" from="PartyStatusCard" to="PartyStatusCard" method="_on_mouse_entered"]
-[connection signal="mouse_exited" from="PartyStatusCard" to="PartyStatusCard" method="_on_mouse_exited"]
 
 [node name="BackgroundShader" type="ColorRect" parent="." unique_id=597839945]
 z_index = -1

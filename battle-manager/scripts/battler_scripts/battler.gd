@@ -387,7 +387,7 @@ func battle_item(item: Item, target: Battler) -> void:
 		var damage = item.damage_amount
 		target.take_damage(damage, self)
 	elif item.heal_amount > 0:
-		var healing = target.take_healing(item.heal_amount)
+		var _healing = target.take_healing(item.heal_amount)
 	
 	# Remove item from inventory
 	if inventory and inventory.collection.has(item):
@@ -554,7 +554,7 @@ var _hit_moment_timer: SceneTreeTimer = null
 func _schedule_hit_moment(duration: float, ratio_override: float = -1.0) -> void:
 	var ratio = ratio_override if ratio_override >= 0.0 else hit_frame_ratio
 	var hit_delay = max(0.05, duration * ratio)
-	var captured_duration = duration
+	var _captured_duration = duration
 	_hit_moment_timer = get_tree().create_timer(hit_delay)
 	_hit_moment_timer.timeout.connect(func():
 		hit_moment.emit(self)
@@ -648,7 +648,7 @@ func _start_movement_timeout() -> void:
 		return_to_original_position()
 
 func return_to_original_position():
-	if is_advancing or original_position == Vector3.ZERO:
+	if is_advancing or global_position.distance_to(original_position) < 0.05:
 		return
 		
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -698,7 +698,7 @@ func perform_dodge_dash() -> void:
 		global_position.distance_to(dodge_target_position) / movement_speed)
 	tween.tween_callback(_on_dodge_dash_complete.bind(dodge_start_position))
 
-func _on_dodge_dash_complete(original_position: Vector3):
+func _on_dodge_dash_complete(p_original_position: Vector3):
 	
 	# Small pause at the end of dodge
 	await get_tree().create_timer(0.15).timeout
@@ -715,8 +715,8 @@ func _on_dodge_dash_complete(original_position: Vector3):
 	
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
-	tween.tween_property(self, "global_position", original_position, 
-		global_position.distance_to(original_position) / movement_speed)
+	tween.tween_property(self, "global_position", p_original_position, 
+		global_position.distance_to(p_original_position) / movement_speed)
 	tween.tween_callback(_on_return_complete)
 
 func _on_return_complete():

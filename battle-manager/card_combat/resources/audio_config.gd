@@ -83,9 +83,9 @@ func _configure_3d_audio(audio_player: AudioStreamPlayer3D, position: Vector3):
 	audio_player.max_distance = max_distance
 	audio_player.attenuation = attenuation
 	if doppler > 0.0:
-		audio_player.doppler_tracking = 1 # ENABLED
+		audio_player.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_IDLE_STEP
 	else:
-		audio_player.doppler_tracking = 0 # DISABLED
+		audio_player.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
 	audio_player.unit_db = _volume_to_db(volume)
 	audio_player.pitch_scale = _apply_random_pitch(pitch)
 

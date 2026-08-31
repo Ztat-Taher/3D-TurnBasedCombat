@@ -278,6 +278,6 @@ func _on_ap_changed(_current_ap: int, _max_ap: int):
 func _on_card_played(_card = null, _target = null):
 	update_hand_display()
 
-func set_card_targeting_mode(enabled: bool):
+func set_card_targeting_mode(_enabled: bool):
 	pass
 	# Enable/disable card targeting UI

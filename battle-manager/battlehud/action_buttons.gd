@@ -41,8 +41,8 @@ func hide_button(button_name: String) -> void:
 	if button and container_juice:
 		container_juice.disappear_sibling(button)
 
-func set_button_visible(button_name: String, visible: bool) -> void:
-	if visible:
+func set_button_visible(button_name: String, should_show: bool) -> void:
+	if should_show:
 		show_button(button_name)
 	else:
 		hide_button(button_name)

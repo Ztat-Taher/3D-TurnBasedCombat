@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="CardConfig" format=3 load_steps=3]
+
+[ext_resource type="Script" path="res://battle-manager/card_combat/resources/card_config.gd" id="1"]
+[ext_resource type="Resource" path="res://database/card_effects/minor_heal_effect.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+actor_animation = "heal"
+animation_priority = 5
+animation_blend_time = 0.2
+animation_speed = 1.0
+animation_events = []
+fallback_animation = "cast"
+animation_layer = "full_body"
+target_type = 3
+target_selection_mode = 0
+target_filter = ""
+requires_los = false
+primary_effect = ExtResource("2")
+secondary_effects = []
+effect_timing = 1
+effect_conditions = []
+vfx_on_actor = null
+vfx_on_target = null
+vfx_on_projectile = null
+camera_effects = null
+screen_effects = null
+projectile_enabled = false
+projectile_scene = ""
+projectile_speed = 10.0
+projectile_lifetime = 2.0
+projectile_arc = 0.0
+projectile_spawn_point = "actor"
+cast_sound = null
+hit_sound = null
+impact_sound = null
+loop_sound = null
+voice_line = ""
+qte_type_string = "none"
+qte_difficulty = 0.0
+qte_timing_string = "before_attack"
+qte_window_duration = 0.0
+qte_success_multiplier = 1.0
+qte_failure_multiplier = 1.0
+qte_sequence = []
+qte_mash_count = 0
+qte_mash_window = 0.0
+base_damage = 0
+damage_scaling = {}
+damage_type = 0
+heal_amount = 15
+shield_amount = 0
+stat_modifiers = {}
+applies_states = []
+applies_self_states = []
+state_chance = 0.0
+state_duration = 0
+card_rarity = 0
+card_element = 0
+card_tags = ["heal", "basic", "single_target"]
+card_description = "Heals a single ally for 15 health points."

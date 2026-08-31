@@ -135,9 +135,9 @@ func show_parry(target: Battler, damage_reduced: int) -> void:
 	display_battle_text("[color=#55DDFF][b]🛡️ %s PARRIED! (-%d DMG)[/b][/color]" % [target.character_name, damage_reduced])
 
 ## Display perfect parry text
-func show_perfect_parry(target: Battler) -> void:
+func show_perfect_parry(_target: Battler) -> void:
 	display_battle_text("[color=#FFDD44][b]✨ PERFECT PARRY! COUNTERATTACK! ✨[/b][/color]")
 
 ## Display counterattack text
-func show_counter(attacker: Battler, target: Battler, damage: int) -> void:
+func show_counter(attacker: Battler, _target: Battler, damage: int) -> void:
 	display_battle_text("[color=#FF4444][b]💥 %s COUNTERS for %d DMG! 💥[/b][/color]" % [attacker.character_name, damage])

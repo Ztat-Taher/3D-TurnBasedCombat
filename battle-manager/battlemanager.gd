@@ -301,6 +301,29 @@ var battle_camera: BattleCamera
 var effect_manager: EffectManager
 
 func _ready():
+	var file = FileAccess.open("res://database/card_configs/basic_attack_config.tres", FileAccess.READ)
+	if file:
+		print("--- TRES FILE CONTENT ---")
+		print(file.get_as_text())
+		print("-------------------------")
+		file.close()
+	
+	var test_config = load("res://database/card_configs/basic_attack_config.tres")
+	print("--- TEST LOAD CONFIG ---")
+	print("Config Object: ", test_config)
+	if test_config:
+		print("Config Class: ", test_config.get_class())
+		print("Config Script: ", test_config.get_script())
+		
+		# Print ALL properties on the loaded resource
+		print("Properties list:")
+		for prop in test_config.get_property_list():
+			var pname = prop["name"]
+			# Ignore built-in Resource/Object properties to keep output clean
+			if prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE:
+				print("  ", pname, " = ", test_config.get(pname))
+	print("------------------------")
+	
 	add_to_group("battle_manager")
 	SignalBus.select_target.connect(target_selected)
 	
@@ -1232,6 +1255,9 @@ func update_button_states():
 func exit_targeting_mode():
 	in_target_selection = false
 	current_target = null
+	current_controller_target = null
+	current_default_selector = null
+	keyboard_target_index = 0
 	
 	# Disable all valid targets
 	for battler in valid_targets:
@@ -1268,7 +1294,7 @@ func exit_targeting_mode():
 func confirm_aoe_execution():
 	var pending_card = get_meta("pending_card")
 	var aoe_targets = get_meta("aoe_targets")
-	var target_type = get_meta("target_type")
+	var _target_type = get_meta("target_type")
 	
 	if not pending_card or aoe_targets.is_empty():
 		exit_targeting_mode()

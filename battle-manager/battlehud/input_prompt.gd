@@ -41,8 +41,8 @@ var keyboard_mapping: Dictionary = {
 func _ready():
 	update_prompt()
 
-func set_action(action_name: String) -> void:
-	self.action_name = action_name
+func set_action(p_action_name: String) -> void:
+	self.action_name = p_action_name
 	update_prompt()
 
 func update_prompt():

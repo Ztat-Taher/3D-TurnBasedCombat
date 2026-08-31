@@ -66,8 +66,6 @@ func apply_camera_effects(camera: Camera3D, actor: Node, target: Node, projectil
 
 ## Apply camera shake
 func _apply_shake(camera: Camera3D):
-	var shake_tween = camera.create_tween()
-	
 	var original_position = camera.global_position
 	var shake_timer = 0.0
 	
@@ -125,7 +123,7 @@ func _apply_tracking(camera: Node3D, actor: Node, target: Node, projectile: Node
 		return
 	
 	var original_position = camera.global_position
-	var tracking_timer = 0.0
+	var _tracking_timer = 0.0
 	
 	var total_frames = int(tracking_duration * 60) # Assuming 60 FPS
 	for i in range(total_frames):
@@ -137,7 +135,7 @@ func _apply_tracking(camera: Node3D, actor: Node, target: Node, projectile: Node
 			var move_amount = min(distance, tracking_speed / 60.0)
 			camera.global_position += direction * move_amount
 		
-		tracking_timer += 1.0 / 60.0 # Assume 60 FPS
+		_tracking_timer += 1.0 / 60.0 # Assume 60 FPS
 		await camera.get_tree().process_frame
 	
 	# Return to original position if configured
