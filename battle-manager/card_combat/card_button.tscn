@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://dskqhs3k6c8xn"]
 
 [ext_resource type="Script" uid="uid://c5dbtyrtv3prv" path="res://battle-manager/card_combat/card_button.gd" id="1"]
-[ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="2_kg3nd"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_glow"]
 bg_color = Color(1, 1, 1, 0)
@@ -41,18 +40,22 @@ size_flags_vertical = 4
 script = ExtResource("1")
 
 [node name="Glow" type="Panel" parent="." unique_id=828943883]
-layout_mode = 0
-offset_left = -4.0
-offset_top = -4.0
-offset_right = 4.0
-offset_bottom = 4.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_glow")
 
 [node name="CardPanel" type="Panel" parent="." unique_id=1210378144]
-layout_mode = 0
-offset_right = 120.0
-offset_bottom = 180.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 pivot_offset = Vector2(60, 180)
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
@@ -111,9 +114,6 @@ layout_mode = 2
 size_flags_vertical = 3
 text = "Card description"
 autowrap_mode = 3
-
-[node name="ButtonJuice" type="Node" parent="." unique_id=357471438]
-script = ExtResource("2_kg3nd")
 
 [connection signal="gui_input" from="." to="." method="_on_gui_input"]
 [connection signal="mouse_entered" from="." to="." method="_on_mouse_entered"]

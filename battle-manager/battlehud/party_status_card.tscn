@@ -11,10 +11,11 @@
 [ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="6_k3ssm"]
 [ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="7_4w1pf"]
 [ext_resource type="Texture2D" uid="uid://c2s5al48qlhc2" path="res://assets/images/ui/bar_progress.png" id="8_nw4dt"]
+[ext_resource type="Script" uid="uid://domq7ntx86pay" path="res://battle-manager/effects/progress_bar_juice.gd" id="9_juice"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bg"]
 shader = ExtResource("5_shader")
-shader_parameter/base_color = Color(0.1, 0.1, 0.15, 1)
+shader_parameter/base_color = Color(0.06, 0.09, 0.16, 0.85)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_dx4pq"]
 atlas = ExtResource("3_dw2lt")
@@ -30,30 +31,13 @@ offset_bottom = 100.0
 mouse_filter = 2
 script = ExtResource("1_party_card")
 
-[node name="CardFocus" type="NinePatchRect" parent="." unique_id=686705471]
-visible = false
-modulate = Color(1, 1, 1, 0)
-z_index = 1
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-texture = ExtResource("3_dw2lt")
-region_rect = Rect2(1, 1, 30, 30)
-patch_margin_left = 8
-patch_margin_top = 8
-patch_margin_right = 8
-patch_margin_bottom = 8
-
 [node name="BackgroundShader" type="ColorRect" parent="." unique_id=597839945]
 z_index = -1
 material = SubResource("ShaderMaterial_bg")
 layout_mode = 0
 offset_right = 200.0
 offset_bottom = 100.0
-color = Color(0.1, 0.1, 0.15, 1)
+color = Color(1, 1, 1, 1)
 
 [node name="MainVBox" type="HBoxContainer" parent="." unique_id=285564334]
 layout_mode = 0
@@ -205,6 +189,12 @@ theme_override_fonts/font = ExtResource("7_4w1pf")
 theme_override_font_sizes/font_size = 13
 text = "171/171"
 
+[node name="HPJuice" type="Node" parent="MainVBox/BarsContainer/HPContainer" unique_id=841107713 node_paths=PackedStringArray("main_bar", "trailing_bar", "associated_label")]
+script = ExtResource("9_juice")
+main_bar = NodePath("../HPBar")
+trailing_bar = NodePath("../HPDamageBar")
+associated_label = NodePath("../HPNumLabel")
+
 [node name="APContainer" type="Control" parent="MainVBox/BarsContainer" unique_id=1422137498]
 custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
@@ -229,7 +219,7 @@ texture_over = ExtResource("3_pp2eq")
 texture_progress = ExtResource("8_nw4dt")
 tint_progress = Color(0, 0.3, 0.4, 1)
 
-[node name="HPBar" type="TextureProgressBar" parent="MainVBox/BarsContainer/APContainer" unique_id=314131510]
+[node name="APBar" type="TextureProgressBar" parent="MainVBox/BarsContainer/APContainer" unique_id=314131510]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -263,6 +253,12 @@ theme_override_constants/shadow_offset_y = 2
 theme_override_fonts/font = ExtResource("7_4w1pf")
 theme_override_font_sizes/font_size = 13
 text = "3/3"
+
+[node name="APJuice" type="Node" parent="MainVBox/BarsContainer/APContainer" unique_id=1490467036 node_paths=PackedStringArray("main_bar", "trailing_bar", "associated_label")]
+script = ExtResource("9_juice")
+main_bar = NodePath("../APBar")
+trailing_bar = NodePath("../APDamageBar")
+associated_label = NodePath("../APNumLabel")
 
 [node name="ActiveTag" type="Label" parent="MainVBox" unique_id=786705469]
 visible = false

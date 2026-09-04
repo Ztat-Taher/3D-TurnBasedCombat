@@ -27,6 +27,7 @@ signal end_turn_pressed
 @onready var move_banner: Control = $Control/MoveBanner
 @onready var move_banner_actor: Label = $Control/MoveBanner/Panel/VBox/ActorLabel
 @onready var move_banner_label: Label = $Control/MoveBanner/Panel/VBox/MoveLabel
+@onready var cursor_system: CursorManager = $CursorSystem
 
 var aoe_confirm_button: Button = null
 
@@ -37,6 +38,70 @@ var enemy_overhead_bar_map: Dictionary = {}
 
 var activeBattler: Node = null
 var enemy: Node = null
+
+# UI State Management
+enum UIState {
+	BASE_STATE,        # Default starting state: Attack button visible, CardUI hidden, Items menu hidden
+	CARD_SELECT_STATE, # Attack button hidden, CardUI visible, Items menu hidden
+	ITEMS_MENU_STATE,  # Attack button visible, CardUI hidden, Items menu visible
+	CARD_EXECUTION_STATE, # All UI hidden during card execution
+	TARGETING_STATE    # CardUI hidden, action buttons hidden during targeting
+}
+
+var current_ui_state: UIState = UIState.BASE_STATE
+var previous_ui_state: UIState = UIState.BASE_STATE
+
+func set_ui_state(new_state: Variant) -> void:
+	# Convert integer to UIState enum if needed
+	if typeof(new_state) == TYPE_INT:
+		new_state = new_state as UIState
+	
+	# Save previous state when entering special states (but don't trigger hiding animations)
+	if (new_state == UIState.CARD_EXECUTION_STATE or new_state == UIState.TARGETING_STATE) and current_ui_state != new_state:
+		previous_ui_state = current_ui_state
+	
+	current_ui_state = new_state
+	
+	match new_state:
+		UIState.BASE_STATE:
+			# Attack button visible, CardUI hidden, Items menu hidden
+			if card_ui:
+				card_ui.visible = false
+			if item_select:
+				item_select.visible = false
+			# Action buttons handled separately via juice system
+		
+		UIState.CARD_SELECT_STATE:
+			# Attack button hidden, CardUI visible, Items menu hidden
+			if card_ui:
+				card_ui.visible = true
+			if item_select:
+				item_select.visible = false
+			# Action buttons handled separately via juice system
+		
+		UIState.ITEMS_MENU_STATE:
+			# Attack button visible, CardUI hidden, Items menu visible
+			if card_ui:
+				card_ui.visible = false
+			if item_select:
+				item_select.visible = true
+			# Action buttons handled separately via juice system
+		
+		UIState.CARD_EXECUTION_STATE:
+			# CardUI hidden, Items hidden (action buttons handled separately via juice system)
+			if card_ui:
+				card_ui.visible = false
+			if item_select:
+				item_select.visible = false
+		
+		UIState.TARGETING_STATE:
+			# CardUI hidden, Items hidden (action buttons handled separately via juice system)
+			if card_ui:
+				card_ui.visible = false
+			if item_select:
+				item_select.visible = false
+	
+	_update_back_button_visibility()
 
 var active_allies: Array = []
 var active_enemies: Array = []
@@ -64,24 +129,104 @@ func _ready():
 		if end_turn_button:
 			end_turn_button.pressed.connect(_on_end_turn_button_pressed)
 	
-	item_select.visible = false
+	# Initialize in base state
+	set_ui_state(UIState.BASE_STATE)
 	hide_action_buttons()
 	
 	# Listen for card battle manager AP changes
 	call_deferred("_connect_card_battle_manager")
+	
+	# Initialize cursor system
+	_initialize_cursor_system()
 
 func _connect_card_battle_manager() -> void:
 	var cbm = get_tree().get_first_node_in_group("card_battle_manager")
 	if cbm and cbm.has_signal("ap_changed"):
 		if not cbm.ap_changed.is_connected(_on_cbm_ap_changed):
 			cbm.ap_changed.connect(_on_cbm_ap_changed)
+	if cbm and cbm.has_signal("card_played"):
+		if not cbm.card_played.is_connected(_on_cbm_card_played):
+			cbm.card_played.connect(_on_cbm_card_played)
 
 func _on_cbm_ap_changed(current_ap: int, max_ap: int) -> void:
 	if activeBattler and is_instance_valid(activeBattler):
 		last_ap_by_battler[activeBattler] = { "current": current_ap, "max": max_ap }
 	update_party_status()
 
+func _initialize_cursor_system() -> void:
+	if not cursor_system:
+		return
+	
+	# Connect cursor system signals
+	if cursor_system.has_signal("cursor_state_changed"):
+		cursor_system.cursor_state_changed.connect(_on_cursor_state_changed)
+	if cursor_system.has_signal("cursor_hover_target"):
+		cursor_system.cursor_hover_target.connect(_on_cursor_hover_target)
+	if cursor_system.has_signal("cursor_clicked"):
+		cursor_system.cursor_clicked.connect(_on_cursor_clicked)
+
+func _on_cursor_state_changed(new_state: String) -> void:
+	# Handle cursor state changes in battle HUD
+	match new_state:
+		"attack":
+			# Could update UI to reflect attack mode
+			pass
+		"interact":
+			# Could update UI to reflect interaction mode
+			pass
+		"targeting":
+			# Could update UI to reflect targeting mode
+			pass
+		"default":
+			# Return to normal UI state
+			pass
+
+func _on_cursor_hover_target(target: Node) -> void:
+	# Handle cursor hovering over targets
+	if target and target.is_in_group("enemies"):
+		# Could highlight enemy or show target info
+		pass
+
+func _on_cursor_clicked(position: Vector2) -> void:
+	# Handle cursor clicks for battle interactions
+	pass
+
+func _on_cbm_card_played(_card = null, _target = null) -> void:
+	# Always restore state after card execution completes (systematic for all card types)
+	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+	if card_battle_manager:
+		var hand = card_battle_manager.get_hand()
+		if hand.is_empty():
+			set_ui_state(UIState.BASE_STATE)
+		else:
+			# Always restore to CARD_SELECT_STATE if hand not empty
+			set_ui_state(UIState.CARD_SELECT_STATE)
+	
+	# Restore action buttons visibility
+	if action_buttons and activeBattler:
+		action_buttons.show()
+		action_buttons.animate_buttons_in()
+		
+		# Set button states based on current state
+		match current_ui_state:
+			UIState.BASE_STATE:
+				if attack_button:
+					action_buttons.show_button("Attack")
+				if items_button:
+					action_buttons.show_button("Items")
+			UIState.CARD_SELECT_STATE:
+				if attack_button:
+					action_buttons.hide_button("Attack")
+				if items_button:
+					action_buttons.show_button("Items")
+
 func _process(_delta: float) -> void:
+	# Respect UI state system - hide action buttons during execution/targeting
+	if current_ui_state == UIState.CARD_EXECUTION_STATE or current_ui_state == UIState.TARGETING_STATE:
+		if action_buttons and action_buttons.visible:
+			action_buttons.hide()
+		return
+	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and (battle_manager.is_animating or battle_manager.in_target_selection):
 		if action_buttons and action_buttons.visible:
@@ -90,8 +235,7 @@ func _process(_delta: float) -> void:
 	
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 	if card_battle_manager and card_battle_manager.is_executing_card:
-		if action_buttons and action_buttons.visible:
-			hide_action_buttons()
+		set_ui_state(UIState.CARD_EXECUTION_STATE)
 		return
 	
 	if action_buttons and action_buttons.visible and activeBattler and is_instance_valid(activeBattler):
@@ -116,8 +260,11 @@ func on_start_combat(enemy_node: Node):
 	enemy = enemy_node
 	if not active_enemies.has(enemy_node):
 		active_enemies.append(enemy_node)
-	_spawn_enemy_overhead_bar(enemy_node)
-	_check_boss_bar(enemy_node)
+		_spawn_enemy_overhead_bar(enemy_node)
+		_check_boss_bar(enemy_node)
+		# Register enemy with cursor system
+		if cursor_system:
+			cursor_system.register_enemy_battler(enemy_node)
 	update_health_bars()
 
 func on_add_character(character: Node):
@@ -224,17 +371,14 @@ func show_action_buttons(character: Node):
 	if not action_buttons:
 		return
 	if not character or not character.is_in_group("players"):
-		hide_action_buttons()
 		return
 	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and battle_manager.is_animating:
-		hide_action_buttons()
 		return
 	
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 	if card_battle_manager and card_battle_manager.is_executing_card:
-		hide_action_buttons()
 		return
 	
 	activeBattler = character
@@ -250,7 +394,8 @@ func show_action_buttons(character: Node):
 				var target_pos = screen_pos + Vector2(70.0, -50.0)
 				action_buttons.position = target_pos
 	
-	action_buttons.show()
+	# Always start in BASE_STATE (Attack button visible)
+	set_ui_state(UIState.BASE_STATE)
 	
 	if end_turn_button:
 		end_turn_button.disabled = false
@@ -258,41 +403,70 @@ func show_action_buttons(character: Node):
 	# Setup input prompts
 	_setup_input_prompts()
 	
-	# Show attack button initially, hide card UI
-	if attack_button:
-		attack_button.visible = true
-	if card_ui:
-		card_ui.visible = false
+	# Use juice system to animate action buttons in
+	action_buttons.show()
+	action_buttons.animate_buttons_in()
 	
-	_update_back_button_visibility()
+	# Set button states via juice system (Attack visible, Items visible in BASE_STATE)
+	if action_buttons:
+		if attack_button:
+			action_buttons.show_button("Attack")
+		if items_button:
+			action_buttons.show_button("Items")
+	
+	activeBattler = character
+	update_party_status()
+	
+	# Set current player battler in card battle manager
+	if card_battle_manager:
+		card_battle_manager.current_player_battler = character
+	
+	# Initial positioning near the battler
+	if activeBattler and is_instance_valid(activeBattler):
+		var cam = get_viewport().get_camera_3d()
+		if cam:
+			var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
+			if not cam.is_position_behind(world_pos):
+				var screen_pos = cam.unproject_position(world_pos)
+				var target_pos = screen_pos + Vector2(70.0, -50.0)
+				action_buttons.position = target_pos
+	
+	# Always start in BASE_STATE (Attack button visible)
+	set_ui_state(UIState.BASE_STATE)
+	
+	if end_turn_button:
+		end_turn_button.disabled = false
+	
+	# Setup input prompts
+	_setup_input_prompts()
 	
 	# Use the new ActionButtons animation system
 	action_buttons.animate_buttons_in()
 
 func hide_action_buttons():
+	# Handle action buttons via juice system separately
 	if action_buttons:
 		action_buttons.animate_buttons_out()
 		var action_tween = action_buttons.get_tween()
 		if action_tween:
 			await action_tween.finished
 		action_buttons.hide()
+	
+	# Update state to handle CardUI and Items
+	set_ui_state(UIState.CARD_EXECUTION_STATE)
 
 func _update_back_button_visibility():
-	# Systematic back button visibility management
+	# Systematic back button visibility management based on current UI state
 	var should_show = false
 	
-	# Show back button if items menu is open
-	if item_select and item_select.visible:
-		should_show = true
-	
-	# Show back button if card UI is open
-	elif card_ui and card_ui.visible:
-		should_show = true
-	
-	# Show back button if in targeting mode
-	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	if battle_manager and battle_manager.in_target_selection:
-		should_show = true
+	# Show back button in states that need back navigation
+	match current_ui_state:
+		UIState.ITEMS_MENU_STATE:
+			should_show = true
+		UIState.CARD_SELECT_STATE:
+			should_show = true
+		UIState.TARGETING_STATE:
+			should_show = true
 	
 	if global_back_button:
 		global_back_button.visible = should_show
@@ -355,49 +529,39 @@ func _on_item_back_pressed() -> void:
 	_close_items_menu()
 
 func _close_items_menu():
-	item_select.visible = false
-	if action_buttons and items_button:
-		action_buttons.show_button("Items")
-	_update_back_button_visibility()
+	set_ui_state(UIState.BASE_STATE)
 
 func _close_card_menu():
-	close_card_ui()
-	_update_back_button_visibility()
+	set_ui_state(UIState.BASE_STATE)
 
 func _on_item_selected(item: Item) -> void:
-	item_select.visible = false
-	if card_ui:
-		card_ui.visible = true
+	set_ui_state(UIState.CARD_SELECT_STATE)
 	action_selected.emit("item", item)
-	_update_back_button_visibility()
+	action_selected.emit("item", item)
 
 func _on_attack_pressed() -> void:
-	if card_ui:
-		card_ui.visible = true
+	set_ui_state(UIState.CARD_SELECT_STATE)
+	
+	# Use juice system to handle button visibility transitions
 	if action_buttons:
 		if attack_button:
 			action_buttons.hide_button("Attack")
 		if items_button:
 			action_buttons.show_button("Items")
-	_update_back_button_visibility()
 
 func close_card_ui() -> void:
-	if card_ui:
-		card_ui.visible = false
-	if action_buttons and attack_button:
-		action_buttons.show_button("Attack")
+	set_ui_state(UIState.BASE_STATE)
 
 func _on_items_pressed() -> void:
 	setup_item_list(activeBattler)
-	item_select.visible = true
-	if card_ui:
-		card_ui.visible = false
+	set_ui_state(UIState.ITEMS_MENU_STATE)
+	
+	# Use juice system to show Attack button and hide Items button
 	if action_buttons:
-		if items_button:
-			action_buttons.hide_button("Items")
 		if attack_button:
 			action_buttons.show_button("Attack")
-	_update_back_button_visibility()
+		if items_button:
+			action_buttons.hide_button("Items")
 
 func _unhandled_input(event: InputEvent) -> void:
 	var handled = false
@@ -455,22 +619,22 @@ func _on_end_turn_button_pressed() -> void:
 func set_targeting_mode(enabled: bool) -> void:
 	# Handle targeting mode visibility
 	if enabled:
-		hide_action_buttons()
+		set_ui_state(UIState.TARGETING_STATE)
+		# Update cursor system for targeting
+		if cursor_system:
+			cursor_system.force_cursor_state(CursorDisplay.CursorState.TARGETING)
 	else:
-		if activeBattler:
-			show_action_buttons(activeBattler)
-	
-	if card_ui:
-		card_ui.visible = not enabled
-	
-	# Immediately update back button visibility
-	_update_back_button_visibility()
+		# Only set CARD_EXECUTION_STATE if we're actually exiting targeting mode
+		# Don't interfere with normal card execution flow for self-targeting cards
+		if current_ui_state == UIState.TARGETING_STATE:
+			set_ui_state(UIState.CARD_EXECUTION_STATE)
+		# Restore cursor system state
+		if cursor_system:
+			cursor_system.restore_previous_state()
 
 func set_aoe_confirmation_mode(enabled: bool, card_name: String = "", target_count: int = 0) -> void:
 	if enabled:
-		hide_action_buttons()
-		if card_ui:
-			card_ui.visible = false
+		set_ui_state(UIState.CARD_EXECUTION_STATE)
 		
 		# Show AOE confirmation UI
 		if global_back_button:
@@ -511,17 +675,18 @@ func _on_aoe_confirm_pressed() -> void:
 		battle_manager.confirm_aoe_execution()
 
 func _on_global_back_pressed() -> void:
-	# Handle different back contexts
-	if item_select.visible:
-		_close_items_menu()
-	elif card_ui and card_ui.visible:
-		_close_card_menu()
-	elif global_back_button and global_back_button.visible:
-		# Handle targeting mode
-		var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-		if battle_manager and battle_manager.has_method("exit_targeting_mode"):
-			battle_manager.exit_targeting_mode()
-		set_targeting_mode(false)
+	# Handle different back contexts based on current UI state
+	match current_ui_state:
+		UIState.ITEMS_MENU_STATE:
+			_close_items_menu()
+		UIState.CARD_SELECT_STATE:
+			_close_card_menu()
+		UIState.TARGETING_STATE:
+			# Handle targeting mode
+			var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+			if battle_manager and battle_manager.has_method("exit_targeting_mode"):
+				battle_manager.exit_targeting_mode()
+			set_targeting_mode(false)
 
 func update_ui():
 	update_character_info()

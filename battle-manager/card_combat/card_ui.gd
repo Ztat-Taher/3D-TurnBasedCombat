@@ -240,7 +240,6 @@ func apply_card_fanning() -> void:
 
 func create_card_button(card: CardData) -> Control:
 	if not card_button_scene:
-		# Create a simple button if scene not available
 		var button = Button.new()
 		button.text = card.name + " (Cost: " + str(card.cost) + ")"
 		button.pressed.connect(func(): _on_card_button_pressed(card))
@@ -250,8 +249,71 @@ func create_card_button(card: CardData) -> Control:
 	if card_button.has_method("setup"):
 		card_button.setup(card)
 		card_button.card_played.connect(func(_card_data): _on_card_button_pressed(card))
+		if card_button.has_signal("card_drag_started"):
+			card_button.card_drag_started.connect(_on_card_drag_started)
+		if card_button.has_signal("card_drag_ended"):
+			card_button.card_drag_ended.connect(_on_card_drag_ended)
 	
 	return card_button
+
+func _on_card_drag_started(card_button: CardButton) -> void:
+	# Ensure the dragged card renders on top of the UI
+	card_button.z_index = 200
+
+func _on_card_drag_ended(card_button: CardButton, dropped_in_play_zone: bool) -> void:
+	if not dropped_in_play_zone:
+		# Return card cleanly into its place in the hand
+		return_card_to_hand(card_button)
+
+func return_card_to_hand(card_button: CardButton) -> void:
+	if not is_instance_valid(card_button):
+		return
+	
+	card_button.is_dragging = false
+	apply_card_fanning()
+	
+	# Animate card_panel and glow back from their dragged position to their fanned position
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EaseType.EASE_OUT)
+	tween.set_trans(Tween.TransitionType.TRANS_CUBIC)
+	
+	if card_button.card_panel:
+		tween.tween_property(card_button.card_panel, "position", Vector2(0.0, card_button.base_y_offset), 0.25)
+		tween.tween_property(card_button.card_panel, "rotation_degrees", card_button.base_rotation, 0.25)
+		tween.tween_property(card_button.card_panel, "scale", Vector2.ONE, 0.25)
+	
+	if card_button.glow:
+		tween.tween_property(card_button.glow, "position", Vector2(0.0, -4.0 + card_button.base_y_offset), 0.25)
+		tween.tween_property(card_button.glow, "rotation_degrees", card_button.base_rotation, 0.25)
+		tween.tween_property(card_button.glow, "scale", Vector2.ONE, 0.25)
+		tween.tween_property(card_button.glow, "modulate:a", 0.0, 0.25)
+	
+	if card_button.card_shader_material:
+		tween.tween_property(card_button.card_shader_material, "shader_parameter/y_rot", 0.0, 0.25)
+		tween.tween_property(card_button.card_shader_material, "shader_parameter/x_rot", 0.0, 0.25)
+		tween.tween_property(card_button.card_shader_material, "shader_parameter/hovering", 0.0, 0.25)
+	
+	tween.chain().tween_callback(func():
+		if is_instance_valid(card_button):
+			card_button.z_index = card_button.base_z_index
+			card_button.is_hovered = false
+			card_button.is_dragging = false
+			if card_button.drop_shadow:
+				card_button.drop_shadow.reset()
+			if card_button.card_panel:
+				card_button.card_panel.position = Vector2(0.0, card_button.base_y_offset)
+				card_button.card_panel.rotation_degrees = card_button.base_rotation
+				card_button.card_panel.scale = Vector2.ONE
+			if card_button.glow:
+				card_button.glow.position = Vector2(0.0, -4.0 + card_button.base_y_offset)
+				card_button.glow.rotation_degrees = card_button.base_rotation
+				card_button.glow.scale = Vector2.ONE
+			var cm = card_button._get_cursor_manager()
+			if cm:
+				cm.notify_hover_exited(card_button)
+				cm.force_cursor_state(CursorDisplay.CursorState.DEFAULT)
+	)
 
 func update_ap_display():
 	pass

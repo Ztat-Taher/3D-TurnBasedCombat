@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://bsdjvwbf7iv4s"]
 
 [ext_resource type="Script" uid="uid://ddc5b88r6h5rt" path="res://battle-manager/battlehud/boss_bar.gd" id="1_script"]
+[ext_resource type="Script" path="res://battle-manager/effects/progress_bar_juice.gd" id="6_juice"]
 [ext_resource type="Shader" path="res://assets/shaders/ui_background_shader.gdshader" id="2_wxggt"]
 [ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="3_uds32"]
 [ext_resource type="Texture2D" uid="uid://qxkfeymmevwl" path="res://assets/images/ui/boss_bar_over.png" id="3_yunph"]
@@ -118,3 +119,6 @@ theme_override_font_sizes/font_size = 13
 text = "100/100"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="HPJuice" type="Node" parent="VBox/HPBarContainer"]
+script = ExtResource("6_juice")

@@ -522,13 +522,10 @@ func target_selected(target: Battler) -> void:
 		if current_target_type == "ally" and battle_camera:
 			battle_camera.set_target_focus(target)
 		
-		# Hide targeting UI and ensure action buttons and cards remain hidden during action execution
+		# Hide targeting UI - don't set CARD_EXECUTION_STATE here, play_card() handles it
 		if hud:
 			if hud.target_back_button:
 				hud.target_back_button.visible = false
-			hud.hide_action_buttons()
-			if hud.card_ui:
-				hud.card_ui.visible = false
 		
 		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 		if card_battle_manager:
@@ -621,9 +618,8 @@ func start_next_turn():
 		return
 	else:
 		if hud:
-			hud.hide_action_buttons()
-			if hud.card_ui:
-				hud.card_ui.visible = false
+			if hud.has_method("set_ui_state"):
+				hud.set_ui_state(3) # CARD_EXECUTION_STATE
 		# MUST await so the enemy's entire action resolves before update_hud/next turn
 		await enemy_turn(current_character)
 	
@@ -635,14 +631,16 @@ func update_hud():
 	hud.update_character_info()
 	# Guard against out-of-bounds access if turn_order changed mid-turn
 	if turn_order.is_empty() or current_turn >= turn_order.size():
-		hud.hide_action_buttons()
+		if hud and hud.has_method("set_ui_state"):
+			hud.set_ui_state(3) # CARD_EXECUTION_STATE
 		return
 	# Don't show action buttons for players (they use cards now)
 	# Only show for items/run if needed
 	if turn_order[current_turn] in players and not is_animating:
 		hud.show_action_buttons(turn_order[current_turn])
 	else:
-		hud.hide_action_buttons()
+		if hud and hud.has_method("set_ui_state"):
+			hud.set_ui_state(3) # CARD_EXECUTION_STATE
 
 var queued_item:Item
 func _on_action_selected(action: String, usable:Item = null):
@@ -931,8 +929,6 @@ func _cancel_menu_selection() -> void:
 	var skill_select = hud.get("skill_select")
 	if skill_select:
 		skill_select.hide()
-	if hud.card_ui:
-		hud.card_ui.visible = true
 	hud.show_action_buttons(current_character)
 
 func _do_menu_selection() -> void:
@@ -961,9 +957,8 @@ func _use_action_on_target() -> void:
 		if hud:
 			if hud.target_back_button:
 				hud.target_back_button.visible = false
-			hud.hide_action_buttons()
-			if hud.card_ui:
-				hud.card_ui.visible = false
+			if hud.has_method("set_ui_state"):
+				hud.set_ui_state(3) # CARD_EXECUTION_STATE
 		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 		if card_battle_manager:
 			_execute_card_async(card_battle_manager, pending_card, current_target)
@@ -976,7 +971,8 @@ func _use_action_on_target() -> void:
 	exit_targeting_mode()
 	in_menu_selection = false
 	is_animating = true
-	hud.hide_action_buttons()
+	if hud and hud.has_method("set_ui_state"):
+		hud.set_ui_state(3) # CARD_EXECUTION_STATE
 	
 	current_character.battle_item(queued_item, current_target)
 	
@@ -1044,7 +1040,6 @@ func damage_calculation(attacker, target, damage) -> void:
 func heal_calculation(user, target, amount):
 	var healing = target.take_healing(amount)
 	hud.update_health_bars()
-	update_hud()
 	
 	# Display healing text with BattleAflictions
 	if hud and hud.battle_text_display:
@@ -1239,7 +1234,8 @@ func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
 			get_tree().change_scene_to_file(game_map)
 			
 		BattleEndCondition.DEFEAT:
-			hud.hide_action_buttons()
+			if hud and hud.has_method("set_ui_state"):
+				hud.set_ui_state(3) # CARD_EXECUTION_STATE
 
 func update_button_states():
 	# ActionButtons are now in BattleHUD, we can access them through HUD
@@ -1308,9 +1304,8 @@ func confirm_aoe_execution():
 	# Hide targeting UI
 	if hud and hud.has_method("hide_aoe_confirmation_mode"):
 		hud.hide_aoe_confirmation_mode()
-	hud.hide_action_buttons()
-	if hud.card_ui:
-		hud.card_ui.visible = false
+	if hud.has_method("set_ui_state"):
+		hud.set_ui_state(3) # CARD_EXECUTION_STATE
 	
 	# Execute AOE card on all targets
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
@@ -1353,8 +1348,6 @@ func _execute_aoe_card_async(card_battle_manager: CardBattleManager, card: CardD
 	# Show action buttons again
 	if hud:
 		hud.show_action_buttons(current_character)
-		if hud.card_ui:
-			hud.card_ui.visible = true
 
 func _execute_card_async(card_battle_manager: CardBattleManager, card: CardData, target: Battler):
 	# Helper function to execute card asynchronously

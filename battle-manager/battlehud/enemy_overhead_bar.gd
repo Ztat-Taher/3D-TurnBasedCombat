@@ -15,6 +15,8 @@ const HEIGHT_OFFSET := 2.4
 @onready var name_label: Label = $VBox/NameLabel
 @onready var hp_label: Label = $VBox/HPBarRow/HPNumLabel
 
+@onready var hp_juice: ProgressBarJuice = $VBox/HPBarRow/HPJuice
+
 func _ready() -> void:
 	# Start invisible until we have a valid battler
 	modulate.a = 0.0
@@ -24,6 +26,12 @@ func setup(battler: Battler) -> void:
 	# Connect to health signal
 	if not battler.health_changed.is_connected(_on_health_changed):
 		battler.health_changed.connect(_on_health_changed)
+
+	# Setup juice component if it exists
+	if hp_juice:
+		hp_juice.setup(hp_bar, hp_damage_bar, hp_label)
+		hp_juice.enable_healing_feedback = true
+		hp_juice.enable_critical_health = true
 
 	# Initialize values
 	hp_bar.max_value = battler.max_health
@@ -65,38 +73,16 @@ func _process(_delta: float) -> void:
 func _on_health_changed(current: int, maximum: int) -> void:
 	if not is_instance_valid(self):
 		return
-	var previous_value := hp_bar.value
-	hp_bar.max_value = maximum
 	
-	# Dual-layer effect: main bar instantly updates, damage bar smoothly catches up
-	hp_bar.value = float(current)
-	
-	if hp_damage_bar:
-		hp_damage_bar.max_value = maximum
-		var damage_tween := create_tween()
-		damage_tween.tween_property(hp_damage_bar, "value", float(current), 0.6).set_ease(Tween.EASE_OUT)
-	
-	_update_hp_label(current, maximum)
-
-	# Enhanced damage feedback
-	if float(current) < previous_value:
-		# Red flash
-		var flash := create_tween()
-		flash.tween_property(self, "modulate", Color(2.2, 0.3, 0.3, 1.0), 0.06)
-		flash.tween_property(self, "modulate", Color.WHITE, 0.18)
-		
-		# Scale pulse on bar
-		var scale_tween := create_tween()
-		scale_tween.tween_property(hp_bar, "scale", Vector2(1.1, 1.2), 0.1).set_ease(Tween.EASE_OUT)
-		scale_tween.tween_property(hp_bar, "scale", Vector2(1.0, 1.0), 0.15).set_ease(Tween.EASE_IN)
-		
-		# Name label shake using position
-		if name_label:
-			var original_pos = name_label.position
-			var shake_tween := create_tween()
-			shake_tween.tween_property(name_label, "position:x", original_pos.x + 4.0, 0.05)
-			shake_tween.tween_property(name_label, "position:x", original_pos.x - 4.0, 0.05)
-			shake_tween.tween_property(name_label, "position:x", original_pos.x, 0.05)
+	if hp_juice:
+		hp_juice.update_value(float(current), float(maximum))
+	elif hp_bar:
+		hp_bar.max_value = maximum
+		hp_bar.value = float(current)
+		if hp_damage_bar:
+			hp_damage_bar.max_value = maximum
+			hp_damage_bar.value = float(current)
+		_update_hp_label(current, maximum)
 
 	# Hide when dead
 	if current <= 0:

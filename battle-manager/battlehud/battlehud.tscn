@@ -3,6 +3,8 @@
 [ext_resource type="Script" uid="uid://835wmi7qej15" path="res://battle-manager/battlehud/battlehud.gd" id="1_0qukq"]
 [ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_uiugx"]
 [ext_resource type="Script" uid="uid://gl487spddx3j" path="res://battle-manager/battlehud/battle_text_display.gd" id="3_btt"]
+[ext_resource type="PackedScene" uid="uid://b5sfv2s0lombo" path="res://battle-manager/battlehud/turn_queue_card.tscn" id="4_ldk3v"]
+[ext_resource type="PackedScene" uid="uid://brk8oam2p4k7l" path="res://battle-manager/battlehud/turn_queue_card_wrapper.tscn" id="5_ejl8j"]
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://battle-manager/battlehud/battleresults.tscn" id="6_g4nh0"]
 [ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="7_cardui"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="7_p32nk"]
@@ -10,7 +12,8 @@
 [ext_resource type="Script" uid="uid://igumddyitxrw" path="res://battle-manager/effects/screen_flash.gd" id="9_flash"]
 [ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="10_input"]
 [ext_resource type="PackedScene" uid="uid://c57p8obm33ioi" path="res://battle-manager/battlehud/action_buttons.tscn" id="12_action_buttons"]
-[ext_resource type="PackedScene" path="res://battle-manager/battlehud/turn_queue_ui.tscn" id="13_turn_queue_ui"]
+[ext_resource type="PackedScene" uid="uid://d1n1invd7ckr8" path="res://battle-manager/battlehud/turn_queue_ui.tscn" id="13_turn_queue_ui"]
+[ext_resource type="PackedScene" uid="uid://c2byxwxttl5y2" path="res://battle-manager/cursor/cursor_system.tscn" id="14_cursor_system"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -27,6 +30,9 @@ grow_vertical = 2
 theme = ExtResource("2_uiugx")
 
 [node name="TurnQueueUI" parent="Control" unique_id=1146046375 instance=ExtResource("13_turn_queue_ui")]
+layout_mode = 1
+turn_queue_card_scene = ExtResource("4_ldk3v")
+turn_queue_card_wrapper_scene = ExtResource("5_ejl8j")
 
 [node name="BattleTextDisplay" type="Control" parent="Control" unique_id=-389943844]
 anchors_preset = 0
@@ -101,6 +107,7 @@ visible = false
 layout_mode = 1
 
 [node name="CardUI" type="Control" parent="Control" unique_id=999999999]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -124,6 +131,7 @@ theme_override_constants/separation = -20
 alignment = 1
 
 [node name="ActionButtons" parent="Control" unique_id=1087849572 instance=ExtResource("12_action_buttons")]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -247,5 +255,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(1, 1, 1, 0)
 script = ExtResource("9_flash")
+
+[node name="CursorSystem" parent="." unique_id=999999996 instance=ExtResource("14_cursor_system")]
 
 [connection signal="pressed" from="Control/BackButton" to="." method="_on_global_back_pressed"]

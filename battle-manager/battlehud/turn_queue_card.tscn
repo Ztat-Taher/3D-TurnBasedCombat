@@ -3,6 +3,11 @@
 [ext_resource type="Script" uid="uid://ctyw3qdm414ml" path="res://battle-manager/battlehud/turn_queue_card.gd" id="1_turn_card"]
 [ext_resource type="Texture2D" uid="uid://n0e72skevc4m" path="res://assets/images/ui/character_portrait.png" id="2_portrait"]
 [ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="4_c1j72"]
+[ext_resource type="Shader" path="res://assets/shaders/ui_background_shader.gdshader" id="5_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_c1j72"]
+shader = ExtResource("5_shader")
+shader_parameter/base_color = Color(0.1, 0.1, 0.15, 1)
 
 [node name="TurnQueueCard" type="Control" unique_id=753841087]
 clip_contents = true
@@ -15,13 +20,13 @@ script = ExtResource("1_turn_card")
 
 [node name="BackgroundShader" type="ColorRect" parent="." unique_id=410918133]
 z_index = -1
+material = SubResource("ShaderMaterial_c1j72")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.1, 0.1, 0.15, 1)
 
 [node name="MainVBox" type="VBoxContainer" parent="." unique_id=880716795]
 layout_mode = 1

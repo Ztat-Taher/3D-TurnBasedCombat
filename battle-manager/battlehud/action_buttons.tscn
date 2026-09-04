@@ -82,7 +82,7 @@ vertical_alignment = 1
 
 [node name="ButtonJuice" type="Node" parent="AttackWrapper/Attack" unique_id=1868925491]
 script = ExtResource("5_21sk8")
-hover_slide_enabled = false
+enable_sliding = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
 [node name="ItemsWrapper" type="Control" parent="." unique_id=2064134804]
@@ -135,7 +135,7 @@ vertical_alignment = 1
 
 [node name="ButtonJuice" type="Node" parent="ItemsWrapper/Items" unique_id=1210691270]
 script = ExtResource("5_21sk8")
-hover_slide_enabled = false
+enable_sliding = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
 [node name="RunWrapper" type="Control" parent="." unique_id=441753648]
@@ -188,7 +188,7 @@ vertical_alignment = 1
 
 [node name="ButtonJuice" type="Node" parent="RunWrapper/Run" unique_id=674618582]
 script = ExtResource("5_21sk8")
-hover_slide_enabled = false
+enable_sliding = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
 [node name="EndTurnWrapper" type="Control" parent="." unique_id=1348201994]
@@ -241,5 +241,5 @@ vertical_alignment = 1
 
 [node name="ButtonJuice" type="Node" parent="EndTurnWrapper/EndTurnButton" unique_id=615609777]
 script = ExtResource("5_21sk8")
-hover_slide_enabled = false
+enable_sliding = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"

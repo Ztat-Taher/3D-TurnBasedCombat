@@ -128,8 +128,8 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 	is_executing_card = true
 	if battle_manager:
 		battle_manager.is_animating = true
-		if battle_manager.hud:
-			battle_manager.hud.hide_action_buttons()
+		if battle_manager.hud and battle_manager.hud.has_method("set_ui_state"):
+			battle_manager.hud.set_ui_state(3) # CARD_EXECUTION_STATE
 	
 	# Camera choreography: wider view for player attack cards only
 	var card_type = card.metadata.get("card_type", "attack")
@@ -154,10 +154,6 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 	is_executing_card = false
 	if battle_manager:
 		battle_manager.is_animating = false
-		if battle_manager.hud and is_instance_valid(current_player_battler):
-			if battle_manager.hud.card_ui:
-				battle_manager.hud.card_ui.visible = true
-			battle_manager.hud.show_action_buttons(current_player_battler)
 	
 	card_played.emit(card, target)
 	
@@ -540,11 +536,9 @@ func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_m
 		if check_state_conditions(self_state_cfg, actor, actor):
 			self_state_cfg.apply_state(actor, actor)
 			
-	# Update HUD and health bars
-	if battle_manager:
-		if battle_manager.hud:
-			battle_manager.hud.update_health_bars()
-		battle_manager.update_hud()
+	# Update health bars only (don't call update_hud during card execution)
+	if battle_manager and battle_manager.hud:
+		battle_manager.hud.update_health_bars()
 
 ## Execute effects on hit frame
 func _execute_effects_on_hit(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
@@ -805,7 +799,6 @@ func start_player_turn() -> void:
 	if battle_manager and battle_manager.hud:
 		var card_ui = battle_manager.hud.get_node_or_null("Control/CardUI")
 		if card_ui:
-			card_ui.visible = true
 			if card_ui.has_method("update_hand_display"):
 				card_ui.update_hand_display()
 		if battle_manager.hud.has_method("update_party_status"):
@@ -815,6 +808,9 @@ func start_player_turn() -> void:
 				"max": ap_info.get("max_ap", 3)
 			}
 			battle_manager.hud.set_activebattler(current_player_battler)
+		# Set BASE_STATE at turn start (not show_action_buttons which might auto-select CardUI)
+		if battle_manager.hud.has_method("set_ui_state"):
+			battle_manager.hud.set_ui_state(0) # BASE_STATE
 
 func end_player_turn() -> void:
 	# If a card is currently playing out, wait for it to finish first

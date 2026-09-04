@@ -113,6 +113,7 @@ func _on_card_selected(card: CardData):
 		CardConfig.TargetScope.SELF:
 			# Execute immediately on self without targeting
 			if card_battle_manager and card_battle_manager.current_player_battler:
+				# Don't set CARD_EXECUTION_STATE here - play_card() handles it
 				card_battle_manager.play_card(card, card_battle_manager.current_player_battler)
 		
 		CardConfig.TargetScope.SINGLE_ENEMY:

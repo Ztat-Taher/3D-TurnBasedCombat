@@ -1,0 +1,73 @@
+[gd_scene format=3 uid="uid://c2byxwxttl5y2"]
+
+[ext_resource type="Script" uid="uid://hweq51x3ed3k" path="res://battle-manager/cursor/cursor_manager.gd" id="1_cursor_manager"]
+[ext_resource type="Script" uid="uid://bn1xbffpap3g8" path="res://battle-manager/cursor/cursor_display.gd" id="2_cursor_display"]
+[ext_resource type="Texture2D" uid="uid://civ88sr146ibq" path="res://assets/images/cursors/cursor_default.png" id="3_pv2k7"]
+[ext_resource type="Texture2D" uid="uid://dcw4i2eewrbd0" path="res://assets/images/cursors/cursor_attack.png" id="4_eqr23"]
+[ext_resource type="Texture2D" uid="uid://t0x151045p81" path="res://assets/images/cursors/cursor_interact.png" id="5_n8rhr"]
+[ext_resource type="Texture2D" uid="uid://5bsildqw8mgc" path="res://assets/images/cursors/cursor_targeting.png" id="6_3puft"]
+[ext_resource type="Texture2D" uid="uid://biirsroouiiyp" path="res://assets/images/cursors/hand_small_closed.png" id="6_press"]
+[ext_resource type="Script" uid="uid://45gyrg158vij" path="res://addons/trail_2d/trail_2d.gd" id="7_trail_script"]
+[ext_resource type="Script" uid="uid://c544b7m24uk1v" path="res://battle-manager/cursor/cursor_juice.gd" id="8_juice_script"]
+
+[sub_resource type="Curve" id="Curve_trail_width"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.5, 0.5), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[node name="CursorSystem" type="CanvasLayer" unique_id=824409362]
+script = ExtResource("1_cursor_manager")
+
+[node name="CursorDisplay" type="Control" parent="." unique_id=326236941 groups=["cursor_display"]]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_cursor_display")
+cursor_default_texture = ExtResource("3_pv2k7")
+cursor_attack_texture = ExtResource("4_eqr23")
+cursor_interact_texture = ExtResource("5_n8rhr")
+cursor_targeting_texture = ExtResource("6_3puft")
+cursor_press_texture = ExtResource("6_press")
+cursor_scale = 2.0
+
+[node name="CursorSprite" type="TextureRect" parent="CursorDisplay" unique_id=1015417382]
+unique_name_in_owner = true
+z_index = 100
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(32, 32)
+mouse_filter = 2
+texture = ExtResource("3_pv2k7")
+expand_mode = 1
+stretch_mode = 3
+
+[node name="CursorJuice" type="Node" parent="CursorDisplay" unique_id=183913409]
+unique_name_in_owner = true
+script = ExtResource("8_juice_script")
+
+[node name="TrailTracker" type="Node2D" parent="CursorDisplay" unique_id=2113584041]
+
+[node name="CursorTrail" type="Line2D" parent="CursorDisplay/TrailTracker" unique_id=241648747]
+unique_name_in_owner = true
+z_index = -1
+width = 15.0
+width_curve = SubResource("Curve_trail_width")
+default_color = Color(1, 1, 1, 0.5)
+script = ExtResource("7_trail_script")

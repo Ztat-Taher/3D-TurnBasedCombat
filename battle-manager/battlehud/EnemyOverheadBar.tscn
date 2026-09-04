@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://dfkkycfn3xtaf" path="res://assets/images/ui/enemy_bar_over.png" id="4_w53xi"]
 [ext_resource type="Texture2D" uid="uid://dy8paujgo1jsd" path="res://assets/images/ui/enemy_bar_progress.png" id="5_6rsgd"]
 [ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="6_0478o"]
+[ext_resource type="Script" uid="uid://domq7ntx86pay" path="res://battle-manager/effects/progress_bar_juice.gd" id="7_juice"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_r3a75"]
 shader = ExtResource("2_72fot")
@@ -113,3 +114,10 @@ theme_override_font_sizes/font_size = 10
 text = "100/100"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="HPJuice" type="Node" parent="VBox/HPBarRow" unique_id=1864643431 node_paths=PackedStringArray("main_bar", "trailing_bar", "associated_label")]
+script = ExtResource("7_juice")
+main_bar = NodePath("../HPBar")
+trailing_bar = NodePath("../HPDamageBar")
+associated_label = NodePath("../HPNumLabel")
+trail_duration = 1.0
