@@ -5,6 +5,7 @@ extends Control
 
 var enemy_battler: Battler = null
 var _camera: Camera3D = null
+var _viewport_scale: Vector2 = Vector2.ONE
 var _is_dying: bool = false
 
 # Height offset (world units) above the battler's origin
@@ -54,8 +55,7 @@ func _process(_delta: float) -> void:
 	if not is_instance_valid(enemy_battler) or _is_dying:
 		return
 
-	if not _camera:
-		_camera = get_viewport().get_camera_3d()
+	_resolve_camera()
 	if not _camera:
 		return
 
@@ -66,9 +66,27 @@ func _process(_delta: float) -> void:
 		return
 
 	modulate.a = 1.0
-	var screen_pos := _camera.unproject_position(world_pos)
+	# The camera renders at the SubViewport's low resolution, so scale the
+	# projected point back up into root HUD space.
+	var screen_pos := _camera.unproject_position(world_pos) * _viewport_scale
 	# Centre the bar on the projected point
 	position = screen_pos - size * 0.5
+
+## Resolve the gameplay camera once through the BattleManager's BattleCamera
+## controller (the camera lives inside the low-res SubViewport).
+func _resolve_camera() -> void:
+	if _camera and is_instance_valid(_camera):
+		return
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if not battle_manager:
+		return
+	var battle_camera = battle_manager.battle_camera
+	if not battle_camera:
+		return
+	var cam: Camera3D = battle_camera.get_camera()
+	if cam:
+		_camera = cam
+		_viewport_scale = battle_camera.get_viewport_scale()
 
 func _on_health_changed(current: int, maximum: int) -> void:
 	if not is_instance_valid(self):

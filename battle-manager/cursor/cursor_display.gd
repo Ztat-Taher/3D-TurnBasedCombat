@@ -21,6 +21,11 @@ enum CursorState {
 var current_state: CursorState = CursorState.DEFAULT
 var is_initialized: bool = false
 
+# True when PRESS was entered through this control's own mouse-press handler.
+# External owners (e.g. card dragging) keep the cursor in PRESS even after the
+# mouse button is released and are responsible for releasing it themselves.
+var _press_from_interact: bool = false
+
 # Scene node references
 @onready var cursor_sprite: TextureRect = $CursorSprite
 @onready var cursor_juice: CursorJuice = $CursorJuice
@@ -284,11 +289,15 @@ func _input(event: InputEvent) -> void:
 		if event.pressed:
 			# Switch to PRESS state if currently in INTERACT state
 			if current_state == CursorState.INTERACT:
+				_press_from_interact = true
 				set_cursor_state(CursorState.PRESS)
 			_on_cursor_clicked(event.position)
 		else:
-			# Release back to INTERACT if we were in PRESS
-			if current_state == CursorState.PRESS:
+			# Release back to INTERACT only if PRESS was entered through our own
+			# press handler. If another system owns the cursor (e.g. a card being
+			# dragged), that system is responsible for releasing the PRESS state.
+			if current_state == CursorState.PRESS and _press_from_interact:
+				_press_from_interact = false
 				set_cursor_state(CursorState.INTERACT)
 
 func _process(_delta: float) -> void:

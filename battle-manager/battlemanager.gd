@@ -1049,6 +1049,10 @@ func enemy_turn(character:Battler) -> void:
 	# SET THESE BEFORE AI CHOOSES ACTION
 	current_character = character
 	current_battler = character
+
+	# No ally is "active" during an enemy turn - clear any leftover highlight.
+	if hud:
+		hud.update_party_status()
 	
 	# Get all players (allies) as targets for enemies
 	var available_targets: Array = []

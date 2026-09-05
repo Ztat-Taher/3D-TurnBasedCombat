@@ -51,6 +51,14 @@ enum UIState {
 var current_ui_state: UIState = UIState.BASE_STATE
 var previous_ui_state: UIState = UIState.BASE_STATE
 
+# Resolve the active BattleCamera controller for projecting 3D battler
+# positions into HUD screen space (handles the low-res SubViewport scaling).
+func _get_battle_camera() -> BattleCamera:
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager:
+		return battle_manager.battle_camera as BattleCamera
+	return null
+
 func set_ui_state(new_state: Variant) -> void:
 	# Convert integer to UIState enum if needed
 	if typeof(new_state) == TYPE_INT:
@@ -239,13 +247,13 @@ func _process(_delta: float) -> void:
 		return
 	
 	if action_buttons and action_buttons.visible and activeBattler and is_instance_valid(activeBattler):
-		var cam = get_viewport().get_camera_3d()
-		if cam:
+		var battle_camera = _get_battle_camera()
+		if battle_camera:
 			# Project 3D position (chest/head height) to 2D screen coordinate
 			var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
 			# Only position if in front of camera
-			if not cam.is_position_behind(world_pos):
-				var screen_pos = cam.unproject_position(world_pos)
+			if not battle_camera.is_position_behind(world_pos):
+				var screen_pos = battle_camera.world_to_screen(world_pos)
 				# Position action buttons to the RIGHT of the character
 				var target_pos = screen_pos + Vector2(70.0, -50.0)
 				# Clamp to screen margins
@@ -315,6 +323,18 @@ func _create_ally_status_card(ally: Battler) -> Control:
 		return null
 
 func update_party_status() -> void:
+	# The "active" highlight may only appear for the ally that is currently
+	# taking their turn. When it's an enemy's turn (or before the first turn),
+	# every ally card must be inactive.
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	var is_player_turn := false
+	var acting_ally = activeBattler
+	if battle_manager and battle_manager.current_character:
+		acting_ally = battle_manager.current_character
+		is_player_turn = acting_ally in battle_manager.players
+	else:
+		is_player_turn = activeBattler != null
+
 	for ally in active_allies:
 		if not is_instance_valid(ally) or not ally_cards_map.has(ally):
 			continue
@@ -323,7 +343,7 @@ func update_party_status() -> void:
 		if not is_instance_valid(card):
 			continue
 		
-		var is_active = (ally == activeBattler)
+		var is_active = is_player_turn and ally == acting_ally
 		card.set_active(is_active)
 		
 		# Update HP
@@ -386,11 +406,11 @@ func show_action_buttons(character: Node):
 	
 	# Initial positioning near the battler
 	if activeBattler and is_instance_valid(activeBattler):
-		var cam = get_viewport().get_camera_3d()
-		if cam:
+		var battle_camera = _get_battle_camera()
+		if battle_camera:
 			var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
-			if not cam.is_position_behind(world_pos):
-				var screen_pos = cam.unproject_position(world_pos)
+			if not battle_camera.is_position_behind(world_pos):
+				var screen_pos = battle_camera.world_to_screen(world_pos)
 				var target_pos = screen_pos + Vector2(70.0, -50.0)
 				action_buttons.position = target_pos
 	
@@ -423,11 +443,11 @@ func show_action_buttons(character: Node):
 	
 	# Initial positioning near the battler
 	if activeBattler and is_instance_valid(activeBattler):
-		var cam = get_viewport().get_camera_3d()
-		if cam:
+		var battle_camera = _get_battle_camera()
+		if battle_camera:
 			var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
-			if not cam.is_position_behind(world_pos):
-				var screen_pos = cam.unproject_position(world_pos)
+			if not battle_camera.is_position_behind(world_pos):
+				var screen_pos = battle_camera.world_to_screen(world_pos)
 				var target_pos = screen_pos + Vector2(70.0, -50.0)
 				action_buttons.position = target_pos
 	

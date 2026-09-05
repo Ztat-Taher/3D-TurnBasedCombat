@@ -32,10 +32,13 @@ var _card_type_color: Color = Color.WHITE
 @onready var cost_background: Panel = get_node("CardPanel/Content/VBox/CostContainer")
 @onready var description_label: Label = get_node("CardPanel/Content/VBox/CardDescription")
 @onready var glow: Panel = get_node("Glow")
+@onready var card_shadow: Panel = get_node_or_null("CardPanel/CardShadow")
 
 var hover_tween: Tween
 var return_tween: Tween
 var card_shader_material: ShaderMaterial
+var card_shadow_material: ShaderMaterial
+var shadow_tween: Tween
 
 func setup(card: CardData) -> void:
 	card_data = card
@@ -96,8 +99,9 @@ func _ready():
 	if glow:
 		glow.pivot_offset = Vector2(64, 184)
 		glow.modulate.a = 0.0
-		
+
 	_setup_shader()
+	_setup_card_shadow()
 	_pop_in()
 
 func _setup_shader():
@@ -116,7 +120,52 @@ func _setup_shader():
 		card_shader_material.set_shader_parameter("cull_back", true)
 		card_shader_material.set_shader_parameter("hovering", 0.0)
 		# Do NOT set shader on card_panel - it has no TEXTURE, causing invisible cards
-		# Instead keep card_panel plain and use modulate for card type color
+		# Instead keep card_panel plain and use modulate for card type color.
+		# The card's drop shadow now comes from a dedicated CardShadow node using
+		# res://assets/shaders/drop_shadow.gdshader, so disable this shader's
+		# built-in shadow to avoid drawing two shadows at once.
+		card_shader_material.set_shader_parameter("shadow_strength", 0.0)
+
+func _setup_card_shadow() -> void:
+	if not card_shadow:
+		return
+	card_shadow.z_index = -1
+	card_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_shadow.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Plain rounded-rect silhouette (the shader reads only its alpha channel).
+	var shadow_style := StyleBoxFlat.new()
+	shadow_style.bg_color = Color(1, 1, 1, 1)
+	shadow_style.set_corner_radius_all(8)
+	card_shadow.add_theme_stylebox_override("panel", shadow_style)
+
+	card_shadow_material = ShaderMaterial.new()
+	card_shadow_material.shader = load("res://assets/shaders/drop_shadow.gdshader")
+	card_shadow_material.set_shader_parameter("shadow_offset", Vector2(0.0, 10.0))
+	card_shadow_material.set_shader_parameter("shadow_color", Color(0.0, 0.0, 0.0, 0.45))
+	card_shadow_material.set_shader_parameter("blur_amount", 2.0)
+	card_shadow_material.set_shader_parameter("disable_rotating", true)
+	card_shadow_material.set_shader_parameter("shadow_strength", 0.0)
+	card_shadow.material = card_shadow_material
+
+func _set_shadow_strength(strength: float, instant: bool = false) -> void:
+	if not card_shadow_material:
+		return
+	if instant:
+		card_shadow_material.set_shader_parameter("shadow_strength", strength)
+		return
+	if shadow_tween and shadow_tween.is_running():
+		shadow_tween.kill()
+	shadow_tween = create_tween()
+	var cur: float = card_shadow_material.get_shader_parameter("shadow_strength")
+	if cur == null:
+		cur = 0.0
+	shadow_tween.tween_method(
+		func(v: float) -> void:
+			card_shadow_material.set_shader_parameter("shadow_strength", v),
+		cur,
+		strength, 0.18
+	)
 
 func _set_card_type_color():
 	if not card_data or not card_panel:
@@ -199,6 +248,9 @@ func _animate_hover(hover: bool):
 	if card_shader_material:
 		hover_tween.tween_property(card_shader_material, "shader_parameter/hovering", 1.0 if hover else 0.0, 0.15)
 
+	# Fade the dedicated drop shadow in while hovering (card is held by the cursor).
+	_set_shadow_strength(1.0 if hover else 0.0)
+
 func _process(delta: float) -> void:
 	var mouse_pos = get_viewport().get_mouse_position()
 	
@@ -268,6 +320,8 @@ func _start_drag():
 	
 	is_dragging = true
 	z_index = 200
+	# Card is being held by the cursor, so show the drop shadow immediately.
+	_set_shadow_strength(1.0, true)
 	
 	var mouse_pos = get_viewport().get_mouse_position()
 	# Drag offset relative to card_panel's global position
@@ -290,6 +344,8 @@ func _end_drag():
 		return
 	
 	is_dragging = false
+	# Back in the hand (or played) -> shadow fades to match resting hover state.
+	_set_shadow_strength(1.0 if is_hovered else 0.0)
 	
 	var mouse_pos = get_viewport().get_mouse_position()
 	var vp_rect = get_viewport().get_visible_rect()

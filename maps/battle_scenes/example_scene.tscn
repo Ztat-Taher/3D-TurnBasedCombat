@@ -2,7 +2,15 @@
 
 [ext_resource type="PackedScene" uid="uid://wxuxctidimwu" path="res://battle-manager/allies/y_bot-ally.tscn" id="1_2aqym"]
 [ext_resource type="PackedScene" uid="uid://bvhah4cfn4txb" path="res://battle-manager/BattleManager.tscn" id="1_t14x8"]
+[ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="3_w26bt"]
 [ext_resource type="Resource" uid="uid://d0noky2jlhk4u" path="res://database/troops/test_troop.tres" id="3_yxp8s"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_pt4kv"]
+shader = ExtResource("3_w26bt")
+shader_parameter/enabled = true
+shader_parameter/dithering = true
+shader_parameter/colors = 16
+shader_parameter/dither_size = 1
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_2ddfu"]
 sky_top_color = Color(0.447336, 0.519571, 0.620102, 1)
@@ -24,30 +32,50 @@ albedo_color = Color(0.192279, 0.227401, 0.23218, 1)
 [node name="Battle-Manager" unique_id=241725287 node_paths=PackedStringArray("enemy_markers") instance=ExtResource("1_t14x8")]
 speed_key = "Tab"
 speed_increase_amount = 2.0
+speed_is_toggle = true
+formation_spacing = 4.0
 active_troop = ExtResource("3_yxp8s")
-enemy_markers = NodePath("FRONTROW")
+enemy_markers = NodePath("SubViewportContainer/SubViewport/FRONTROW")
+use_procedural_formation = false
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." index="1" unique_id=1830630196]
+[node name="SubViewportContainer" type="SubViewportContainer" parent="." index="1" unique_id=1175905045]
+material = SubResource("ShaderMaterial_pt4kv")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 6
+size_flags_vertical = 6
+stretch = true
+stretch_shrink = 2
+
+[node name="SubViewport" type="SubViewport" parent="SubViewportContainer" index="0" unique_id=1614226519]
+handle_input_locally = false
+size = Vector2i(640, 360)
+render_target_update_mode = 4
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="SubViewportContainer/SubViewport" index="0" unique_id=1830630196]
 environment = SubResource("Environment_misr6")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment" index="0" unique_id=1312529796]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport/WorldEnvironment" index="0" unique_id=1312529796]
 transform = Transform3D(1, 0, 0, 0, 0.0715845, 0.997435, 0, -0.997435, 0.0715845, 0, 17.7598, 0)
 light_energy = 1.646
 shadow_enabled = true
 
-[node name="Platform" type="CSGBox3D" parent="." index="2" unique_id=716479702]
+[node name="Platform" type="CSGBox3D" parent="SubViewportContainer/SubViewport" index="1" unique_id=716479702]
 use_collision = true
 size = Vector3(100, 0.5, 100)
 material = SubResource("StandardMaterial3D_3fc4g")
 
-[node name="Ally1" parent="." index="3" unique_id=306467406 instance=ExtResource("1_2aqym")]
+[node name="Ally1" parent="SubViewportContainer/SubViewport" index="2" unique_id=306467406 instance=ExtResource("1_2aqym")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.260986, -1.00599)
 
-[node name="Ally2" parent="." index="4" unique_id=1684378736 instance=ExtResource("1_2aqym")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.260986, -1.00599)
+[node name="Ally2" parent="SubViewportContainer/SubViewport" index="3" unique_id=1684378736 instance=ExtResource("1_2aqym")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.25, -1)
 
-[node name="Camera3D" type="Camera3D" parent="." index="5" unique_id=1327336196]
-transform = Transform3D(-0.730587, -0.228461, 0.643466, -0.0331128, 0.953111, 0.300804, -0.682016, 0.198457, -0.703896, 2.48554, 3.00572, -3.08627)
+[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport" index="4" unique_id=1327336196 groups=["battle_camera"]]
+transform = Transform3D(-0.73058707, -0.2284613, 0.6434656, -0.033112805, 0.953111, 0.30080417, -0.6820161, 0.19845673, -0.7038955, 2.48554, 3.00572, -3.08627)
 
-[node name="FRONTROW" type="Marker3D" parent="." index="6" unique_id=952362055 groups=["FRONTROW"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 3)
+[node name="FRONTROW" type="Marker3D" parent="SubViewportContainer/SubViewport" index="5" unique_id=952362055 groups=["FRONTROW"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 3.5)

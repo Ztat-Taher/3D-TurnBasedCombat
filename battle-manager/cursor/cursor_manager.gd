@@ -17,6 +17,11 @@ var current_state: int = CursorDisplay.CursorState.DEFAULT
 # Previous cursor state (for restoring after special states)
 var previous_state: int = CursorDisplay.CursorState.DEFAULT
 
+# When true, the cursor is locked in its PRESS state by an external system
+# (e.g. a card being dragged). While occupied, hover/targeting updates are
+# ignored so the cursor stays in its PRESS form until the system releases it.
+var is_occupied: bool = false
+
 # Reference to cursor display
 var cursor_display: CursorDisplay
 
@@ -122,6 +127,11 @@ func set_cursor_state(new_state: int) -> void:
 		return
 	
 	if current_state == new_state:
+		return
+	
+	# While another system occupies the cursor (e.g. dragging a card), ignore
+	# hover/targeting updates so it stays in its PRESS form.
+	if is_occupied and new_state != CursorDisplay.CursorState.PRESS:
 		return
 	
 	# Save previous state if entering a special state
@@ -350,10 +360,30 @@ func _on_hover_target(battler: Battler) -> void:
 
 # Public methods for game systems to control cursor
 
+## Locks or unlocks the cursor in its PRESS state while an external system
+## (such as dragging a card) is holding the mouse button. While occupied, hover
+## and targeting updates are ignored and the cursor stays in its PRESS form.
+func set_cursor_occupied(occupied: bool) -> void:
+	is_occupied = occupied
+	if occupied:
+		current_state = CursorDisplay.CursorState.PRESS
+		last_state_change_time = Time.get_ticks_msec() / 1000.0
+		if cursor_display:
+			cursor_display.set_cursor_state(CursorDisplay.CursorState.PRESS)
+		cursor_state_changed.emit(_get_state_name(CursorDisplay.CursorState.PRESS))
+	else:
+		hovered_button = null
+		current_state = CursorDisplay.CursorState.DEFAULT
+		last_state_change_time = Time.get_ticks_msec() / 1000.0
+		if cursor_display:
+			cursor_display.set_cursor_state(CursorDisplay.CursorState.DEFAULT)
+		cursor_state_changed.emit(_get_state_name(CursorDisplay.CursorState.DEFAULT))
+
 func force_cursor_state(state: int) -> void:
 	# Force a specific cursor state (bypasses auto-detection and hover guard)
 	if state == CursorDisplay.CursorState.DEFAULT:
 		hovered_button = null
+		is_occupied = false
 	current_state = state
 	last_state_change_time = Time.get_ticks_msec() / 1000.0
 	if cursor_display:

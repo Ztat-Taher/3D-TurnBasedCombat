@@ -10,6 +10,10 @@ uniform vec4 shadow_color : source_color = vec4(0.0, 0.0, 0.0, 0.4);
 uniform float blur_amount : hint_range(0.0, 5.0) = 1.5;
 uniform float shadow_scale : hint_range(1.0, 2.0) = 1.05;
 uniform bool disable_rotating = false;
+// Fade the built-in drop shadow (0 = none, 1 = full). The card_button scene
+// drives this so its always-on shadow can be disabled in favour of the
+// dedicated CardShadow node's appear/disappear behaviour.
+uniform float shadow_strength : hint_range(0.0, 1.0) = 1.0;
 
 // 3D Perspective controls
 uniform float fov : hint_range(1, 179) = 90.0;
@@ -150,7 +154,7 @@ vec4 process_texture(vec2 uv, sampler2D tex, bool is_main, vec2 pixel_size) {
 	float fade_y = calculate_fade(uv.y, shadow_scale);
 	float fade = smoothstep(0.0, 1.0, min(fade_x, fade_y));
 	
-	return vec4(shadow_color.rgb, (blurred.a - (1.0 - shadow_color.a)) * modulate.a * fade);
+		return vec4(shadow_color.rgb, (blurred.a - (1.0 - shadow_color.a)) * modulate.a * fade * shadow_strength);
 }
 
 void fragment() {

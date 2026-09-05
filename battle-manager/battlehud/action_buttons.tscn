@@ -9,6 +9,7 @@
 [ext_resource type="Texture2D" uid="uid://canwm08m3musu" path="res://assets/images/ui/items.png" id="6_items_tex"]
 [ext_resource type="Texture2D" uid="uid://bramr4vhhulsw" path="res://assets/images/ui/run.png" id="7_run_tex"]
 [ext_resource type="Texture2D" uid="uid://dmqu76l8ut0f4" path="res://assets/images/ui/end.png" id="8_end_tex"]
+[ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://battle-manager/effects/drop_shadow.gd" id="8_mnswn"]
 [ext_resource type="Script" uid="uid://rwcygibspbd8" path="res://battle-manager/effects/container_juice.gd" id="9_container_juice"]
 
 [node name="ActionButtons" type="BoxContainer" unique_id=74957540]
@@ -85,6 +86,19 @@ script = ExtResource("5_21sk8")
 enable_sliding = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
+[node name="Shadow" type="TextureRect" parent="AttackWrapper/Attack" unique_id=9001001]
+z_index = -1
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("8_mnswn")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
+
 [node name="ItemsWrapper" type="Control" parent="." unique_id=2064134804]
 custom_minimum_size = Vector2(32, 64)
 layout_mode = 2
@@ -137,6 +151,20 @@ vertical_alignment = 1
 script = ExtResource("5_21sk8")
 enable_sliding = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Shadow" type="TextureRect" parent="ItemsWrapper/Items" unique_id=650896891]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("8_mnswn")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
 
 [node name="RunWrapper" type="Control" parent="." unique_id=441753648]
 custom_minimum_size = Vector2(32, 64)
@@ -191,6 +219,20 @@ script = ExtResource("5_21sk8")
 enable_sliding = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
 
+[node name="Shadow" type="TextureRect" parent="RunWrapper/Run" unique_id=1876541643]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("8_mnswn")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
+
 [node name="EndTurnWrapper" type="Control" parent="." unique_id=1348201994]
 custom_minimum_size = Vector2(32, 64)
 layout_mode = 2
@@ -243,3 +285,17 @@ vertical_alignment = 1
 script = ExtResource("5_21sk8")
 enable_sliding = false
 metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Shadow" type="TextureRect" parent="EndTurnWrapper/EndTurnButton" unique_id=1022856279]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("8_mnswn")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5

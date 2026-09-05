@@ -59,7 +59,18 @@ var previous_value: float = 0.0
 var max_value: float = 100.0
 var original_bar_modulate: Color
 var original_label_position: Vector2
+var original_label_offset: Vector2 = Vector2.ZERO
 var original_label_scale: Vector2
+
+# Tween handles so overlapping juice events kill prior animations instead of
+# leaving the bar/label stranded mid-animation (which caused label drift).
+var _label_shake_tween: Tween
+var _label_pop_tween: Tween
+var _damage_tween: Tween
+var _damage_scale_tween: Tween
+var _heal_tween: Tween
+var _heal_scale_tween: Tween
+var _critical_tween: Tween
 var critical_health_timer: Timer = null
 var is_critical: bool = false
 
@@ -80,17 +91,20 @@ func _auto_setup_from_parent() -> void:
 		if child is TextureProgressBar:
 			progress_bars.append(child)
 	
-	# If we have progress bars, set them up
-	if progress_bars.size() >= 1:
+	# If we have progress bars, set them up. Refs that were explicitly
+	# configured on the node (via node_paths in the scene) always win over
+	# auto-detection - auto-assignment must not overwrite the correct order.
+	if progress_bars.size() >= 1 and not main_bar:
 		main_bar = progress_bars[0]
 		if progress_bars.size() >= 2:
 			trailing_bar = progress_bars[1]
 	
 	# Look for Label sibling
-	for child in parent.get_children():
-		if child is Label:
-			associated_label = child
-			break
+	if not associated_label:
+		for child in parent.get_children():
+			if child is Label:
+				associated_label = child
+				break
 	
 	# If we found a main bar, setup with it
 	if main_bar:
@@ -119,7 +133,11 @@ func setup(bar: TextureProgressBar, damage_bar: TextureProgressBar = null, label
 			trailing_bar.pivot_offset = trailing_bar.size / 2.0
 	
 	if associated_label:
+		# Capture both the layout position and the raw anchored offsets. The
+		# offsets are layout-independent and are what we restore afterwards, so
+		# a layout that hasn't resolved yet can't bake in a stale position.
 		original_label_position = associated_label.position
+		original_label_offset = Vector2(associated_label.offset_left, associated_label.offset_top)
 		original_label_scale = associated_label.scale
 	
 	# Setup critical health timer
@@ -175,20 +193,22 @@ func _animate_damage_feedback() -> void:
 	if not main_bar:
 		return
 	
-	var tween = create_tween()
-	tween.set_parallel(true)
+	_kill_bar_tweens()
+	
+	_damage_tween = create_tween()
+	_damage_tween.set_parallel(true)
 	
 	# Red flash
 	if use_easing:
-		tween.set_ease(Tween.EASE_OUT)
+		_damage_tween.set_ease(Tween.EASE_OUT)
 	
-	tween.tween_property(main_bar, "modulate", damage_flash_color, damage_flash_duration)
-	tween.tween_property(main_bar, "modulate", original_bar_modulate, damage_flash_recovery)
+	_damage_tween.tween_property(main_bar, "modulate", damage_flash_color, damage_flash_duration)
+	_damage_tween.tween_property(main_bar, "modulate", original_bar_modulate, damage_flash_recovery)
 	
 	# Scale pulse
-	var scale_tween = create_tween()
-	scale_tween.tween_property(main_bar, "scale", damage_scale_pulse, damage_scale_duration).set_ease(Tween.EASE_OUT)
-	scale_tween.tween_property(main_bar, "scale", Vector2.ONE, damage_scale_recovery).set_ease(Tween.EASE_IN)
+	_damage_scale_tween = create_tween()
+	_damage_scale_tween.tween_property(main_bar, "scale", damage_scale_pulse, damage_scale_duration).set_ease(Tween.EASE_OUT)
+	_damage_scale_tween.tween_property(main_bar, "scale", Vector2.ONE, damage_scale_recovery).set_ease(Tween.EASE_IN)
 	
 	# Text juice
 	if enable_text_juice and associated_label:
@@ -198,20 +218,22 @@ func _animate_healing_feedback() -> void:
 	if not main_bar:
 		return
 	
-	var tween = create_tween()
-	tween.set_parallel(true)
+	_kill_bar_tweens()
+	
+	_heal_tween = create_tween()
+	_heal_tween.set_parallel(true)
 	
 	# Green flash
 	if use_easing:
-		tween.set_ease(Tween.EASE_OUT)
+		_heal_tween.set_ease(Tween.EASE_OUT)
 	
-	tween.tween_property(main_bar, "modulate", healing_flash_color, healing_flash_duration)
-	tween.tween_property(main_bar, "modulate", original_bar_modulate, healing_flash_recovery)
+	_heal_tween.tween_property(main_bar, "modulate", healing_flash_color, healing_flash_duration)
+	_heal_tween.tween_property(main_bar, "modulate", original_bar_modulate, healing_flash_recovery)
 	
 	# Scale growth
-	var scale_tween = create_tween()
-	scale_tween.tween_property(main_bar, "scale", healing_scale_growth, healing_scale_duration).set_ease(Tween.EASE_OUT)
-	scale_tween.tween_property(main_bar, "scale", Vector2.ONE, healing_scale_recovery).set_ease(Tween.EASE_IN)
+	_heal_scale_tween = create_tween()
+	_heal_scale_tween.tween_property(main_bar, "scale", healing_scale_growth, healing_scale_duration).set_ease(Tween.EASE_OUT)
+	_heal_scale_tween.tween_property(main_bar, "scale", Vector2.ONE, healing_scale_recovery).set_ease(Tween.EASE_IN)
 	
 	# Text juice
 	if enable_text_juice and associated_label:
@@ -221,26 +243,53 @@ func _animate_text_damage() -> void:
 	if not associated_label:
 		return
 	
+	_kill_label_tweens()
+	
 	if enable_text_shake:
 		var original_pos = original_label_position
-		var shake_tween = create_tween()
-		shake_tween.tween_property(associated_label, "position:x", original_pos.x + text_shake_intensity, 0.05)
-		shake_tween.tween_property(associated_label, "position:x", original_pos.x - text_shake_intensity, 0.05)
-		shake_tween.tween_property(associated_label, "position:x", original_pos.x, 0.05)
+		_label_shake_tween = create_tween()
+		_label_shake_tween.tween_property(associated_label, "position:x", original_pos.x + text_shake_intensity, 0.05)
+		_label_shake_tween.tween_property(associated_label, "position:x", original_pos.x - text_shake_intensity, 0.05)
+		_label_shake_tween.tween_property(associated_label, "position:x", original_pos.x, 0.05)
+		# Hard-reset to the anchored layout so overlapping updates can never
+		# leave the label offset from its original position.
+		_label_shake_tween.tween_callback(_restore_label_layout)
 	
 	if enable_text_pop:
-		var pop_tween = create_tween()
-		pop_tween.tween_property(associated_label, "scale", original_label_scale * text_pop_scale, text_pop_duration).set_ease(Tween.EASE_OUT)
-		pop_tween.tween_property(associated_label, "scale", original_label_scale, text_pop_duration * 1.5).set_ease(Tween.EASE_IN)
+		_label_pop_tween = create_tween()
+		_label_pop_tween.tween_property(associated_label, "scale", original_label_scale * text_pop_scale, text_pop_duration).set_ease(Tween.EASE_OUT)
+		_label_pop_tween.tween_property(associated_label, "scale", original_label_scale, text_pop_duration * 1.5).set_ease(Tween.EASE_IN)
 
 func _animate_text_healing() -> void:
 	if not associated_label:
 		return
 	
 	if enable_text_pop:
-		var pop_tween = create_tween()
-		pop_tween.tween_property(associated_label, "scale", original_label_scale * text_pop_scale, text_pop_duration).set_ease(Tween.EASE_OUT)
-		pop_tween.tween_property(associated_label, "scale", original_label_scale, text_pop_duration * 1.5).set_ease(Tween.EASE_IN)
+		_kill_label_tweens()
+		_label_pop_tween = create_tween()
+		_label_pop_tween.tween_property(associated_label, "scale", original_label_scale * text_pop_scale, text_pop_duration).set_ease(Tween.EASE_OUT)
+		_label_pop_tween.tween_property(associated_label, "scale", original_label_scale, text_pop_duration * 1.5).set_ease(Tween.EASE_IN)
+
+func _kill_label_tweens() -> void:
+	if _label_shake_tween and _label_shake_tween.is_valid() and _label_shake_tween.is_running():
+		_label_shake_tween.kill()
+	if _label_pop_tween and _label_pop_tween.is_valid() and _label_pop_tween.is_running():
+		_label_pop_tween.kill()
+
+func _kill_bar_tweens() -> void:
+	for tween in [_damage_tween, _damage_scale_tween, _heal_tween, _heal_scale_tween, _critical_tween]:
+		if tween and tween.is_valid() and tween.is_running():
+			tween.kill()
+
+## Restores the associated label to its design-time anchored offsets. Offsets
+## are layout-independent, so this is safe even when the label is anchored
+## (e.g. centred on a bar) and its position was captured before layout.
+func _restore_label_layout() -> void:
+	if not associated_label:
+		return
+	associated_label.offset_left = original_label_offset.x
+	associated_label.offset_top = original_label_offset.y
+	associated_label.scale = original_label_scale
 
 func _update_critical_health(current_value: float) -> void:
 	if not enable_critical_health or max_value == 0:
@@ -276,9 +325,11 @@ func _on_critical_pulse() -> void:
 	if not main_bar or not is_critical:
 		return
 	
-	var tween = create_tween()
-	tween.tween_property(main_bar, "modulate", critical_pulse_color, critical_pulse_duration * 0.5)
-	tween.tween_property(main_bar, "modulate", original_bar_modulate, critical_pulse_duration * 0.5)
+	if _critical_tween and _critical_tween.is_valid() and _critical_tween.is_running():
+		_critical_tween.kill()
+	_critical_tween = create_tween()
+	_critical_tween.tween_property(main_bar, "modulate", critical_pulse_color, critical_pulse_duration * 0.5)
+	_critical_tween.tween_property(main_bar, "modulate", original_bar_modulate, critical_pulse_duration * 0.5)
 
 func animate_entrance() -> void:
 	if not main_bar:
@@ -325,6 +376,9 @@ func set_critical_health_enabled(enabled: bool) -> void:
 		_stop_critical_health()
 
 func reset_to_original() -> void:
+	_kill_label_tweens()
+	_kill_bar_tweens()
+	
 	if main_bar:
 		main_bar.scale = Vector2.ONE
 		main_bar.modulate = original_bar_modulate
@@ -334,8 +388,7 @@ func reset_to_original() -> void:
 		trailing_bar.modulate = original_bar_modulate
 	
 	if associated_label:
-		associated_label.position = original_label_position
-		associated_label.scale = original_label_scale
+		_restore_label_layout()
 	
 	_stop_critical_health()
 

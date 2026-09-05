@@ -33,24 +33,117 @@ func _ready() -> void:
 	call_deferred("_setup_camera")
 
 func _setup_camera() -> void:
-	if not camera:
-		camera = get_viewport().get_camera_3d()
-	if not camera:
-		var parent_camera = get_parent().get_node_or_null("Camera3D")
-		if parent_camera is Camera3D:
-			camera = parent_camera
-	if not camera:
-		camera = get_tree().get_first_node_in_group("battle_camera") as Camera3D
-		
+	if not camera or not is_instance_valid(camera):
+		camera = _find_camera()
 	if camera:
 		_default_transform = camera.global_transform
 		_default_fov = camera.fov
+
+## Resolves the gameplay Camera3D wherever it lives:
+##  - the active camera of this controller's own viewport (legacy layout)
+##  - a Camera3D child of the parent node (legacy layout)
+##  - a camera in the "battle_camera" group (recommended for SubViewport layouts)
+##  - any active camera found inside a SubViewport of the current scene
+func _find_camera() -> Camera3D:
+	if not is_inside_tree():
+		return null
+	# 1) Active camera of our own viewport.
+	var own_cam := get_viewport().get_camera_3d()
+	if own_cam is Camera3D:
+		return own_cam
+	# 2) A Camera3D child of our parent (legacy battle layout).
+	var parent := get_parent()
+	if parent:
+		var parent_camera = parent.get_node_or_null("Camera3D")
+		if parent_camera is Camera3D:
+			return parent_camera
+	# 3) Explicit group hook (recommended for SubViewport battle layouts).
+	var grouped := get_tree().get_first_node_in_group("battle_camera")
+	if grouped is Camera3D:
+		return grouped
+	# 4) Generic fallback: scan SubViewports in the current scene.
+	for viewport in _find_sub_viewports(get_tree().current_scene):
+		var sub_cam := viewport.get_camera_3d()
+		if sub_cam:
+			return sub_cam
+	return null
+
+func _find_sub_viewports(node: Node) -> Array[SubViewport]:
+	var result: Array[SubViewport] = []
+	if node == null:
+		return result
+	if node is SubViewport:
+		result.append(node)
+	for child in node.get_children():
+		result.append_array(_find_sub_viewports(child))
+	return result
 
 func set_default_camera() -> void:
 	current_mode = CameraMode.DEFAULT
 	if not camera:
 		return
 	_animate_camera(_default_transform, _default_fov)
+
+## Returns the resolved gameplay camera (re-resolves on demand).
+func get_camera() -> Camera3D:
+	if not camera or not is_instance_valid(camera):
+		camera = _find_camera()
+	return camera
+
+## Ratio between the root HUD viewport's coordinate space and the gameplay
+## SubViewport's render space (e.g. 2x when a 640x360 viewport fills a 1280x720
+## window). Unprojected camera coordinates must be multiplied by this to land in
+## root HUD space.
+func get_viewport_scale() -> Vector2:
+	var cam := get_camera()
+	if not cam:
+		return Vector2.ONE
+	var vp := cam.get_viewport()
+	if not vp:
+		return Vector2.ONE
+	var view_size := Vector2(vp.get_visible_rect().size)
+	if view_size.x <= 0.0 or view_size.y <= 0.0:
+		return Vector2.ONE
+	var root_vp := get_viewport()
+	if not root_vp:
+		return Vector2.ONE
+	var root_size := Vector2(root_vp.get_visible_rect().size)
+	if root_size.x <= 0.0 or root_size.y <= 0.0:
+		return Vector2.ONE
+	return Vector2(root_size.x / view_size.x, root_size.y / view_size.y)
+
+## Project a world-space position into root HUD screen coordinates.
+func world_to_screen(world_pos: Vector3) -> Vector2:
+	var cam := get_camera()
+	if not cam:
+		return Vector2.ZERO
+	return cam.unproject_position(world_pos) * get_viewport_scale()
+
+## Convert a root-HUD screen point to the gameplay camera's viewport space.
+func screen_to_viewport(screen_point: Vector2) -> Vector2:
+	return screen_point / get_viewport_scale()
+
+## World-space ray origin for a root-HUD mouse position (used for mouse
+## targeting while the camera lives inside a low-res SubViewport).
+func project_ray_origin(screen_point: Vector2) -> Vector3:
+	var cam := get_camera()
+	if not cam:
+		return Vector3.ZERO
+	return cam.project_ray_origin(screen_to_viewport(screen_point))
+
+## World-space ray direction for a root-HUD mouse position.
+func project_ray_normal(screen_point: Vector2) -> Vector3:
+	var cam := get_camera()
+	if not cam:
+		return Vector3.ZERO
+	return cam.project_ray_normal(screen_to_viewport(screen_point))
+
+## True if a world-space position is behind the gameplay camera.
+func is_position_behind(world_pos: Vector3) -> bool:
+	var cam := get_camera()
+	if not cam:
+		return false
+	return cam.is_position_behind(world_pos)
 
 func _get_or_create_instance(scene: PackedScene, cached_instance: Camera3D) -> Camera3D:
 	if is_instance_valid(cached_instance):

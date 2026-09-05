@@ -299,8 +299,6 @@ func return_card_to_hand(card_button: CardButton) -> void:
 			card_button.z_index = card_button.base_z_index
 			card_button.is_hovered = false
 			card_button.is_dragging = false
-			if card_button.drop_shadow:
-				card_button.drop_shadow.reset()
 			if card_button.card_panel:
 				card_button.card_panel.position = Vector2(0.0, card_button.base_y_offset)
 				card_button.card_panel.rotation_degrees = card_button.base_rotation

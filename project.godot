@@ -42,6 +42,13 @@ AIManager="*res://battle-manager/ai_manager.gd"
 SignalBus="*res://assets/globals/signal_bus.gd"
 ItemHandler="*res://inventory/item_handler.gd"
 MCPRuntime="*uid://fj17x84g2o5q"
+DebugMenu="*uid://cggqb75a8w8r"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
 
 [dotnet]
 
@@ -49,7 +56,7 @@ project/assembly_name="Turn-Based Combat"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/anthonyec.camera_preview/plugin.cfg", "res://addons/card_combat/plugin.cfg", "res://addons/godot_mcp/plugin.cfg")
+enabled=PackedStringArray("res://addons/anthonyec.camera_preview/plugin.cfg", "res://addons/card_combat/plugin.cfg", "res://addons/debug_menu/plugin.cfg", "res://addons/godot_mcp/plugin.cfg")
 
 [file_customization]
 
@@ -207,3 +214,4 @@ attack={
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
+shading/overrides/force_vertex_shading=true
