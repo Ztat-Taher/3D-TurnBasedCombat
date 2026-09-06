@@ -27,7 +27,19 @@ signal end_turn_pressed
 @onready var move_banner: Control = $Control/MoveBanner
 @onready var move_banner_actor: Label = $Control/MoveBanner/Panel/VBox/ActorLabel
 @onready var move_banner_label: Label = $Control/MoveBanner/Panel/VBox/MoveLabel
-@onready var cursor_system: CursorManager = $CursorSystem
+@onready var cursor_system: CursorManager = _resolve_cursor_system()
+
+## The cursor system is a global autoload (CursorSystem) so that menus get the
+## custom cursor too; falls back to a local child if one is instanced here.
+func _resolve_cursor_system() -> CursorManager:
+	if has_node("CursorSystem"):
+		return get_node("CursorSystem") as CursorManager
+	var autoload_instance := get_node_or_null("/root/CursorSystem") as CursorManager
+	if autoload_instance:
+		return autoload_instance
+	var local_system := CursorManager.new()
+	add_child(local_system)
+	return local_system
 
 var aoe_confirm_button: Button = null
 

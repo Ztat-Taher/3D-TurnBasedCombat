@@ -71,6 +71,10 @@ func _ready() -> void:
 	button_exit_timer.one_shot = true
 	add_child(button_exit_timer)
 	button_exit_timer.timeout.connect(_on_button_exit_timeout)
+	
+	# Track buttons added later (menus, popups and battles are loaded after
+	# this autoload starts) so hover states work in every scene.
+	get_tree().node_added.connect(_on_tree_node_added)
 
 func _setup_cursor_display() -> void:
 	# Try to find existing cursor display in the scene first
@@ -138,6 +142,9 @@ func set_cursor_state(new_state: int) -> void:
 	if new_state == CursorDisplay.CursorState.TARGETING or new_state == CursorDisplay.CursorState.ATTACK:
 		previous_state = current_state
 	
+	# A scene change can free the hovered button without a mouse_exited event.
+	if hovered_button and not is_instance_valid(hovered_button):
+		hovered_button = null
 	# Don't allow DEFAULT to override INTERACT when hovering a button, unless forced
 	if hovered_button and new_state == CursorDisplay.CursorState.DEFAULT:
 		return
@@ -179,6 +186,8 @@ func _get_state_name(state: int) -> String:
 
 func restore_previous_state() -> void:
 	# Don't restore if still hovering an interactive element
+	if hovered_button and not is_instance_valid(hovered_button):
+		hovered_button = null
 	if hovered_button:
 		return
 	set_cursor_state(previous_state)
@@ -195,14 +204,21 @@ func _connect_to_buttons() -> void:
 	
 	# Connect to button signals
 	for button in buttons:
-		if button.has_signal("mouse_entered"):
-			if not button.mouse_entered.is_connected(_on_button_mouse_entered):
-				button.mouse_entered.connect(_on_button_mouse_entered.bind(button))
-		if button.has_signal("mouse_exited"):
-			if not button.mouse_exited.is_connected(_on_button_mouse_exited):
-				button.mouse_exited.connect(_on_button_mouse_exited.bind(button))
+		_connect_button_hover_signals(button)
 	
 	print("CursorManager: Connected to ", buttons.size(), " buttons for hover detection")
+
+func _connect_button_hover_signals(button: Control) -> void:
+	if button.has_signal("mouse_entered") and not button.mouse_entered.is_connected(_on_button_mouse_entered):
+		button.mouse_entered.connect(_on_button_mouse_entered.bind(button))
+	if button.has_signal("mouse_exited") and not button.mouse_exited.is_connected(_on_button_mouse_exited):
+		button.mouse_exited.connect(_on_button_mouse_exited.bind(button))
+
+func _on_tree_node_added(node: Node) -> void:
+	# Buttons created after startup (menus, popups, the battle HUD) need hover
+	# connections too; this keeps the custom cursor working in every scene.
+	if node is Button or node is TextureButton:
+		_connect_button_hover_signals(node)
 
 func _find_buttons_recursive(node: Node, buttons: Array) -> void:
 	# Check if this node is a button
@@ -238,7 +254,8 @@ func notify_hover_exited(element: Control) -> void:
 
 func _on_button_exit_timeout() -> void:
 	# Only revert if we're not on a button and in INTERACT or PRESS state
-	if not hovered_button and (current_state == CursorDisplay.CursorState.INTERACT or current_state == CursorDisplay.CursorState.PRESS):
+	if not is_instance_valid(hovered_button) and (current_state == CursorDisplay.CursorState.INTERACT or current_state == CursorDisplay.CursorState.PRESS):
+		hovered_button = null
 		restore_previous_state()
 
 func _coordinate_with_effects(new_state: int) -> void:

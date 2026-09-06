@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/game/levels/battle_level.gd" id="1_level"]
+[ext_resource type="PackedScene" uid="uid://b56ncgnrwugct" path="res://maps/battle_scenes/example_scene.tscn" id="2_battle"]
+
+[node name="BattleLevel1" type="Node3D"]
+script = ExtResource("1_level")
+
+[node name="Battle" parent="." instance=ExtResource("2_battle")]

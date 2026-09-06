@@ -20,6 +20,10 @@ func _ready() -> void:
 		turn_queue_card_wrapper_scene = preload("res://battle-manager/battlehud/turn_queue_card_wrapper.tscn")
 
 func update_queue(turn_order: Array, turn_idx: int) -> void:
+	# A battler can be erased from the order mid-turn (e.g. killed by a counter),
+	# leaving the caller's turn index out of bounds, so clamp it to the current
+	# bounds before using it anywhere.
+	turn_idx = clampi(turn_idx, 0, maxi(turn_order.size() - 1, 0))
 	current_turn_order = turn_order
 	current_turn_idx = turn_idx
 	

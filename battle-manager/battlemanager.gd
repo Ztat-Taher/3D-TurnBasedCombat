@@ -16,6 +16,16 @@ extends Node3D
 
 enum BattleEndCondition { WIN, CUTSCENE, DEFEAT, ESCAPE }
 
+## Emitted once the battle reaches an end condition (WIN, DEFEAT, ESCAPE, CUTSCENE).
+## Level wrappers connect to this to continue the run flow (next battle / run over / replay).
+## If nothing is connected (e.g. playing a battle scene standalone),
+## WIN and ESCAPE fall back to loading [member game_map].
+signal battle_ended(end_condition: BattleEndCondition)
+
+## Set once a battle is finished so out-of-band kills (e.g. parry counters)
+## can safely re-check the win condition without double-ending the battle.
+var battle_finished : bool = false
+
 var skip_turn = false # Please please please, Change the functionality or entirely remove this down the line.
 var players: Array[Battler] = []
 var enemies: Array[Battler] = []
@@ -1195,6 +1205,11 @@ func escape_battle():
 		return false
 
 func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
+	# Guard against re-entry: out-of-band kills (parry counters, status effects)
+	# may detect the battle is over more than once before the flow advances.
+	if battle_finished:
+		return
+	battle_finished = true
 	# ESCAPE always ends the battle abruptly. WIN, Will end the battle and return to normal, DEFEAT will end the battle with game over.
 	match state:
 		BattleEndCondition.ESCAPE:
@@ -1209,14 +1224,14 @@ func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
 				var tween = create_tween()
 				tween.set_parallel(true)
 				tween.tween_property(enemy, "position:y", enemy.position.y + 2.0, 1.0)  # Float up
-				tween.tween_property(enemy, "scale", Vector3.ZERO, 1.0)  # Shrink to nothing
+				tween.tween_property(enemy, "scale", Vector3.ONE * 0.01, 1.0)  # Shrink to almost nothing (exactly zero makes the basis singular)
 				tween.tween_callback(func(): enemy.queue_free())
 			
 			await get_tree().create_timer(1.5).timeout
-			get_tree().change_scene_to_file(game_map)
-			
+			_finish_battle(state)
+
 		BattleEndCondition.CUTSCENE:
-			pass
+			_finish_battle(state)
 			
 		BattleEndCondition.WIN:
 			# Show battle results screen
@@ -1231,15 +1246,43 @@ func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
 				var tween = create_tween()
 				tween.set_parallel(true)
 				tween.tween_property(enemy, "position:y", enemy.position.y + 2.0, 1.0)  # Float up
-				tween.tween_property(enemy, "scale", Vector3.ZERO, 1.0)  # Shrink to nothing
+				tween.tween_property(enemy, "scale", Vector3.ONE * 0.01, 1.0)  # Shrink to almost nothing (exactly zero makes the basis singular)
 				tween.tween_callback(func(): enemy.queue_free())
 			
 			await get_tree().create_timer(1.5).timeout
-			get_tree().change_scene_to_file(game_map)
-			
+			_finish_battle(state)
+
 		BattleEndCondition.DEFEAT:
 			if hud and hud.has_method("set_ui_state"):
 				hud.set_ui_state(3) # CARD_EXECUTION_STATE
+			await _play_defeat_sequence()
+
+## Shared exit point for every end condition. Emits [signal battle_ended] so a
+## level wrapper can continue the run (next battle / run over / replay). When
+## nothing is connected (e.g. playing a battle scene standalone), falls back to
+## the old behavior of loading [member game_map] after a WIN or ESCAPE.
+func _finish_battle(state: BattleEndCondition) -> void:
+	if not is_node_alive(): return
+	if battle_ended.get_connections().size() > 0:
+		battle_ended.emit(state)
+		return
+	match state:
+		BattleEndCondition.WIN, BattleEndCondition.ESCAPE:
+			get_tree().change_scene_to_file(game_map)
+		_:
+			pass
+
+## Brief defeat moment: play the defeat sound, then hand control to the level flow.
+func _play_defeat_sequence() -> void:
+	var defeat_sound : AudioStream = load("res://assets/sounds/defeatsound1.wav")
+	if defeat_sound:
+		var defeat_player := AudioStreamPlayer.new()
+		defeat_player.stream = defeat_sound
+		add_child(defeat_player)
+		defeat_player.play()
+	await get_tree().create_timer(2.0).timeout
+	if not is_node_alive(): return
+	_finish_battle(BattleEndCondition.DEFEAT)
 
 func update_button_states():
 	# ActionButtons are now in BattleHUD, we can access them through HUD

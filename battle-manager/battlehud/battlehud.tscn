@@ -13,7 +13,6 @@
 [ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="10_input"]
 [ext_resource type="PackedScene" uid="uid://c57p8obm33ioi" path="res://battle-manager/battlehud/action_buttons.tscn" id="12_action_buttons"]
 [ext_resource type="PackedScene" uid="uid://d1n1invd7ckr8" path="res://battle-manager/battlehud/turn_queue_ui.tscn" id="13_turn_queue_ui"]
-[ext_resource type="PackedScene" uid="uid://c2byxwxttl5y2" path="res://battle-manager/cursor/cursor_system.tscn" id="14_cursor_system"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -255,7 +254,5 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(1, 1, 1, 0)
 script = ExtResource("9_flash")
-
-[node name="CursorSystem" parent="." unique_id=999999996 instance=ExtResource("14_cursor_system")]
 
 [connection signal="pressed" from="Control/BackButton" to="." method="_on_global_back_pressed"]

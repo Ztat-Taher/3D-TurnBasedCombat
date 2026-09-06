@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://cvppmhved48fg"]
+
+[ext_resource type="Script" uid="uid://ctfh15uou1js1" path="res://scenes/menus/options_menu/audio/audio_input_option_control.gd" id="2_m6bxx"]
+
+[node name="AudioInputOptionControl" type="HBoxContainer" unique_id=1866818783]
+visible = false
+custom_minimum_size = Vector2(0, 40)
+offset_right = 400.0
+offset_bottom = 40.0
+script = ExtResource("2_m6bxx")
+option_name = "Input Device"
+option_section = 2
+key = "InputDevice"
+section = "AudioSettings"
+property_type = 4
+default_value = false
+
+[node name="OptionLabel" type="Label" parent="." unique_id=1854788461]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Input Device :"
+vertical_alignment = 1
+
+[node name="OptionButton" type="OptionButton" parent="." unique_id=264509485]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text_overrun_behavior = 1
+clip_text = true

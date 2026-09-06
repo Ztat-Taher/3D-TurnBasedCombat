@@ -1,0 +1,41 @@
+[gd_scene format=3 uid="uid://tkqxr4cnrcp6"]
+
+[ext_resource type="Script" uid="uid://dtj6vrdj7ohb6" path="res://scenes/menus/map_menu/map_menu.gd" id="1_3k8dc"]
+
+[node name="MapMenu" type="Control" unique_id=1957918175]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_3k8dc")
+
+[node name="Background" type="ColorRect" parent="." unique_id=162852376]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.09, 0.09, 0.12, 1)
+
+[node name="TitleLabel" type="Label" parent="." unique_id=658725429]
+layout_mode = 0
+anchor_right = 1.0
+offset_top = 24.0
+offset_bottom = 76.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 40
+text = "Choose Your Path"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="." unique_id=218704137]
+layout_mode = 0
+anchor_right = 1.0
+offset_top = 76.0
+offset_bottom = 104.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 16
+text = "Pick the next encounter on the way to the summit."
+horizontal_alignment = 1

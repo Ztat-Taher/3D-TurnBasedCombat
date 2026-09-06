@@ -354,6 +354,12 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 				battle_manager.hud.turn_queue_ui.update_queue(battle_manager.turn_order, battle_manager.current_turn)
 			elif battle_manager.hud and battle_manager.hud.has_method("update_turn_queue"):
 				battle_manager.hud.update_turn_queue(battle_manager.turn_order, battle_manager.current_turn)
+			# Out-of-band kills (parry counters etc.) don't go through the normal
+			# turn cycle. If the ACTING battler was just defeated, its own attack
+			# coroutine can no longer end the turn - advance the flow now, whether
+			# the battle is over or not (start_next_turn checks the win condition).
+			if battle_manager.current_battler == self or battle_manager.is_battle_over():
+				battle_manager.start_next_turn()
 			await _fade_and_remove()
 		elif battle_manager and team == TEAM.ALLY:
 			# For players, just update the turn queue when they die
@@ -366,6 +372,10 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 				battle_manager.hud.turn_queue_ui.update_queue(battle_manager.turn_order, battle_manager.current_turn)
 			elif battle_manager.hud and battle_manager.hud.has_method("update_turn_queue"):
 				battle_manager.hud.update_turn_queue(battle_manager.turn_order, battle_manager.current_turn)
+			# If the ACTING battler was just defeated (e.g. killed by a counter),
+			# its turn can no longer end on its own - advance now, win or not.
+			if battle_manager.current_battler == self or battle_manager.is_battle_over():
+				battle_manager.start_next_turn()
 		else:
 			_is_despawning = false
 
@@ -842,8 +852,11 @@ func _fade_and_remove() -> void:
 		geo.transparency = 0.0
 		tween.tween_property(geo, "transparency", 1.0, 0.35)
 	
-	# Universal fallback: Scale the entire battler to 0
-	tween.tween_property(self, "scale", Vector3.ZERO, 0.35)
+	# Universal fallback: Scale the entire battler to (almost) nothing.
+	# Scaling to exactly Vector3.ZERO makes the transform basis singular, which
+	# makes engine transform code fail with 'invert: Condition "det == 0"' errors
+	# (e.g. skeleton pose updates), so scale to a tiny epsilon instead.
+	tween.tween_property(self, "scale", Vector3.ONE * 0.01, 0.35)
 	
 	await tween.finished
 	

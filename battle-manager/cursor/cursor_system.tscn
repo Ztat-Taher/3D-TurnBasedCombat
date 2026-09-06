@@ -15,6 +15,8 @@ _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.5, 0.5), 0.0, 0.0, 0, 0, Vecto
 point_count = 3
 
 [node name="CursorSystem" type="CanvasLayer" unique_id=824409362]
+process_mode = 3
+layer = 100
 script = ExtResource("1_cursor_manager")
 
 [node name="CursorDisplay" type="Control" parent="." unique_id=326236941 groups=["cursor_display"]]

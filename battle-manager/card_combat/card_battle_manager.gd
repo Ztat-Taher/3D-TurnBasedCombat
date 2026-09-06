@@ -972,7 +972,7 @@ func _execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> voi
 		# Clean up defeated enemy
 		if battle_manager:
 			battle_manager._cleanup_defeated_from_turn_order()
-			battle_manager._cleanup_defeated_enemies()
+			battle_manager.cleanup_defeated_enemies()
 	
 	# Allow defender to finish swing and return to idle
 	await get_tree().create_timer(0.3).timeout
