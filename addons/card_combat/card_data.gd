@@ -39,6 +39,20 @@ enum PlayKind { UNIT, EFFECT, PERSISTENT }
 ## When set, this overrides the metadata-based configuration system
 @export var card_config: Resource = null
 
+## Modular card display fields
+@export var background_sprite: Texture2D = null  ## Type-based background texture
+@export var main_image: Texture2D = null  ## Character portrait or icon
+@export var attack_icon: Texture2D = null  ## Attack damage icon
+@export var effect_icon: Texture2D = null  ## Effect/special ability icon
+@export var description: String = ""  ## Card description for pop-up
+@export var card_type: String = "attack"  ## For type-based background selection
+
+## Additional modular display fields for detailed card design
+@export var card_frame_texture: Texture2D = null  ## Outer frame/border texture
+@export var name_banner_texture: Texture2D = null  ## Textured banner for card name
+@export var cost_badge_texture: Texture2D = null  ## Cost badge texture
+@export var type_icon: Texture2D = null  ## Card type indicator icon
+
 
 func get_total_cost() -> int:
 	return cost
@@ -90,6 +104,15 @@ func get_animation() -> String:
 		return "attack"
 	return card_config.actor_animation if not card_config.actor_animation.is_empty() else "attack"
 
+## Get background sprite for card type
+func get_background_for_type() -> Texture2D:
+	# If a specific background sprite is set, use it
+	if background_sprite:
+		return background_sprite
+	
+	# Otherwise, return null and let the UI handle type-based backgrounds
+	return null
+
 
 func can_afford(player_mana: int) -> bool:
 	return player_mana >= get_total_cost()
@@ -123,6 +146,14 @@ static func from_dict(data: Dictionary) -> CardData:
 	if not config_path.is_empty() and ResourceLoader.exists(config_path):
 		card.card_config = load(config_path)
 	
+	# Load modular card display fields
+	card.background_sprite = data.get("background_sprite")
+	card.main_image = data.get("main_image")
+	card.attack_icon = data.get("attack_icon")
+	card.effect_icon = data.get("effect_icon")
+	card.description = data.get("description", "")
+	card.card_type = data.get("card_type", "attack")
+	
 	return card
 
 
@@ -140,6 +171,13 @@ func serialize() -> Dictionary:
 		"play_kind": PlayKind.keys()[play_kind],
 		"metadata": metadata.duplicate(),
 		"spell_effects": effects,
+		# Modular card display fields
+		"background_sprite": background_sprite,
+		"main_image": main_image,
+		"attack_icon": attack_icon,
+		"effect_icon": effect_icon,
+		"description": description,
+		"card_type": card_type,
 	}
 	
 	# Add card config if present (serialize as resource path)

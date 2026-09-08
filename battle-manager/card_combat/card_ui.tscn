@@ -1,0 +1,155 @@
+[gd_scene format=3 uid="uid://d0g1vty6xfk1y"]
+
+[ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="1_la4tj"]
+[ext_resource type="Texture2D" uid="uid://da7q5k240bgnf" path="res://assets/images/cards/template/card_template_background.png" id="2_kbya7"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="3_quaov"]
+[ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="4_button_juice"]
+
+[node name="CardUI" type="Control" unique_id=1376086127]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_la4tj")
+
+[node name="CardContainer" type="HBoxContainer" parent="." unique_id=2055738151]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -250.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = -20
+alignment = 1
+
+[node name="DrawPile" type="TextureButton" parent="." unique_id=1133914594]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -230.0
+offset_right = 136.0
+offset_bottom = -50.0
+grow_vertical = 0
+texture_normal = ExtResource("2_kbya7")
+
+[node name="CardBack1" type="TextureRect" parent="DrawPile" unique_id=658763481]
+modulate = Color(0.5019608, 0.5019608, 0.5019608, 0.7294118)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = -90.0
+offset_right = 60.0
+offset_bottom = 90.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_kbya7")
+
+[node name="CardBack2" type="TextureRect" parent="DrawPile" unique_id=786922038]
+modulate = Color(0.5019608, 0.5019608, 0.5019608, 0.7294118)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = -90.0
+offset_right = 60.0
+offset_bottom = 90.0
+grow_horizontal = 2
+grow_vertical = 2
+rotation = -0.05
+texture = ExtResource("2_kbya7")
+
+[node name="CardBack3" type="TextureRect" parent="DrawPile" unique_id=741992297]
+modulate = Color(0.5019608, 0.5019608, 0.5019608, 0.7294118)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = -90.0
+offset_right = 60.0
+offset_bottom = 90.0
+grow_horizontal = 2
+grow_vertical = 2
+rotation = -0.1
+texture = ExtResource("2_kbya7")
+
+[node name="DrawPileCountBadge" type="Panel" parent="DrawPile" unique_id=181821313]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -16.5
+offset_top = -48.0
+offset_right = 16.5
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="DrawPileCount" type="Label" parent="DrawPile/DrawPileCountBadge" unique_id=1894635695]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DrawPileLabel" type="Label" parent="DrawPile" unique_id=1695024669]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -54.5
+offset_top = 8.0
+offset_right = 54.5
+offset_bottom = 30.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("3_quaov")
+theme_override_font_sizes/font_size = 13
+text = "DRAW"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ButtonJuice" type="Node" parent="DrawPile" unique_id=2090803407]
+script = ExtResource("4_button_juice")
+enable_sliding = false
+
+[node name="DiscardAnchor" type="Control" parent="." unique_id=1881099077]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -60.0
+offset_top = -60.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2

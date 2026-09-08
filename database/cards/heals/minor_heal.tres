@@ -10,6 +10,7 @@ card_id = "minor_heal"
 name = "Minor Heal"
 cost = 2
 health = 15
+description = "Heals a single ally for 15 health points."
 metadata = {
 "card_type": "heal"
 }

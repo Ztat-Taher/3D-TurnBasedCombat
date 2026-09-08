@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://ckrdk0ttkyd2v"]
+
+[ext_resource type="Script" uid="uid://57hxy61bnwbc" path="res://battle-manager/card_combat/card_description_popup.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://cr244eente0qr" path="res://assets/images/cards/template/card_template_main.png" id="2_0qbs1"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="3_x0dj2"]
+
+[node name="CardDescriptionPopup" type="Control" unique_id=2063715433]
+z_index = 1000
+layout_mode = 3
+anchors_preset = 0
+offset_right = 200.0
+offset_bottom = 100.0
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Background" type="NinePatchRect" parent="." unique_id=1242310080]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_0qbs1")
+patch_margin_left = 25
+patch_margin_top = 23
+patch_margin_right = 25
+patch_margin_bottom = 23
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
+
+[node name="DescriptionLabel" type="Label" parent="." unique_id=642805821]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("3_x0dj2")
+theme_override_font_sizes/font_size = 13
+vertical_alignment = 1
+autowrap_mode = 3

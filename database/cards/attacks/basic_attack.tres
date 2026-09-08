@@ -10,6 +10,7 @@ card_id = "basic_attack"
 name = "Basic Attack"
 cost = 1
 attack = 10
+description = "A basic attack that deals 10 physical damage to a single enemy."
 metadata = {
 "card_type": "attack"
 }

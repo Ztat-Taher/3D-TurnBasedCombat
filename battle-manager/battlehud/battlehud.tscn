@@ -6,13 +6,13 @@
 [ext_resource type="PackedScene" uid="uid://b5sfv2s0lombo" path="res://battle-manager/battlehud/turn_queue_card.tscn" id="4_ldk3v"]
 [ext_resource type="PackedScene" uid="uid://brk8oam2p4k7l" path="res://battle-manager/battlehud/turn_queue_card_wrapper.tscn" id="5_ejl8j"]
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://battle-manager/battlehud/battleresults.tscn" id="6_g4nh0"]
-[ext_resource type="Script" uid="uid://ckm71brgkqjop" path="res://battle-manager/card_combat/card_ui.gd" id="7_cardui"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://battle-manager/effects/button_juice.gd" id="7_p32nk"]
 [ext_resource type="PackedScene" uid="uid://bsdjvwbf7iv4s" path="res://battle-manager/battlehud/BossBar.tscn" id="8_bossbar"]
 [ext_resource type="Script" uid="uid://igumddyitxrw" path="res://battle-manager/effects/screen_flash.gd" id="9_flash"]
 [ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://battle-manager/battlehud/input_prompt.gd" id="10_input"]
 [ext_resource type="PackedScene" uid="uid://c57p8obm33ioi" path="res://battle-manager/battlehud/action_buttons.tscn" id="12_action_buttons"]
 [ext_resource type="PackedScene" uid="uid://d1n1invd7ckr8" path="res://battle-manager/battlehud/turn_queue_ui.tscn" id="13_turn_queue_ui"]
+[ext_resource type="PackedScene" uid="uid://d0g1vty6xfk1y" path="res://battle-manager/card_combat/card_ui.tscn" id="13_xkcqd"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -27,6 +27,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_uiugx")
+
+[node name="CardUI" parent="Control" unique_id=1376086127 instance=ExtResource("13_xkcqd")]
+visible = false
+layout_mode = 1
 
 [node name="TurnQueueUI" parent="Control" unique_id=1146046375 instance=ExtResource("13_turn_queue_ui")]
 layout_mode = 1
@@ -104,30 +108,6 @@ mouse_filter = 2
 [node name="Results" parent="Control" unique_id=1064251967 instance=ExtResource("6_g4nh0")]
 visible = false
 layout_mode = 1
-
-[node name="CardUI" type="Control" parent="Control" unique_id=999999999]
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 1
-mouse_behavior_recursive = 2
-script = ExtResource("7_cardui")
-
-[node name="CardContainer" type="HBoxContainer" parent="Control/CardUI" unique_id=999999998]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -250.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_constants/separation = -20
-alignment = 1
 
 [node name="ActionButtons" parent="Control" unique_id=1087849572 instance=ExtResource("12_action_buttons")]
 visible = false

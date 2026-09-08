@@ -663,6 +663,11 @@ func set_targeting_mode(enabled: bool) -> void:
 		# Restore cursor system state
 		if cursor_system:
 			cursor_system.restore_previous_state()
+		
+		# Notify card UI to return pending card to hand if targeting was cancelled
+		var card_ui_node = get_tree().get_first_node_in_group("card_ui")
+		if card_ui_node and card_ui_node.has_method("return_pending_card_to_hand"):
+			card_ui_node.return_pending_card_to_hand()
 
 func set_aoe_confirmation_mode(enabled: bool, card_name: String = "", target_count: int = 0) -> void:
 	if enabled:

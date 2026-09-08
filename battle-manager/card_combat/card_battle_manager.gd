@@ -779,7 +779,17 @@ func start_player_turn() -> void:
 	# Refresh AP
 	ap_system.regen_ap()
 	
-	# Refresh hand: discard remaining cards, draw a fresh hand
+	# --- Step 1: Play discard animation for any leftover hand cards in the UI ---
+	var card_ui: CardUI = null
+	if battle_manager and battle_manager.hud:
+		card_ui = battle_manager.hud.get_node_or_null("Control/CardUI")
+	
+	if card_ui and card_ui.has_method("discard_hand_to_pile"):
+		# Animate the remaining hand flying to the discard corner before the
+		# deck-side data is touched (so card buttons still exist for the tween).
+		await card_ui.discard_hand_to_pile()
+	
+	# --- Step 2: Sync deck data (discard leftover hand, draw fresh cards) ---
 	var deck = _get_current_deck()
 	if deck:
 		# Discard whatever is left in hand from the previous turn
@@ -795,9 +805,8 @@ func start_player_turn() -> void:
 	# Clear queued cards from previous turn
 	queued_cards.clear()
 	
-	# Update CardUI display for the new hand and notify HUD
+	# --- Step 3: Update CardUI display for the new hand and notify HUD ---
 	if battle_manager and battle_manager.hud:
-		var card_ui = battle_manager.hud.get_node_or_null("Control/CardUI")
 		if card_ui:
 			if card_ui.has_method("update_hand_display"):
 				card_ui.update_hand_display()
