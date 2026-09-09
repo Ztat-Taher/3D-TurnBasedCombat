@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="CardConfig" format=3 load_steps=3]
 
-[ext_resource type="Script" path="res://battle-manager/card_combat/resources/card_config.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
 [ext_resource type="Resource" path="res://database/card_effects/minor_heal_effect.tres" id="2"]
 
 [resource]

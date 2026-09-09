@@ -1,9 +1,0 @@
-[gd_scene format=3 uid="uid://bvhah4cfn4txb"]
-
-[ext_resource type="Script" uid="uid://c4knt0u45bqyx" path="res://battle-manager/battlemanager.gd" id="1_duov8"]
-[ext_resource type="PackedScene" uid="uid://cyjcaceen0235" path="res://battle-manager/battlehud/battlehud.tscn" id="5_se261"]
-
-[node name="Battle-Manager" type="Node3D" unique_id=363930196]
-script = ExtResource("1_duov8")
-
-[node name="BattleHUD" parent="." unique_id=1325232602 instance=ExtResource("5_se261")]

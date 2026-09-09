@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="QTEConfig" format=3]
 
-[ext_resource type="Script" path="res://battle-manager/card_combat/qte_config.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/systems/battle/card_combat/qte/qte_config.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

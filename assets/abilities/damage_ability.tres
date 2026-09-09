@@ -1,9 +1,6 @@
-[gd_resource type="Resource" script_class="CharacterAbilities" load_steps=2 format=3 uid="uid://bkn0p2p5vxwv3"]
-
-[ext_resource type="Script" uid="uid://452h5duekyet" path="res://battle-manager/skills/character_abilities.gd" id="1_nc1uw"]
+[gd_resource type="Resource" script_class="CharacterAbilities" load_steps=1 format=3 uid="uid://bkn0p2p5vxwv3"]
 
 [resource]
-script = ExtResource("1_nc1uw")
 ability_name = "Damage"
 ability_description = "Deals damage through ability use."
 target_type = "Enemy"

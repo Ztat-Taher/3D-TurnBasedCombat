@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b56ncgnrwugct"]
 
-[ext_resource type="PackedScene" uid="uid://wxuxctidimwu" path="res://battle-manager/allies/y_bot-ally.tscn" id="1_2aqym"]
-[ext_resource type="PackedScene" uid="uid://bvhah4cfn4txb" path="res://battle-manager/BattleManager.tscn" id="1_t14x8"]
+[ext_resource type="PackedScene" uid="uid://wxuxctidimwu" path="res://scenes/battle/core/allies/models/y_bot-ally.tscn" id="1_2aqym"]
+[ext_resource type="PackedScene" uid="uid://bvhah4cfn4txb" path="res://scenes/battle/core/battle_manager/BattleManager.tscn" id="1_t14x8"]
 [ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="3_w26bt"]
 [ext_resource type="Resource" uid="uid://d0noky2jlhk4u" path="res://database/troops/test_troop.tres" id="3_yxp8s"]
 

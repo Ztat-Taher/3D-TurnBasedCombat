@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="CardEffect" format=3 uid="uid://u1e7kn5o2xed"]
 
-[ext_resource type="Script" uid="uid://by6qea4gp8ecb" path="res://battle-manager/card_combat/resources/card_effect.gd" id="1"]
+[ext_resource type="Script" uid="uid://by6qea4gp8ecb" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

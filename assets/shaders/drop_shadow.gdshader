@@ -13,7 +13,7 @@ shader_type canvas_item;
 // match it, assign this shader and tune shadow_offset / shadow_color. For a
 // sprite or TextureRect the node should display the same texture. Animate
 // shadow_strength to fade the shadow in and out. Pair with the DropShadow
-// component (res://battle-manager/effects/drop_shadow.gd) for convenience.
+// component (res://scripts/juice/shadows/drop_shadow.gd) for convenience.
 
 // Offset of the shadow in screen pixels (positive Y = below the element).
 uniform vec2 shadow_offset = vec2(0.0, 6.0);

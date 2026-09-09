@@ -42,16 +42,16 @@ buses/default_bus_layout="uid://c2kwyeuku2cbw"
 
 GlobalBattleSettings="*res://assets/globals/battle-settings/GlobalBattleSettings.gd"
 SaveLoader="*res://assets/globals/save-system/save_loader.gd"
-AIManager="*res://battle-manager/ai_manager.gd"
+AIManager="*res://scripts/systems/battle/core/ai/ai_manager.gd"
 SignalBus="*res://assets/globals/signal_bus.gd"
-ItemHandler="*res://inventory/item_handler.gd"
+ItemHandler="*res://scripts/systems/inventory/items/item_handler.gd"
 MCPRuntime="*uid://fj17x84g2o5q"
 DebugMenu="*uid://cggqb75a8w8r"
 AppConfig="*uid://cjke6crjg14a0"
 SceneLoader="*uid://cbwmrnp0af35y"
 ProjectMusicController="*uid://r5t485lr3p7t"
 ProjectUISoundController="*uid://cc37235kj4384"
-CursorSystem="*res://battle-manager/cursor/cursor_system.tscn"
+CursorSystem="*res://scenes/ui/cursor/main_system/cursor_system.tscn"
 
 [display]
 
@@ -72,8 +72,9 @@ enabled=PackedStringArray("res://addons/anthonyec.camera_preview/plugin.cfg", "r
 folder_colors={
 "res://animations/": "red",
 "res://assets/": "orange",
-"res://battle-manager/": "teal",
-"res://database/": "blue"
+"res://database/": "blue",
+"res://scenes/": "teal",
+"res://scripts/": "yellow"
 }
 
 [global_group]

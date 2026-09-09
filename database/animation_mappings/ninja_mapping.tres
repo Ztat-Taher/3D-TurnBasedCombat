@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="AnimationMapping" load_steps=2 format=3 uid="uid://d3l8m5n6p7q8r"]
 
-[ext_resource type="Script" path="res://battle-manager/card_combat/resources/animation_mapping.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/battle/card_combat/resources/animation/animation_mapping.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

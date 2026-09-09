@@ -1,0 +1,201 @@
+[gd_scene format=3 uid="uid://dskqhs3k6c8xn"]
+
+[ext_resource type="Script" uid="uid://c5dbtyrtv3prv" path="res://scenes/battle/card_combat/card_components/buttons/card_button.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://da7q5k240bgnf" path="res://assets/images/cards/template/card_template_background.png" id="2_kg3nd"]
+[ext_resource type="Texture2D" uid="uid://cw8ivhl56fcqe" path="res://assets/images/cards/template/card_template_border.png" id="3_yx3cs"]
+[ext_resource type="Texture2D" uid="uid://6gn1iqwl230x" path="res://assets/images/cards/template/card_template_banner.png" id="4_f5rll"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="5_8ugqd"]
+[ext_resource type="Texture2D" uid="uid://cr244eente0qr" path="res://assets/images/cards/template/card_template_main.png" id="6_f5rll"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_7g8l3"]
+load_path = "res://.godot/imported/20251124emptyFrameC1-Sheet.png-84ea66a0154b2e3bd910d94b0039feda.ctex"
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3xdqv"]
+atlas = SubResource("CompressedTexture2D_7g8l3")
+region = Rect2(65, 1, 30, 30)
+
+[node name="CardButton" type="Control" unique_id=1369546722]
+custom_minimum_size = Vector2(120, 180)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 120.0
+offset_bottom = 180.0
+pivot_offset = Vector2(60, 90)
+size_flags_horizontal = 4
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Card3DContainer" type="SubViewportContainer" parent="." unique_id=3001]
+layout_mode = 0
+offset_right = 120.0
+offset_bottom = 180.0
+pivot_offset = Vector2(60, 90)
+mouse_filter = 2
+stretch = true
+
+[node name="CardViewport" type="SubViewport" parent="Card3DContainer" unique_id=2051745250]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(120, 180)
+render_target_update_mode = 4
+
+[node name="CardContent" type="Control" parent="Card3DContainer/CardViewport" unique_id=1771674501]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(60, 90)
+mouse_filter = 2
+
+[node name="CardBackground" type="TextureRect" parent="Card3DContainer/CardViewport/CardContent" unique_id=1002]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_kg3nd")
+expand_mode = 1
+
+[node name="CardFrame" type="TextureRect" parent="Card3DContainer/CardViewport/CardContent" unique_id=1001]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_yx3cs")
+expand_mode = 1
+
+[node name="NameBanner" type="NinePatchRect" parent="Card3DContainer/CardViewport/CardContent" unique_id=1020997729]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -56.0
+offset_top = -60.0
+offset_right = 56.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
+texture = ExtResource("4_f5rll")
+region_rect = Rect2(0, 0, 96, 32)
+patch_margin_left = 23
+patch_margin_top = 8
+patch_margin_right = 23
+patch_margin_bottom = 12
+
+[node name="CardName" type="Label" parent="Card3DContainer/CardViewport/CardContent/NameBanner" unique_id=1385623766]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -54.5
+offset_top = -11.0
+offset_right = 54.5
+offset_bottom = 11.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("5_8ugqd")
+theme_override_font_sizes/font_size = 13
+text = "Card Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MainImage" type="TextureRect" parent="Card3DContainer/CardViewport/CardContent" unique_id=1007]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -44.0
+offset_top = -54.0
+offset_right = 44.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("6_f5rll")
+
+[node name="CostBadge" type="TextureRect" parent="Card3DContainer/CardViewport/CardContent" unique_id=1005]
+layout_mode = 1
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 36.0
+offset_bottom = 36.0
+pivot_offset = Vector2(10, 10)
+mouse_filter = 2
+texture = SubResource("AtlasTexture_3xdqv")
+expand_mode = 1
+
+[node name="APCost" type="Label" parent="Card3DContainer/CardViewport/CardContent/CostBadge" unique_id=763950266]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("5_8ugqd")
+theme_override_font_sizes/font_size = 13
+text = "3"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TypeIcon" type="TextureRect" parent="Card3DContainer/CardViewport/CardContent" unique_id=1008]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = -8.0
+grow_vertical = 0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="StatsArea" type="HBoxContainer" parent="Card3DContainer/CardViewport/CardContent" unique_id=1009]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -44.0
+offset_top = -24.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="AttackIcon" type="TextureRect" parent="Card3DContainer/CardViewport/CardContent/StatsArea" unique_id=1010]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="EffectIcon" type="TextureRect" parent="Card3DContainer/CardViewport/CardContent/StatsArea" unique_id=1011]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+mouse_filter = 2
+
+[connection signal="mouse_entered" from="." to="." method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="." to="." method="_on_mouse_exited"]
+[connection signal="gui_input" from="Card3DContainer" to="." method="_on_gui_input"]
