@@ -1,0 +1,34 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://d1k8nelecovl2"]
+
+[ext_resource type="Shader" uid="uid://bqcwo3dpcjx63" path="res://assets/effects/shaders/electric_aura.gdshader" id="1_elec"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_elec"]
+noise_type = 0
+frequency = 0.025
+fractal_octaves = 2
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_elec"]
+noise = SubResource("FastNoiseLite_elec")
+seamless = true
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_elec")
+shader_parameter/primary_color = Color(0.85, 0.92, 1, 1)
+shader_parameter/secondary_color = Color(0.35, 0.55, 1, 1)
+shader_parameter/tertiary_color = Color(0.3, 0.1, 0.65, 1)
+shader_parameter/emission = 4.0
+shader_parameter/color_curve = 1.5
+shader_parameter/hue_variation = 0.05
+shader_parameter/noise_texture = SubResource("NoiseTexture2D_elec")
+shader_parameter/noise_scale = Vector2(1, 1.4)
+shader_parameter/noise_scroll = Vector2(0.1, -0.35)
+shader_parameter/shape_curve = 1.0
+shader_parameter/fresnel_power = 3.5
+shader_parameter/distortion_strength = 0.03
+shader_parameter/arc_width = 0.03
+shader_parameter/strobe_speed = 3.0
+shader_parameter/edge_hardness = 0.0
+shader_parameter/edge_position = 0.0
+shader_parameter/proximity_fade = false
+shader_parameter/proximity_fade_distance = 1.0
