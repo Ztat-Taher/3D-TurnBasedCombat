@@ -114,10 +114,13 @@ func can_play_card(card: CardData) -> bool:
 	if not _get_current_deck():
 		return false
 	
-	# Use our own AP system for cost validation
-	var ap_can_spend = ap_system.can_spend_ap(card.cost)
+	# Check AP on active player battler first, fallback to ap_system
+	if current_player_battler:
+		return current_player_battler.can_spend_ap(card.cost)
+	elif ap_system:
+		return ap_system.can_spend_ap(card.cost)
 	
-	return ap_can_spend
+	return true
 
 var is_executing_card: bool = false
 
@@ -139,8 +142,15 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 	# Execute card effect
 	await execute_card_effect(card, target)
 	
-	# Spend AP and discard card systematically only AFTER effect resolves
-	ap_system.spend_ap(card.cost)
+	# Spend AP from battler systematically only AFTER effect resolves
+	if current_player_battler:
+		current_player_battler.spend_ap(card.cost)
+		if ap_system:
+			ap_system.current_ap = current_player_battler.current_ap
+			ap_system.max_ap = current_player_battler.max_ap
+		ap_changed.emit(current_player_battler.current_ap, current_player_battler.max_ap)
+	elif ap_system:
+		ap_system.spend_ap(card.cost)
 	
 	# Remove from hand (move to graveyard through deck system without mana restriction)
 	var deck = _get_current_deck()
@@ -267,6 +277,10 @@ func execute_card_with_config(card: CardData, target: Battler) -> void:
 	# Phase 9: Audio Phase
 	if card_cfg.cast_sound or card_cfg.hit_sound or card_cfg.impact_sound:
 		execute_audio_phase(card_cfg, context)
+	
+	# Phase 10: Return the actor to its battle idle once the card fully resolves.
+	if current_player_battler and current_player_battler.has_method("battle_idle"):
+		current_player_battler.battle_idle()
 
 ## Execute animation phase
 func execute_animation_phase(card_cfg: CardConfig, context: Dictionary) -> void:
@@ -287,9 +301,18 @@ func execute_animation_phase(card_cfg: CardConfig, context: Dictionary) -> void:
 		if actor.has_method("_try_animation"):
 			actor._try_animation(animation_name)
 			
-			# Handle animation events
+			# Always wait for the animation to finish so the battler isn't left
+			# mid-animation when the next phase starts (e.g. heal cast cutting off
+			# before the character settles — battle_idle() at phase end needs a
+			# settled state, not a clip that was interrupted 0.1s in).
+			var anim_duration: float = 0.0
+			if actor.has_method("_get_animation_duration"):
+				anim_duration = actor._get_animation_duration(animation_name)
+			
 			if not card_cfg.animation_events.is_empty():
 				await process_animation_events(card_cfg, context)
+			elif anim_duration > 0.0:
+				await get_tree().create_timer(anim_duration).timeout
 
 ## Process animation events
 func process_animation_events(card_cfg: CardConfig, context: Dictionary) -> void:
@@ -676,8 +699,9 @@ func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) 
 			while current_player_battler.is_advancing:
 				await get_tree().create_timer(0.016).timeout
 	
-	# Play attack animation
-	current_player_battler._try_animation("attack")
+	# Play attack animation (standardised melee slot — resolves through the character's
+	# animation mapping / combat_actions sub-machine automatically).
+	current_player_battler._try_animation(AnimationMapping.MELEE_COMBO_1)
 	
 	# Simple QTE system: start QTE, get result, apply damage with multiplier
 	var damage_multiplier = 1.0
@@ -776,8 +800,15 @@ func start_player_turn() -> void:
 	if battle_manager and is_instance_valid(battle_manager.current_character):
 		current_player_battler = battle_manager.current_character
 	
-	# Refresh AP
-	ap_system.regen_ap()
+	# Refresh AP on active player battler
+	if current_player_battler:
+		current_player_battler.regen_ap()
+		if ap_system:
+			ap_system.current_ap = current_player_battler.current_ap
+			ap_system.max_ap = current_player_battler.max_ap
+		ap_changed.emit(current_player_battler.current_ap, current_player_battler.max_ap)
+	elif ap_system:
+		ap_system.regen_ap()
 	
 	# --- Step 1: Play discard animation for any leftover hand cards in the UI ---
 	var card_ui: CardUI = null
@@ -847,7 +878,16 @@ func _on_ap_changed(current_ap: int, max_ap: int) -> void:
 	ap_changed.emit(current_ap, max_ap)
 
 func get_ap_info() -> Dictionary:
-	if ap_system:
+	if current_player_battler:
+		var cur = current_player_battler.current_ap
+		var mx = current_player_battler.max_ap
+		var pct = float(cur) / float(mx) if mx > 0 else 0.0
+		return {
+			"current_ap": cur,
+			"max_ap": mx,
+			"ap_percentage": pct
+		}
+	elif ap_system:
 		return {
 			"current_ap": ap_system.get_current_ap(),
 			"max_ap": ap_system.get_max_ap(),
@@ -888,7 +928,7 @@ func await_qte_completion() -> bool:
 	
 	return state["success"]
 
-func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler = null) -> int:
+func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler = null, attack_config: EnemyAttackConfig = null) -> int:
 	var target_defender = defender if defender else current_player_battler
 	if not target_defender or not qte_manager or not card_battle_config:
 		return damage
@@ -898,7 +938,7 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 	
 	player_attacked.emit(attacker, damage)
 	
-	var outcome = await qte_manager.await_reactive_defense(target_defender)
+	var outcome = await qte_manager.await_reactive_defense(target_defender, attack_config)
 	var hud = battle_manager.hud if battle_manager else null
 	
 	match outcome:
@@ -928,6 +968,20 @@ func trigger_reactive_defense(attacker: Battler, damage: int, defender: Battler 
 			
 			return 0 # Complete damage avoidance
 			
+		"jump":
+			if hud and hud.battle_text_display:
+				hud.battle_text_display.show_jump(target_defender)
+			
+			# Reuse dodge screen effect for jump
+			if battle_manager and battle_manager.effect_manager:
+				battle_manager.effect_manager.trigger_dodge()
+			
+			# Play jump animation on defender
+			if target_defender and target_defender.has_method("perform_jump_evade"):
+				target_defender.perform_jump_evade()
+			
+			return 0 # Complete damage avoidance
+			
 		"parry":
 			var reduction = card_battle_config.parry_damage_reduction
 			var reduced_damage = int(damage * (1.0 - reduction))
@@ -952,10 +1006,8 @@ func _execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> voi
 	# Stun the attacker momentarily so they don't return before taking counter damage
 	attacker.is_counter_stunned = true
 	
-	# Play attack animation on defender
-	var attack_anim_name = "basic_attacks/attack"
-	if not defender._try_animation(attack_anim_name):
-		defender._try_animation("attack")
+	# Play attack animation on defender (standardised melee slot).
+	defender._try_animation(AnimationMapping.MELEE_COMBO_1)
 	
 	# Wait for defender's contact frame (hit_moment)
 	await defender.hit_moment

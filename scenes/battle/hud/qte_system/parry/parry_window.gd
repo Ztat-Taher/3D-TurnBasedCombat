@@ -4,6 +4,7 @@ extends PanelContainer
 var title_label: Label
 var parry_prompt: Label
 var dodge_prompt: Label
+var jump_prompt: Label
 var progress_bar: ProgressBar
 var perfect_indicator: Panel
 var hint_label: Label
@@ -12,6 +13,7 @@ func _ready() -> void:
 	title_label = $VBox/Header/TitleLabel
 	parry_prompt = $VBox/Header/ParryPrompt
 	dodge_prompt = $VBox/Header/DodgePrompt
+	jump_prompt = $VBox/Header/JumpPrompt
 	progress_bar = $VBox/BarContainer/ProgressBar
 	perfect_indicator = $VBox/BarContainer/PerfectIndicator
 	hint_label = $VBox/HintLabel
@@ -20,7 +22,8 @@ func _ready() -> void:
 	apply_progress_bar_style()
 	apply_perfect_indicator_style()
 
-func setup(defender_name: String, duration: float, perfect_duration: float) -> void:
+func setup(defender_name: String, duration: float, perfect_duration: float,
+		allow_parry: bool = true, allow_dodge: bool = true, allow_jump: bool = false) -> void:
 	if not title_label:
 		await ready
 	
@@ -30,6 +33,33 @@ func setup(defender_name: String, duration: float, perfect_duration: float) -> v
 	
 	var perfect_ratio = clampf(perfect_duration / max(duration, 0.001), 0.1, 0.9)
 	perfect_indicator.set_anchor(SIDE_LEFT, 1.0 - perfect_ratio)
+	
+	# Show/hide prompts based on allowed defense types
+	if parry_prompt:
+		parry_prompt.visible = allow_parry
+	if dodge_prompt:
+		dodge_prompt.visible = allow_dodge
+	if jump_prompt:
+		jump_prompt.visible = allow_jump
+	
+	# Update the golden zone hint label depending on the mode
+	if hint_label:
+		if allow_jump:
+			hint_label.text = "⬆ Jump to evade the incoming attack!"
+			hint_label.add_theme_color_override("font_color", Color(1.0, 0.93, 0.3, 0.9))
+			if perfect_indicator:
+				perfect_indicator.visible = false
+		elif allow_parry:
+			hint_label.text = "⚡ Golden zone = Perfect Parry Counterattack!"
+			hint_label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9, 0.7))
+			if perfect_indicator:
+				perfect_indicator.visible = true
+		else:
+			hint_label.text = "Dodge the attack!"
+			hint_label.add_theme_color_override("font_color", Color(0.4, 1.0, 0.6, 0.8))
+			if perfect_indicator:
+				perfect_indicator.visible = false
+
 
 func update_progress(time_remaining: float) -> void:
 	if progress_bar:

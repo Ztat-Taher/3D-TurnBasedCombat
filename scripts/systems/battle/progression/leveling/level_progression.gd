@@ -60,7 +60,8 @@ static func apply_level_stats(battler: Battler, level: int = -1) -> void:
 		"max_health": battler.stats.max_health,
 		"attack": battler.stats.attack,
 		"defense": battler.stats.defense,
-		"agility": battler.stats.agility
+		"agility": battler.stats.agility,
+		"max_ap": battler.stats.max_ap
 	}
 	
 	# Get stat multipliers from BattlerStats exports
@@ -68,7 +69,8 @@ static func apply_level_stats(battler: Battler, level: int = -1) -> void:
 		"max_health": battler.stats.health_multiplier,
 		"attack": battler.stats.attack_multiplier,
 		"defense": battler.stats.defense_multiplier,
-		"agility": battler.stats.agility_multiplier
+		"agility": battler.stats.agility_multiplier,
+		"max_ap": battler.stats.ap_multiplier
 	}
 	
 	# Calculate new stats at this level
@@ -79,9 +81,12 @@ static func apply_level_stats(battler: Battler, level: int = -1) -> void:
 	battler.attack = calculated_stats.get("attack", 10)
 	battler.defense = calculated_stats.get("defense", 5)
 	battler.agility = calculated_stats.get("agility", 5)
+	battler.max_ap = calculated_stats.get("max_ap", 3)
+	battler.ap_regen_per_turn = battler.stats.ap_regen_per_turn
 	
-	# Update current health to not exceed max
+	# Update current health and AP to not exceed max
 	battler.current_health = min(battler.current_health, battler.max_health)
+	battler.current_ap = min(battler.current_ap, battler.max_ap)
 
 ## Handle level up - recalculate stats and apply bonuses
 static func level_up(battler: Battler) -> void:

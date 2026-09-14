@@ -39,7 +39,9 @@ Enemies at higher levels still follow the same formula, making boss encounters c
 
 ## How to Use in This Game
 
-### Setting Up a Character
+### Setting Up an Ally / Player Character
+> **Note**: Level progression multipliers apply to player/ally battlers via `BattlerStats`. Enemies use dedicated `EnemyStats` resources with fixed encounter stats (see `docs/ENEMY_CREATION_GUIDE.md`).
+
 1. **Open BattlerStats resource** (.tres file for a character)
 2. **Set Base Stats (Level 1):**
    - `max_health: 100`

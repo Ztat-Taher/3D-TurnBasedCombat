@@ -64,24 +64,26 @@ script = ExtResource("1")
 
 **Required Fields:**
 - `actor_animation`: Animation name (string)
-  - Use generic animation names for multi-character support (e.g., "attack", "magic_cast", "heal")
-  - Common generic values: "attack", "kick", "magic_cast", "heal", "defend", "heavy_attack"
-  - These will be resolved through character-specific animation mapping if available
+  - Use **canonical slot names only** — these work on every standardised character:
+    - Offensive: `"melee_combo_1"`, `"melee_combo_2"`, `"melee_combo_3"`, `"ranged_cast_1"`, `"ranged_cast_2"`
+    - Locomotion: `"walk"` · Defensive: `"dodge"`, `"parry"`, `"jump"`, `"jump_land"`, `"hit"`, `"death"`
+  - Non-melee skills/casts (heal, buff, debuff, spell attacks) all use the canonical cast slots `"ranged_cast_1"` / `"ranged_cast_2"`
+  - Legacy names like `"attack"`, `"heal"`, `"magic_cast"`, `"cast"`, `"defend"`, `"heavy_attack"` do **not** exist on the standardised AnimationTree and will fail validation
 - `animation_priority`: Integer (0-10, higher = more important)
 - `animation_blend_time`: Float (0.0-1.0 seconds)
 - `animation_speed`: Float (0.5-2.0 multiplier)
-- `fallback_animation`: Animation name if primary not found
+- `fallback_animation`: Canonical slot name used if `actor_animation` is empty
 - `animation_layer`: "full_body", "upper_body", or "additive"
 
 ### Animation Mapping System
 
-**Overview:** The animation mapping system allows cards to use generic animation names that are automatically remapped to character-specific animations. This eliminates the need to add every animation to every character.
+**Overview:** The animation mapping system allows cards to use the **canonical slot names** which are automatically remapped to character-specific animation states. This keeps cards portable across characters while still allowing each character to look unique.
 
 **How It Works:**
-1. Cards specify generic animation names (e.g., "magic_cast", "heavy_attack")
-2. Each character can have an AnimationMapping resource that maps generic names to their specific animations
-3. When a card is played, the system resolves the animation name through the character's mapping
-4. If no mapping exists, the original generic name is used (backward compatible)
+1. Cards specify canonical slot names (e.g., "melee_combo_1", "ranged_cast_1")
+2. Each character can have an AnimationMapping resource that maps canonical slots to their specific animation states
+3. When a card is played, the system resolves the slot name through the character's mapping
+4. If no mapping exists, the canonical slot name is used directly (every standardised tree has it)
 
 **AnimationMapping Resource:**
 
@@ -99,24 +101,29 @@ script = ExtResource("1")
 **Example AnimationMapping for Wizard:**
 ```gdscript
 animation_map = {
-    "attack": "wizard_staff_bash",
-    "magic_cast": "wizard_spell_cast",
-    "heal": "wizard_heal_cast",
-    "defend": "wizard_barrier",
-    "heavy_attack": "wizard_fireball_cast"
+    "melee_combo_1": "wizard_staff_bash",
+    "melee_combo_2": "wizard_staff_combo",
+    "ranged_cast_1": "wizard_spell_cast",
+    "ranged_cast_2": "wizard_fireball_cast",
+    "hit": "wizard_hit",
+    "death": "wizard_death"
 }
 ```
 
 **Example AnimationMapping for Ninja:**
 ```gdscript
 animation_map = {
-    "attack": "ninja_quick_slash",
-    "magic_cast": "ninja_ninja_magic",
-    "heal": "ninja_meditate",
-    "defend": "ninja_dodge",
-    "heavy_attack": "ninja_combo_attack"
+    "melee_combo_1": "ninja_quick_slash",
+    "melee_combo_2": "ninja_combo_slash",
+    "ranged_cast_1": "ninja_ninja_magic",
+    "ranged_cast_2": "ninja_shuriken_flurry",
+    "hit": "ninja_hit",
+    "death": "ninja_vanish"
 }
 ```
+**Important:** every value in `animation_map` must be a state that actually exists on
+that character's AnimationTree. Mapping to a state that is not in the tree will fail
+`_try_animation()` validation loudly — the character's tree is the source of truth.
 
 **Assigning AnimationMapping to Characters:**
 1. Create AnimationMapping resource in `database/animation_mappings/`
@@ -662,7 +669,7 @@ AI agents must ensure:
 ### Heal Card
 - Target: SINGLE_ALLY or ALL_ALLIES
 - Effect: HEAL
-- Animation: "heal" or "cast"
+- Animation: "ranged_cast_1" (canonical cast gesture)
 - No QTE typically
 - VFX: Healing aura on target
 - Audio: Heal sound
@@ -670,7 +677,7 @@ AI agents must ensure:
 ### Buff Card
 - Target: SINGLE_ALLY or ALL_ALLIES
 - Effect: BUFF with stat modifiers
-- Animation: "buff" or "cast"
+- Animation: "ranged_cast_1" or "ranged_cast_2"
 - No QTE typically
 - VFX: Buff glow on target
 - Duration: 2-3 turns
@@ -678,24 +685,30 @@ AI agents must ensure:
 ### Debuff Card
 - Target: SINGLE_ENEMY or ALL_ENEMIES
 - Effect: DEBUFF + State application
-- Animation: "magic_cast" or "attack" (use generic names)
+- Animation: "melee_combo_1" or "ranged_cast_1" (canonical slots only)
 - QTE: Optional timing QTE
 - States: Apply poison/slow/etc.
 - State chance: 0.5-0.75
 
-## Animation Mapping Best Practices
+## Canonical Animation Slot Reference
 
-### Generic Animation Names
-Use consistent, descriptive generic animation names across your card system:
-- `"attack"` - Basic attack animation
-- `"heavy_attack"` - Stronger attack animation
-- `"magic_cast"` - Spell casting animation
-- `"heal"` - Healing animation
-- `"defend"` - Defensive stance/animation
-- `"buff"` - Buff application animation
-- `"debuff"` - Debuff application animation
-- `"hit"` - Being hit reaction
-- `"death"` - Death animation
+### Offensive slots (`combat_actions` sub-machine)
+Use these for every damaging/skill card:
+- `"melee_combo_1"` - Basic melee attack
+- `"melee_combo_2"` - Second melee combo hit
+- `"melee_combo_3"` - Finishing melee hit
+- `"ranged_cast_1"` - Generic cast/skill gesture (heal, buff, debuff, spells)
+- `"ranged_cast_2"` - Alternate/second skill cast (heavy spells)
+
+### Root slots
+- `"walk"` - Locomotion · `"dodge"` - Dodge dash · `"parry"` - Block/parry
+- `"jump"` / `"jump_land"` - Jump evade · `"hit"` - Being hit reaction
+- `"death"` - Defeat animation
+
+> ⚠️ Legacy names (`"attack"`, `"kick"`, `"heal"`, `"magic_cast"`, `"cast"`,
+> `"defend"`, `"heavy_attack"`, `"buff"`, `"debuff"`) are **not** valid anywhere —
+> replace them with the canonical slots above. Unknown names are rejected by
+> `_try_animation()` validation with a clear error instead of being played.
 
 ### Character-Specific Mapping
 When creating a new character:

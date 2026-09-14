@@ -4,10 +4,12 @@ extends Resource
 ## Resource-driven balance parameters for card combat integration
 
 @export_group("Action Points System")
-## Action Points granted per turn
+## Action Points granted per turn (used as default fallback if battler has no stats)
 @export var ap_per_turn: int = 3
-## Maximum Action Points a player can have
+## Maximum Action Points a player can have (used as default fallback if battler has no stats)
 @export var max_ap: int = 3
+## Action Points cost to draw an extra card from the draw pile
+@export var draw_card_ap_cost: int = 1
 
 @export_group("Deck Settings")
 ## Number of cards in initial hand

@@ -1,5 +1,14 @@
-(Script used for functional turn based players.)
-res://battle-manager/players/battler_ally.gd
+(Unified script used for both turn-based players/allies and enemies:)
+res://scripts/systems/battle/battlers/main/battler.gd
 
-(Script used for functional turn based enemys.)
-res://battle-manager/players/battler_enemy.gd
+(Player/Ally Configuration Resource:)
+res://scripts/systems/battle/battlers/stats/BattlerStats.gd
+
+(Enemy Configuration Resources:)
+res://scripts/systems/battle/battlers/stats/EnemyStats.gd
+res://scripts/systems/battle/battlers/stats/EnemyAttackConfig.gd
+
+(Guides:)
+docs/ENEMY_CREATION_GUIDE.md
+docs/level_progression_guide.md
+ANIMATION_SYSTEM_GUIDE.md

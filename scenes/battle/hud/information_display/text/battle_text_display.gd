@@ -141,3 +141,7 @@ func show_perfect_parry(_target: Battler) -> void:
 ## Display counterattack text
 func show_counter(attacker: Battler, _target: Battler, damage: int) -> void:
 	display_battle_text("[color=#FF4444][b]💥 %s COUNTERS for %d DMG! 💥[/b][/color]" % [attacker.character_name, damage])
+
+## Display jump evade text
+func show_jump(target: Battler) -> void:
+	display_battle_text("[color=#FFEE44][b]🦘 %s JUMPED OVER! 🦘[/b][/color]" % target.character_name)

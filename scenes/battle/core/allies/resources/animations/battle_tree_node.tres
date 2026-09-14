@@ -1,43 +1,90 @@
 [gd_resource type="AnimationNodeStateMachine" format=3 uid="uid://c7waot7s0me6v"]
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_e4e1w"]
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_1"]
+animation = &"sword_02/sword_combo_attack_01_var002"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_2"]
+animation = &"sword_02/sword_combo_attack_01_var003"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_3"]
+animation = &"sword_02/sword_combo_attack_01_var004"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_1"]
 animation = &"Locomotion-Library/attack1"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ys4go"]
-animation = &"Locomotion-Library/kick1"
-
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xi3w4"]
+[sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_2"]
 animation = &"skill-animations/strong-attack"
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_q7yk4"]
-advance_mode = 0
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee1"]
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_4t2y6"]
-advance_mode = 0
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee2"]
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_e4e1w"]
-advance_mode = 0
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee3"]
 
-[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_q7yk4"]
-states/attack/node = SubResource("AnimationNodeAnimation_e4e1w")
-states/attack/position = Vector2(319, 18)
-states/kick/node = SubResource("AnimationNodeAnimation_ys4go")
-states/kick/position = Vector2(362, 100)
-states/skill-strong-attack/node = SubResource("AnimationNodeAnimation_xi3w4")
-states/skill-strong-attack/position = Vector2(371, 191)
-transitions = ["Start", "attack", SubResource("AnimationNodeStateMachineTransition_q7yk4"), "Start", "kick", SubResource("AnimationNodeStateMachineTransition_4t2y6"), "Start", "skill-strong-attack", SubResource("AnimationNodeStateMachineTransition_e4e1w")]
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged1"]
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_q7yk4"]
-animation = &"armature_stand"
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged2"]
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_f8jrq"]
-animation = &"Locomotion-Library/idle2"
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_4vh7f"]
+switch_mode = 2
+advance_mode = 2
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_lxots"]
-animation = &"Locomotion-Library/walk"
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_m5yw2"]
+switch_mode = 2
+advance_mode = 2
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_4t2y6"]
-animation = &"Locomotion-Library/walk"
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_thekq"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_csrss"]
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_jex2m"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachine" id="combat_actions_sm"]
+states/Start/position = Vector2(16, 174.4)
+states/melee_combo_1/node = SubResource("anim_melee_combo_1")
+states/melee_combo_1/position = Vector2(300.32, 3.2000008)
+states/melee_combo_2/node = SubResource("anim_melee_combo_2")
+states/melee_combo_2/position = Vector2(300, 100)
+states/melee_combo_3/node = SubResource("anim_melee_combo_3")
+states/melee_combo_3/position = Vector2(300, 180)
+states/ranged_cast_1/node = SubResource("anim_ranged_cast_1")
+states/ranged_cast_1/position = Vector2(300, 280)
+states/ranged_cast_2/node = SubResource("anim_ranged_cast_2")
+states/ranged_cast_2/position = Vector2(300, 360)
+transitions = ["Start", "melee_combo_1", SubResource("ca_start_to_melee1"), "Start", "melee_combo_2", SubResource("ca_start_to_melee2"), "Start", "melee_combo_3", SubResource("ca_start_to_melee3"), "Start", "ranged_cast_1", SubResource("ca_start_to_ranged1"), "Start", "ranged_cast_2", SubResource("ca_start_to_ranged2"), "melee_combo_1", "End", SubResource("AnimationNodeStateMachineTransition_4vh7f"), "melee_combo_2", "End", SubResource("AnimationNodeStateMachineTransition_m5yw2"), "melee_combo_3", "End", SubResource("AnimationNodeStateMachineTransition_thekq"), "ranged_cast_1", "End", SubResource("AnimationNodeStateMachineTransition_csrss"), "ranged_cast_2", "End", SubResource("AnimationNodeStateMachineTransition_jex2m")]
+graph_offset = Vector2(-12, -119.79018)
+
+[sub_resource type="AnimationNodeAnimation" id="anim_death"]
+animation = &"sword_02/sword_hit_death_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_dodge"]
+animation = &"sword_02/sword_dodge_combat_backward_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_hit"]
+animation = &"sword_02/sword_hit_backward_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_idle"]
+animation = &"sword_02/sword_idle_combat_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_jump"]
+animation = &"sword_02/sword_jump_start_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_jump_land"]
+animation = &"sword_02/sword_jump_stop_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_parry"]
+animation = &"sword_02/sword_block_hit_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_walk"]
+animation = &"sword_02/sword_dodge_combat_forward_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_walk_back"]
+animation = &"sword_02/sword_dodge_combat_backward_var001"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="start_to_idle"]
 advance_mode = 2
@@ -49,36 +96,86 @@ advance_condition = &"is_walking"
 [sub_resource type="AnimationNodeStateMachineTransition" id="walk_to_idle"]
 xfade_time = 0.2
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="walk_to_basic_attacks"]
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_walk_back"]
 xfade_time = 0.2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="walk_back_to_idle"]
+xfade_time = 0.2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_combat"]
+xfade_time = 0.15
 advance_condition = &"is_attacking"
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_basic_attacks"]
-xfade_time = 0.2
+[sub_resource type="AnimationNodeStateMachineTransition" id="walk_to_combat"]
+xfade_time = 0.15
 advance_condition = &"is_attacking"
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="basic_attacks_to_idle"]
+[sub_resource type="AnimationNodeStateMachineTransition" id="combat_to_idle"]
 xfade_time = 0.2
-advance_mode = 0
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_defend"]
-advance_condition = &"defend"
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="defend_to_idle"]
+switch_mode = 2
 advance_mode = 2
 
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_dodge"]
+advance_condition = &"is_dodging"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="dodge_to_idle"]
+xfade_time = 0.15
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_parry"]
+advance_condition = &"is_parrying"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="parry_to_idle"]
+xfade_time = 0.15
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_jump"]
+advance_condition = &"is_jumping"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="jump_to_jump_land"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="jump_land_to_idle"]
+xfade_time = 0.15
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_hit"]
+advance_condition = &"is_hit"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="hit_to_idle"]
+xfade_time = 0.1
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_death"]
+advance_condition = &"is_dead"
+
 [resource]
-states/End/position = Vector2(1205, 100)
-states/Start/position = Vector2(38, 29)
-states/basic_attacks/node = SubResource("AnimationNodeStateMachine_q7yk4")
-states/basic_attacks/position = Vector2(325.80048, 226.7181)
-states/defend/node = SubResource("AnimationNodeAnimation_q7yk4")
-states/defend/position = Vector2(230.58777, -8.376553)
-states/idle1/node = SubResource("AnimationNodeAnimation_f8jrq")
-states/idle1/position = Vector2(429, 19)
-states/run/node = SubResource("AnimationNodeAnimation_lxots")
-states/run/position = Vector2(292, 297)
-states/walk/node = SubResource("AnimationNodeAnimation_4t2y6")
-states/walk/position = Vector2(87.43619, 171.11974)
-transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "walk", "basic_attacks", SubResource("walk_to_basic_attacks"), "idle1", "basic_attacks", SubResource("idle_to_basic_attacks"), "basic_attacks", "idle1", SubResource("basic_attacks_to_idle"), "idle1", "defend", SubResource("idle_to_defend"), "defend", "idle1", SubResource("defend_to_idle")]
-graph_offset = Vector2(-97.199524, -52.05975)
+states/End/position = Vector2(1300, 200)
+states/Start/position = Vector2(38, 200)
+states/combat_actions/node = SubResource("combat_actions_sm")
+states/combat_actions/position = Vector2(621.6, 199.8592)
+states/death/node = SubResource("anim_death")
+states/death/position = Vector2(37.344, 49.504)
+states/dodge/node = SubResource("anim_dodge")
+states/dodge/position = Vector2(619.43036, 49.68)
+states/hit/node = SubResource("anim_hit")
+states/hit/position = Vector2(240, 50)
+states/idle1/node = SubResource("anim_idle")
+states/idle1/position = Vector2(240, 200)
+states/jump/node = SubResource("anim_jump")
+states/jump/position = Vector2(423.2, 347.82397)
+states/jump_land/node = SubResource("anim_jump_land")
+states/jump_land/position = Vector2(622.368, 348.48315)
+states/parry/node = SubResource("anim_parry")
+states/parry/position = Vector2(38.572815, 349.68)
+states/walk/node = SubResource("anim_walk")
+states/walk/position = Vector2(240, 350)
+states/walk_back/node = SubResource("anim_walk_back")
+states/walk_back/position = Vector2(240.288, 470.8)
+transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "combat_actions", "idle1", SubResource("combat_to_idle"), "idle1", "dodge", SubResource("idle_to_dodge"), "dodge", "idle1", SubResource("dodge_to_idle"), "idle1", "parry", SubResource("idle_to_parry"), "parry", "idle1", SubResource("parry_to_idle"), "idle1", "jump", SubResource("idle_to_jump"), "jump", "jump_land", SubResource("jump_to_jump_land"), "jump_land", "idle1", SubResource("jump_land_to_idle"), "idle1", "hit", SubResource("idle_to_hit"), "hit", "idle1", SubResource("hit_to_idle"), "idle1", "death", SubResource("idle_to_death")]
+graph_offset = Vector2(-173.40161, 80.4765)

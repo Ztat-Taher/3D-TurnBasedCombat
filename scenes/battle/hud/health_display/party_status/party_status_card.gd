@@ -46,11 +46,21 @@ func setup(ally: Battler) -> void:
 		ap_juice.enable_critical_health = false
 	
 	update_hp(ally.current_health, ally.max_health)
-	update_ap(3, 3) # Default AP
 	
-	# Try to get level from ally, default to 3 if not available
-	var level = 3
-	if "level" in ally:
+	# Read AP directly from ally battler
+	var ally_cur_ap = ally.current_ap if "current_ap" in ally else 3
+	var ally_max_ap = ally.max_ap if "max_ap" in ally else 3
+	update_ap(ally_cur_ap, ally_max_ap)
+	
+	# Connect to ally AP changes if signal exists
+	if ally.has_signal("ap_changed") and not ally.ap_changed.is_connected(update_ap):
+		ally.ap_changed.connect(update_ap)
+	
+	# Read level from ally stats
+	var level = 1
+	if ally.stats and "level" in ally.stats:
+		level = ally.stats.level
+	elif "level" in ally:
 		level = ally.level
 	elif ally.has_method("get_level"):
 		level = ally.get_level()

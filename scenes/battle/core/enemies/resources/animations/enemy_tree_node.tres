@@ -1,0 +1,182 @@
+[gd_resource type="AnimationNodeStateMachine" format=3 uid="uid://8pbhl24jtx0m"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_1"]
+animation = &"monster_01/monster_swipe_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_2"]
+animation = &"monster_02/zombie_kick_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_3"]
+animation = &"monster_02/zombie_headbutt_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_1"]
+animation = &"monster_01/monster_jump_attack_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_2"]
+animation = &"monster_02/zombie_attack_var001"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee1"]
+advance_mode = 0
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee2"]
+advance_mode = 0
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee3"]
+advance_mode = 0
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged1"]
+advance_mode = 0
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged2"]
+advance_mode = 0
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_jo775"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_giucu"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_hr4tk"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_yyo5o"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_yjvbk"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachine" id="combat_actions_sm"]
+states/Start/position = Vector2(16, 174.4)
+states/melee_combo_1/node = SubResource("anim_melee_combo_1")
+states/melee_combo_1/position = Vector2(300, 20)
+states/melee_combo_2/node = SubResource("anim_melee_combo_2")
+states/melee_combo_2/position = Vector2(300, 100)
+states/melee_combo_3/node = SubResource("anim_melee_combo_3")
+states/melee_combo_3/position = Vector2(300, 180.8)
+states/ranged_cast_1/node = SubResource("anim_ranged_cast_1")
+states/ranged_cast_1/position = Vector2(300, 280)
+states/ranged_cast_2/node = SubResource("anim_ranged_cast_2")
+states/ranged_cast_2/position = Vector2(300, 360)
+transitions = ["Start", "melee_combo_1", SubResource("ca_start_to_melee1"), "Start", "melee_combo_2", SubResource("ca_start_to_melee2"), "Start", "melee_combo_3", SubResource("ca_start_to_melee3"), "Start", "ranged_cast_1", SubResource("ca_start_to_ranged1"), "Start", "ranged_cast_2", SubResource("ca_start_to_ranged2"), "melee_combo_1", "End", SubResource("AnimationNodeStateMachineTransition_jo775"), "melee_combo_2", "End", SubResource("AnimationNodeStateMachineTransition_giucu"), "melee_combo_3", "End", SubResource("AnimationNodeStateMachineTransition_hr4tk"), "ranged_cast_1", "End", SubResource("AnimationNodeStateMachineTransition_yyo5o"), "ranged_cast_2", "End", SubResource("AnimationNodeStateMachineTransition_yjvbk")]
+graph_offset = Vector2(-58, -43.802643)
+
+[sub_resource type="AnimationNodeAnimation" id="anim_death"]
+animation = &"monster_01/monster_death_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_dodge"]
+animation = &"monster_02/zombie_stumble_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_hit"]
+animation = &"monster_02/zombie_reaction_hit_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_idle"]
+animation = &"monster_01/monster_breath_idle_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_jump"]
+animation = &"monster_01/monster_jump_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_jump_land"]
+animation = &"monster_01/monster_jump_var002"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_parry"]
+animation = &"monster_02/zombie_reaction_hit_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_walk"]
+animation = &"monster_01/monster_walk_var001"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_walk_back"]
+animation = &"monster_01/monster_walk_var001"
+play_mode = 1
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="start_to_idle"]
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_walk"]
+xfade_time = 0.2
+advance_condition = &"is_walking"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="walk_to_idle"]
+xfade_time = 0.2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_walk_back"]
+xfade_time = 0.2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="walk_back_to_idle"]
+xfade_time = 0.2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_combat"]
+xfade_time = 0.15
+advance_condition = &"is_attacking"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="walk_to_combat"]
+xfade_time = 0.15
+advance_condition = &"is_attacking"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="combat_to_idle"]
+xfade_time = 0.2
+advance_mode = 0
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_dodge"]
+advance_condition = &"is_dodging"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="dodge_to_idle"]
+xfade_time = 0.15
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_parry"]
+advance_condition = &"is_parrying"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="parry_to_idle"]
+xfade_time = 0.15
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_jump"]
+advance_condition = &"is_jumping"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="jump_to_jump_land"]
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="jump_land_to_idle"]
+xfade_time = 0.15
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_hit"]
+advance_condition = &"is_hit"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="hit_to_idle"]
+xfade_time = 0.1
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_death"]
+advance_condition = &"is_dead"
+
+[resource]
+states/End/position = Vector2(1300, 200)
+states/Start/position = Vector2(38, 200)
+states/combat_actions/node = SubResource("combat_actions_sm")
+states/combat_actions/position = Vector2(620.4787, 199.97185)
+states/death/node = SubResource("anim_death")
+states/death/position = Vector2(37.344, 49.504)
+states/dodge/node = SubResource("anim_dodge")
+states/dodge/position = Vector2(619.43036, 49.68)
+states/hit/node = SubResource("anim_hit")
+states/hit/position = Vector2(240, 50)
+states/idle1/node = SubResource("anim_idle")
+states/idle1/position = Vector2(240, 200)
+states/jump/node = SubResource("anim_jump")
+states/jump/position = Vector2(423.2, 347.82397)
+states/jump_land/node = SubResource("anim_jump_land")
+states/jump_land/position = Vector2(622.368, 348.48315)
+states/parry/node = SubResource("anim_parry")
+states/parry/position = Vector2(38.02291, 347.48273)
+states/walk/node = SubResource("anim_walk")
+states/walk/position = Vector2(240.768, 347.85828)
+states/walk_back/node = SubResource("anim_walk_back")
+states/walk_back/position = Vector2(240, 468.4)
+transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "combat_actions", "idle1", SubResource("combat_to_idle"), "idle1", "dodge", SubResource("idle_to_dodge"), "dodge", "idle1", SubResource("dodge_to_idle"), "idle1", "parry", SubResource("idle_to_parry"), "parry", "idle1", SubResource("parry_to_idle"), "idle1", "jump", SubResource("idle_to_jump"), "jump", "jump_land", SubResource("jump_to_jump_land"), "jump_land", "idle1", SubResource("jump_land_to_idle"), "idle1", "hit", SubResource("idle_to_hit"), "hit", "idle1", SubResource("hit_to_idle"), "idle1", "death", SubResource("idle_to_death")]
+graph_offset = Vector2(-101.40161, 43.088562)

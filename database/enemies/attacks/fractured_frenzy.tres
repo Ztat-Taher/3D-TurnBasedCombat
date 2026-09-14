@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyAttackConfig" format=3 uid="uid://fr4ctur3dfr3n"]
+
+[ext_resource type="Script" uid="uid://286lbfhgjnsn" path="res://scripts/systems/battle/battlers/stats/EnemyAttackConfig.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+attack_name = "Fractured Frenzy"
+animation_name = "ranged_cast_2"
+damage_multiplier = 1.4
+hit_frame_ratio = 0.55
+move_announcement_type = "attack"
+weight = 2.5
+description = "A wild lunging claw-flurry - can be dodged OR parried."
+can_dodge = true
+can_parry = true

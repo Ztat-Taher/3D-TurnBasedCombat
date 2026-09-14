@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyAttackConfig" format=3 uid="uid://5kullcru5h1ng"]
+
+[ext_resource type="Script" uid="uid://286lbfhgjnsn" path="res://scripts/systems/battle/battlers/stats/EnemyAttackConfig.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+attack_name = "Skull Crush"
+animation_name = "melee_combo_3"
+damage_multiplier = 1.6
+hit_frame_ratio = 0.7
+move_announcement_type = "attack"
+weight = 1.5
+description = "A heavy telegraphed overhead smash - can only be parried, never dodged."
+can_dodge = false
+can_parry = true

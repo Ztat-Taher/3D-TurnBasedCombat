@@ -1,5 +1,15 @@
-(Skills)
-res://database/skills/
+(Cards & Decks)
+res://database/cards/
+res://database/decks/
+res://database/card_configs/
+res://database/card_effects/
+res://database/animation_mappings/
 
-(States, Not implemented.)
-res://database/skills/states/
+(Items & Drops)
+res://database/items/
+
+(States & Status Effects)
+res://database/states/
+
+(Troops & Encounters)
+res://database/troops/

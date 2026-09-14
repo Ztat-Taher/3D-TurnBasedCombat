@@ -5,7 +5,7 @@
 
 [resource]
 script = ExtResource("1")
-actor_animation = "attack"
+actor_animation = "melee_combo_1"
 animation_priority = 5
 fallback_animation = "attack"
 primary_effect = ExtResource("2")
