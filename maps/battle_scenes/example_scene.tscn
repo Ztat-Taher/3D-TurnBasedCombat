@@ -71,11 +71,8 @@ material = SubResource("StandardMaterial3D_3fc4g")
 [node name="Ally1" parent="SubViewportContainer/SubViewport" index="2" unique_id=306467406 instance=ExtResource("1_2aqym")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.261, -1.006)
 
-[node name="Ally2" parent="SubViewportContainer/SubViewport" index="3" unique_id=1684378736 instance=ExtResource("1_2aqym")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.25, -1)
-
-[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport" index="4" unique_id=1327336196 groups=["battle_camera"]]
+[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport" index="3" unique_id=1327336196 groups=["battle_camera"]]
 transform = Transform3D(-0.73058707, -0.2284613, 0.6434656, -0.033112805, 0.953111, 0.30080417, -0.6820161, 0.19845673, -0.7038955, 2.48554, 3.00572, -3.08627)
 
-[node name="FRONTROW" type="Marker3D" parent="SubViewportContainer/SubViewport" index="5" unique_id=952362055 groups=["FRONTROW"]]
+[node name="FRONTROW" type="Marker3D" parent="SubViewportContainer/SubViewport" index="4" unique_id=952362055 groups=["FRONTROW"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 3.5)

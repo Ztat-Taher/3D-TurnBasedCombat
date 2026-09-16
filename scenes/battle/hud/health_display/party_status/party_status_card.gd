@@ -35,6 +35,7 @@ func setup(ally: Battler) -> void:
 	
 	update_hp(ally.current_health, ally.max_health)
 	
+	# Read AP directly from ally battler
 	var current_ap = 3
 	var max_ap = 3
 	if "current_ap" in ally:
@@ -43,8 +44,12 @@ func setup(ally: Battler) -> void:
 		max_ap = ally.max_ap
 	elif ally.has_method("get_max_ap"):
 		max_ap = ally.get_max_ap()
-		
+	
 	update_ap(current_ap, max_ap)
+	
+	# Connect to ally AP changes if signal exists
+	if ally.has_signal("ap_changed") and not ally.ap_changed.is_connected(update_ap):
+		ally.ap_changed.connect(update_ap)
 	
 	# Entrance animation
 	modulate.a = 0.0

@@ -28,6 +28,8 @@ extends Resource
 @export var parry_action: String = "parry"
 ## Input action name for dodge
 @export var dodge_action: String = "dodge"
+## Input action name for jump (evade low/sweep attacks)
+@export var jump_action: String = "jump"
 
 @export_group("QTE Timing")
 ## Base time (seconds) for countdown QTEs

@@ -27,11 +27,6 @@ enum Elements {
 	NONE = 6, # In theory this would ensure everyone can be effected.
 	ENDLIST}
 
-enum SkillTypes {
-	SKILLS = 0,
-	HEALING = 1, #Placerholder.
-	HEALTHREDUCTIONATTACKS = 2,
-	ENDLIST}
 
 enum ItemTypes {
 	HEALING = 0,

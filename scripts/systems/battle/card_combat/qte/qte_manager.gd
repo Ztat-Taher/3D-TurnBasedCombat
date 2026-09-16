@@ -69,19 +69,32 @@ func start_card_qte(card: CardData) -> bool:
 # ============================================================================
 
 ## Awaits reactive input from player within the defense window.
-## Returns: "perfect_parry", "parry", "dodge", or "none"
-func await_reactive_defense(defender: Battler) -> String:
+## Returns: "perfect_parry", "parry", "dodge", "jump", or "none"
+func await_reactive_defense(defender: Battler, attack_config: EnemyAttackConfig = null) -> String:
 	if not qte_config or not qte_config.reactive_defense_enabled:
 		return "none"
+	
+	# Determine which defenses are allowed for this attack
+	var allowed: Dictionary
+	if attack_config:
+		allowed = attack_config.get_allowed_defenses()
+	else:
+		allowed = {"jump": false, "dodge": true, "parry": true}
+	
+	var allowed_jump: bool = allowed.get("jump", false)
+	var allowed_dodge: bool = allowed.get("dodge", true)
+	var allowed_parry: bool = allowed.get("parry", true)
 	
 	var window_duration = qte_config.reactive_window_duration
 	var perfect_duration = qte_config.perfect_parry_window
 	var parry_action = qte_config.parry_action
 	var dodge_action = qte_config.dodge_action
+	var jump_action = qte_config.jump_action if qte_config.get("jump_action") != null else "jump"
 	
 	var hud = _get_hud()
 	if hud and hud.has_method("show_parry_window"):
-		hud.show_parry_window(window_duration, perfect_duration, defender.character_name if defender else "Ally")
+		hud.show_parry_window(window_duration, perfect_duration, defender.character_name if defender else "Ally",
+				allowed_parry, allowed_dodge, allowed_jump)
 	
 	var start_time = Time.get_ticks_msec() / 1000.0
 	var outcome = "none"
@@ -94,7 +107,16 @@ func await_reactive_defense(defender: Battler) -> String:
 		if hud and hud.has_method("update_parry_window"):
 			hud.update_parry_window(max(0.0, time_left))
 		
-		# Check for Dodge input (E key or B button)
+		# Check for Jump input (Space or jump action) — only valid if allowed
+		var jump_pressed = false
+		if InputMap.has_action(jump_action):
+			if Input.is_action_just_pressed(jump_action):
+				jump_pressed = true
+		if not jump_pressed:
+			if Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE):
+				jump_pressed = true
+		
+		# Check for Dodge input (E key or dodge action) — only valid if allowed
 		var dodge_pressed = false
 		if InputMap.has_action(dodge_action):
 			if Input.is_action_just_pressed(dodge_action):
@@ -103,7 +125,7 @@ func await_reactive_defense(defender: Battler) -> String:
 			if Input.is_key_pressed(KEY_E) or Input.is_physical_key_pressed(KEY_E):
 				dodge_pressed = true
 		
-		# Check for Parry input (Q key or LB button)
+		# Check for Parry input (Q key or parry action) — only valid if allowed
 		var parry_pressed = false
 		if InputMap.has_action(parry_action):
 			if Input.is_action_just_pressed(parry_action):
@@ -112,14 +134,19 @@ func await_reactive_defense(defender: Battler) -> String:
 			if Input.is_key_pressed(KEY_Q) or Input.is_physical_key_pressed(KEY_Q):
 				parry_pressed = true
 		
-		if parry_pressed:
+		# Resolve outcome — only allowed defenses count
+		if jump_pressed and allowed_jump:
+			outcome = "jump"
+			break
+		
+		if parry_pressed and allowed_parry:
 			if elapsed <= perfect_duration:
 				outcome = "perfect_parry"
 			else:
 				outcome = "parry"
 			break
 		
-		if dodge_pressed:
+		if dodge_pressed and allowed_dodge:
 			outcome = "dodge"
 			break
 		

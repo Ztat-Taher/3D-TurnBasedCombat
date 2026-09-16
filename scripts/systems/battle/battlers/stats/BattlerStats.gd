@@ -1,26 +1,22 @@
 @tool
 class_name BattlerStats
 extends Resource
+## Configuration and progression stats for player/ally battlers
 
-@export var character_name: String = "Player" ## Fill in this variable as soon as possible, This will be used when mentioning the character
-@export var thumbnail: Texture2D = preload("res://Placeholder.svg") ## Portrait shown in battle results UI.
-@export var is_boss: bool = false ## If true, this battler uses the cinematic top-center boss health bar instead of a regular overhead bar.
-
-@export_group("Battle Rewards")
-@export var exp_reward: int = 100 ## EXP granted when this battler is defeated.
-@export var cash_reward: int = 10 ## Cash granted when this battler is defeated.
-@export var item_drops: Array[EnemyDrop] = [] ## Optional item drops with per-drop percentage chance (EnemyDrop resources).
+@export var character_name: String = "Player" ## Character display name
+@export var thumbnail: Texture2D = preload("res://Placeholder.svg") ## Portrait shown in battle results and HUD
 
 ## LEVEL-FOCUSED PROGRESSION SYSTEM
-## Each battler has a level that determines their stats via multipliers
 ## Stat = base_stat + (level - 1) * stat_multiplier
 @export var level: int = 1 ## Character level (determines stat scaling)
 
 @export_group("Base Stats (at Level 1)")
 @export var max_health: int = 100 ## Health is used to make sure character's take longer to be downed.
-@export var attack: int = 10 ## Attack will increase the amount of base damage when peforming any skill.
-@export var defense: int = 5 ## Defense is another way to reduce damage. (Added to the damage intake)
-@export var agility: int = 5 ## Agility of the character (affects speed and evasion)
+@export var attack: int = 10 ## Attack increases the amount of base damage when performing cards/attacks.
+@export var defense: int = 5 ## Defense reduces incoming damage.
+@export var agility: int = 5 ## Agility affects combat speed and turn order.
+@export var max_ap: int = 3 ## Maximum Action Points for actions and card play
+@export var ap_regen_per_turn: int = 3 ## AP regenerated at the start of each turn
 
 @export_group("Stat Multipliers (per level)")
 ## Growth per level: new_stat = base_stat + (level - 1) * multiplier
@@ -28,9 +24,10 @@ extends Resource
 @export var attack_multiplier: int = 2 ## Attack gain per level
 @export var defense_multiplier: int = 1 ## Defense gain per level
 @export var agility_multiplier: int = 1 ## Agility gain per level
+@export var ap_multiplier: int = 0 ## AP gain per level (default 0)
 
 @export_group("Other Stats")
-@export var element: int = GlobalBattleSettings.Elements.Physical ## Elements has their own docs file.
+@export var element: int = GlobalBattleSettings.Elements.Physical ## Character element
 
 ## Voicelines and Audio
-@export var voicelines: Voicelines  ## Character voicelines for combat events
+@export var voicelines: Voicelines ## Character voicelines for combat events

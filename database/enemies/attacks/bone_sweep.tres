@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EnemyAttackConfig" format=3 uid="uid://b0n3sw33p1ng"]
+
+[ext_resource type="Script" uid="uid://286lbfhgjnsn" path="res://scripts/systems/battle/battlers/stats/EnemyAttackConfig.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+attack_name = "Bone Sweep"
+animation_name = "melee_combo_2"
+damage_multiplier = 1.2
+hit_frame_ratio = 0.6
+move_announcement_type = "attack"
+weight = 2.0
+description = "A low bone-kick sweep - must be jumped over, dodge and parry are disabled."
+can_dodge = false
+can_parry = false
+requires_jump = true

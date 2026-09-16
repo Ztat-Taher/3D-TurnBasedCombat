@@ -1,0 +1,32 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://c3m7vfireovl1"]
+
+[ext_resource type="Shader" uid="uid://bgemy4n8cw2ra" path="res://assets/effects/shaders/fire_aura.gdshader" id="1_fire"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_fire"]
+frequency = 0.035
+fractal_octaves = 3
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_fire"]
+noise = SubResource("FastNoiseLite_fire")
+seamless = true
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_fire")
+shader_parameter/primary_color = Color(1, 0.45, 0.1, 1)
+shader_parameter/secondary_color = Color(1, 0.9, 0.4, 1)
+shader_parameter/tertiary_color = Color(0.5, 0.05, 0, 1)
+shader_parameter/emission = 3.0
+shader_parameter/color_curve = 1.0
+shader_parameter/hue_variation = 0.05
+shader_parameter/noise_texture = SubResource("NoiseTexture2D_fire")
+shader_parameter/noise_scale = Vector2(1.2, 0.8)
+shader_parameter/noise_scroll = Vector2(0, -0.5)
+shader_parameter/shape_curve = 1.5
+shader_parameter/intensity = 2.2
+shader_parameter/fresnel_power = 3.0
+shader_parameter/distortion_strength = 0.08
+shader_parameter/edge_hardness = 0.0
+shader_parameter/edge_position = 0.0
+shader_parameter/proximity_fade = false
+shader_parameter/proximity_fade_distance = 1.0

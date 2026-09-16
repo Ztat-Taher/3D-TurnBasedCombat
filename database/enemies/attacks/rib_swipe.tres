@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyAttackConfig" format=3 uid="uid://r1b5w1p34tt4c"]
+
+[ext_resource type="Script" uid="uid://286lbfhgjnsn" path="res://scripts/systems/battle/battlers/stats/EnemyAttackConfig.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+attack_name = "Rib Swipe"
+animation_name = "melee_combo_1"
+damage_multiplier = 1.0
+hit_frame_ratio = 0.5
+move_announcement_type = "attack"
+weight = 3.0
+description = "A fast horizontal claw swipe - can only be dodged, never parried."
+can_dodge = true
+can_parry = false

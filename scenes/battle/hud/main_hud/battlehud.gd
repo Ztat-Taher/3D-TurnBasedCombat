@@ -361,10 +361,13 @@ func update_party_status() -> void:
 		# Update HP
 		card.update_hp(ally.current_health, ally.max_health)
 		
-		# Update AP (from last_ap_by_battler)
-		var ap_data = last_ap_by_battler.get(ally, { "current": 3, "max": 3 })
-		var cur_ap = ap_data.get("current", 3)
-		var max_ap = ap_data.get("max", 3)
+		# Update AP (from ally directly or fallback to last_ap_by_battler)
+		var cur_ap = ally.current_ap if "current_ap" in ally else 3
+		var max_ap = ally.max_ap if "max_ap" in ally else 3
+		if not ("current_ap" in ally):
+			var ap_data = last_ap_by_battler.get(ally, { "current": 3, "max": 3 })
+			cur_ap = ap_data.get("current", 3)
+			max_ap = ap_data.get("max", 3)
 		card.update_ap(cur_ap, max_ap)
 
 func set_activebattler(character: Node):
@@ -392,9 +395,11 @@ func _check_boss_bar(enemy_node: Node) -> void:
 	if not boss_bar or not is_instance_valid(enemy_node):
 		return
 	var is_boss_enemy := false
-	if "is_boss" in enemy_node:
+	if "enemy_stats" in enemy_node and enemy_node.enemy_stats and "is_boss" in enemy_node.enemy_stats:
+		is_boss_enemy = enemy_node.enemy_stats.is_boss
+	elif "is_boss" in enemy_node:
 		is_boss_enemy = enemy_node.is_boss
-	elif enemy_node.stats and "is_boss" in enemy_node.stats:
+	elif "stats" in enemy_node and enemy_node.stats and "is_boss" in enemy_node.stats:
 		is_boss_enemy = enemy_node.stats.is_boss
 	if is_boss_enemy:
 		boss_bar.show_boss(enemy_node as Battler)
@@ -734,7 +739,8 @@ func update_ui():
 # ============================================================================
 var _parry_window: ParryWindow = null
 
-func show_parry_window(duration: float, perfect_duration: float, defender_name: String) -> void:
+func show_parry_window(duration: float, perfect_duration: float, defender_name: String,
+		allow_parry: bool = true, allow_dodge: bool = true, allow_jump: bool = false) -> void:
 	hide_parry_window()
 	
 	if not parry_window_scene:
@@ -746,7 +752,7 @@ func show_parry_window(duration: float, perfect_duration: float, defender_name: 
 		push_error("Failed to instantiate parry window!")
 		return
 	
-	_parry_window.setup(defender_name, duration, perfect_duration)
+	_parry_window.setup(defender_name, duration, perfect_duration, allow_parry, allow_dodge, allow_jump)
 	$Control.add_child(_parry_window)
 
 func update_parry_window(time_remaining: float) -> void:

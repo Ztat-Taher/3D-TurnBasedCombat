@@ -24,6 +24,9 @@ KEY RESOURCES
 	 * formation: Formation type (enum)
 	 * damage_reduction: Multiplier applied to all enemies (1.0 = normal)
 
+Note: Enemy scenes referenced in enemy_scenes should be configured with EnemyStats
+(see docs/ENEMY_CREATION_GUIDE.md for instructions on creating enemy battlers).
+
 ========================================
 FORMATIONS
 ========================================

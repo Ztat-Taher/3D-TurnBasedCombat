@@ -61,7 +61,7 @@ func _execute_counter_attack(defender: Battler, attacker: Battler) -> void:
 	# Default counter attack (basic attack with multiplier)
 	attacker.is_counter_stunned = true  # Stun attacker
 
-	defender._try_animation("basic_attacks/attack")
+	defender._try_animation(AnimationMapping.MELEE_COMBO_1)
 	await defender.get_tree().create_timer(0.5).timeout
 
 	var counter_damage = Formulas.physical_damage(

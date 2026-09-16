@@ -936,9 +936,6 @@ func _cancel_menu_selection() -> void:
 			hud._close_items_menu()
 		else:
 			hud.item_select.hide()
-	var skill_select = hud.get("skill_select")
-	if skill_select:
-		skill_select.hide()
 	hud.show_action_buttons(current_character)
 
 func _do_menu_selection() -> void:
@@ -995,7 +992,7 @@ func _on_anim_damage():
 	# For now, keeping it for compatibility with existing animations
 	pass
 
-func damage_calculation(attacker, target, damage) -> void:
+func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConfig = null) -> void:
 	# Safety check - if damage is 0, don't process
 	if damage <= 0:
 		return
@@ -1018,10 +1015,11 @@ func damage_calculation(attacker, target, damage) -> void:
 	
 	damage = Formulas.physical_damage(attacker, target, damage)
 	
-	# Check for reactive defense (Dodge / Parry / Perfect Parry Counter) if target is player ally
+	# Check for reactive defense (Dodge / Parry / Perfect Parry Counter / Jump) if target is player ally
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 	if card_battle_manager and target in players:
-		damage = await card_battle_manager.trigger_reactive_defense(attacker, damage, target)
+		damage = await card_battle_manager.trigger_reactive_defense(attacker, damage, target, attack_config)
+
 	
 	# Only apply if damage is still positive after calculation
 	if damage > 0:
@@ -1375,7 +1373,13 @@ func _execute_aoe_card_async(card_battle_manager: CardBattleManager, card: CardD
 	card_battle_manager.is_executing_card = true
 	
 	# Spend AP
-	if card_battle_manager.ap_system:
+	if card_battle_manager.current_player_battler:
+		card_battle_manager.current_player_battler.spend_ap(card.cost)
+		if card_battle_manager.ap_system:
+			card_battle_manager.ap_system.current_ap = card_battle_manager.current_player_battler.current_ap
+			card_battle_manager.ap_system.max_ap = card_battle_manager.current_player_battler.max_ap
+		card_battle_manager.ap_changed.emit(card_battle_manager.current_player_battler.current_ap, card_battle_manager.current_player_battler.max_ap)
+	elif card_battle_manager.ap_system:
 		card_battle_manager.ap_system.spend_ap(card.cost)
 	
 	# Remove from hand

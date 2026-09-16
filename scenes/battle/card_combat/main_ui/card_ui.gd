@@ -303,9 +303,13 @@ func _on_draw_pile_pressed() -> void:
 	if not card_battle_manager or card_battle_manager.is_executing_card:
 		return
 	
-	# Check if player has at least 1 AP
+	# Check if player has enough AP
+	var draw_cost = 1
+	if card_battle_manager.card_battle_config:
+		draw_cost = card_battle_manager.card_battle_config.draw_card_ap_cost
+	
 	var ap_info = card_battle_manager.get_ap_info()
-	if ap_info.get("current_ap", 0) < 1:
+	if ap_info.get("current_ap", 0) < draw_cost:
 		return
 	
 	# Check if hand is not full (max_hand_size check)
@@ -318,8 +322,15 @@ func _on_draw_pile_pressed() -> void:
 	if hand.size() >= max_hand_size:
 		return
 	
-	# Spend 1 AP
-	card_battle_manager.ap_system.spend_ap(1)
+	# Spend AP
+	if card_battle_manager.current_player_battler:
+		card_battle_manager.current_player_battler.spend_ap(draw_cost)
+		if card_battle_manager.ap_system:
+			card_battle_manager.ap_system.current_ap = card_battle_manager.current_player_battler.current_ap
+			card_battle_manager.ap_system.max_ap = card_battle_manager.current_player_battler.max_ap
+		card_battle_manager.ap_changed.emit(card_battle_manager.current_player_battler.current_ap, card_battle_manager.current_player_battler.max_ap)
+	elif card_battle_manager.ap_system:
+		card_battle_manager.ap_system.spend_ap(draw_cost)
 	
 	# Draw a card from the deck
 	var drawn_card = card_battle_manager.draw_card_for_deck(deck)

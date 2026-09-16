@@ -1,6 +1,6 @@
 ## [color=green]AI Manager[/color]
 ## [br][br]
-## This class manages AI action selection based on Skills available to the battler,
+## This class manages AI action selection based on EnemyStats and EnemyAttackConfig available to the battler,
 ## the battler's Intelligence, and AI Type.
 ## [br][br]
 ## Logic to handle decision-making for NPCs in combat should be put in here.
@@ -36,15 +36,37 @@ func aggressive_action(character:Battler, players: Array, battle_manager:BattleM
 			await battle_manager.get_tree().create_timer(0.45).timeout
 		
 		# STEP 2: Move to Target Focus Camera on acting enemy & Announce Move
+		var chosen_attack: EnemyAttackConfig = null
+		if character.enemy_stats and not character.enemy_stats.attacks.is_empty():
+			# Weighted random attack selection
+			var total_weight = 0.0
+			for atk in character.enemy_stats.attacks:
+				if atk:
+					total_weight += atk.weight
+			var roll = randf() * max(0.01, total_weight)
+			var current_weight = 0.0
+			for atk in character.enemy_stats.attacks:
+				if atk:
+					current_weight += atk.weight
+					if roll <= current_weight:
+						chosen_attack = atk
+						break
+			if not chosen_attack and not character.enemy_stats.attacks.is_empty():
+				chosen_attack = character.enemy_stats.attacks[0]
+		
 		var move_name = "Strike"
-		if character.stats and character.stats.character_name:
-			move_name = "%s's Attack" % character.stats.character_name
+		var announcement_type = "attack"
+		if chosen_attack:
+			move_name = chosen_attack.attack_name
+			announcement_type = chosen_attack.move_announcement_type
+		elif character.character_name:
+			move_name = "%s's Attack" % character.character_name
 		
 		if battle_manager.battle_camera:
 			battle_manager.battle_camera.set_target_focus(character)
 		
 		if battle_manager.hud and battle_manager.hud.has_method("show_move_announcement"):
-			battle_manager.hud.show_move_announcement(character.character_name, move_name, "attack")
+			battle_manager.hud.show_move_announcement(character.character_name, move_name, announcement_type)
 		
 		# Dramatic pause for announcement display
 		await battle_manager.get_tree().create_timer(0.85).timeout
@@ -59,7 +81,7 @@ func aggressive_action(character:Battler, players: Array, battle_manager:BattleM
 		
 		# STEP 4: Execution
 		# attack_anim handles movement, turns, contact-frame damage at hit_moment, and return-to-origin
-		await character.attack_anim(target)
+		await character.attack_anim(target, chosen_attack)
 
 
 func defensive_action(character:Battler, players: Array, battle_manager:BattleManager) -> void:

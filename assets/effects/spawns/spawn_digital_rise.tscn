@@ -1,0 +1,154 @@
+[gd_scene format=4 uid="uid://efc40n07g20a"]
+
+[ext_resource type="Script" path="res://assets/effects/core/vfx_instance.gd" id="1_scr"]
+[ext_resource type="Texture2D" uid="uid://byr4qgw2mukq5" path="res://assets/effects/textures/gradient_linear_01.png" id="2_5atko"]
+[ext_resource type="Shader" uid="uid://bx8tqw5dddb4y" path="res://assets/effects/shaders/rise_squares_process.gdshader" id="7_prc"]
+[ext_resource type="Shader" uid="uid://ckoujkbqp16gk" path="res://assets/effects/shaders/rise_bits_process.gdshader" id="8_bits"]
+
+[sub_resource type="Gradient" id="Gradient_rise"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 0.95, 0.78, 1, 1, 0.62, 0.28, 1, 0.5, 0.18, 0.02, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_rise"]
+gradient = SubResource("Gradient_rise")
+metadata/uniform_name = "u_m2_rgb"
+
+[sub_resource type="Shader" id="Shader_squares"]
+code = "shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled;
+
+uniform float opacity = 1.0;
+uniform sampler2D main_tex : source_color, filter_linear_mipmap, repeat_disable;
+
+varying flat uint instance_id;
+varying float age;
+
+void vertex()
+{
+	instance_id = uint(INSTANCE_ID);
+	age = INSTANCE_CUSTOM.y;
+}
+
+void fragment()
+{
+	vec4 main_s = texture(main_tex, UV);
+	ALPHA = COLOR.a;
+	ALPHA *= main_s.r;
+	ALPHA = clamp(ALPHA * opacity, 0.0, 1.0);
+	ALBEDO = COLOR.rgb;
+	ALBEDO *= main_s.rgb;
+	
+}
+
+
+"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_add"]
+render_priority = 0
+shader = SubResource("Shader_squares")
+shader_parameter/opacity = 1.0
+shader_parameter/main_tex = ExtResource("2_5atko")
+
+[sub_resource type="Curve" id="Curve_m2a"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.1, 1), 0.0, 0.0, 0, 0, Vector2(0.72, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTexture_m2a"]
+curve = SubResource("Curve_m2a")
+metadata/uniform_name = "u_m2_alpha"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_process"]
+shader = ExtResource("7_prc")
+shader_parameter/spawn_height = 0.03
+shader_parameter/rise_speed = 1.4
+shader_parameter/rise_acceleration = 3.0
+shader_parameter/acceleration_curve = 2.5
+shader_parameter/square_size = 0.65
+shader_parameter/yaw_angle = 0.0
+shader_parameter/u_m2_rgb = SubResource("GradientTexture1D_rise")
+shader_parameter/u_m2_alpha = SubResource("CurveTexture_m2a")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ck6ip"]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_0jsxj"]
+_surfaces = [{
+"aabb": AABB(-1, -0.00616753, -1, 2, 0.01233506, 2),
+"format": 34896613377,
+"index_count": 96,
+"index_data": PackedByteArray("AAABAAIAAwACAAEABAAAAAIAAAAFAAEABAACAAYABwAAAAQACAACAAMACAAGAAIAAwABAAkACQAHAAMAAwAKAAgAAwAHAAoABwAEAAoACwAAAAcACQALAAcACwAFAAAACQABAAwABQAMAAEADQALAAkACQAMAA0ADQAMAAYADQAGAAgADgAGAAwADgAEAAYABQAOAAwACgAEAA4ADwAFAAsADQAPAAsADwAOAAUACAAPAA0ACgAOAA8ACAAKAA8A"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 16,
+"vertex_data": PackedByteArray("AAAAAP//AAAAAP//AAAAAAAA/////wAARQX//7n6AAD//wAA//8AAAAAAAAAAAAA////////AABFBQAAufoAALn6//+5+gAARQX//0UFAAC5+gAAufoAAEUFAABFBQAA/////wAAAAC5+v//RQUAAP//AAAAAAAAufoAAEUFAAA=")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_5atko"]
+resource_name = "box_01_Cube_002"
+_surfaces = [{
+"aabb": AABB(-1, -0.00616753, -1, 2, 0.01233506, 2),
+"attribute_data": PackedByteArray("/1////+f/7//n////1//v/9f/7//n/9//5//v/9f/3//X/9//5//P/+f/3//X/8//1//P/+fAAD/n/8//18AAFChUUGuXq5+UKGufq5eUUGt3lFBrl5RQVChUUFRIVFBUSGufv8f/z9RIVFB/1//P/8f/3+uXlFBrl6ufv9f/3+t3lFB/9//f63ern7/n/9//9//P1Chrn5QoVFB/5//P1Chrn5RIa5+rd6ufq5ern6t3q5+USFRQa3eUUFRIa5+"),
+"format": 34896613399,
+"index_count": 96,
+"index_data": PackedByteArray("AAABAAIAAAADAAEABAAFAAYABAAHAAUACAAJAAoACAALAAkADAANAA4ADAAPAA0AEAARABIAEAATABEAFAAVABYAFAAXABUAGAAZABoAGgAZABsAGAAcABkAGgAbAB0AHgAcABgAHQAbAB8AHgAfABwAHQAfAB4AIAAhACIAIgAhACMAIAAkACEAIgAjACUAJgAkACAAJQAjACcAJgAnACQAJQAnACYAKAApACoAKAArACkALAAtAC4ALAAvAC0A"),
+"material": SubResource("StandardMaterial3D_ck6ip"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 48,
+"vertex_data": PackedByteArray("AAAAAP//VNUAAP//AABU1QAA/////1TVAAAAAAAAVNUAAAAAAAD///////8AAP//AAD//wAA/////wAAAAD/////AAAAAFTV////////VNX/////AABU1f//AAD//1TV//8AAP///78AAP//////v/////////+/AAAAAP///7+5+v//ufqqKrn6AABFBaoqufr//0UFqiq5+gAAufqqKkUF//+5+v//ufoAALn6//+5+v//ufr//0UFAAC5+v//RQUAAEUF/78AAAAA////v0UFAAC5+v+///8AAP///78AAAAAAAD/v7n6AAC5+v+/ufoAAEUF/7///wAAAAD/v0UF//+5+v//AAD//wAA//9FBf//RQX///////8AAP//AAD///////+5+v//RQX//7n6//+5+v////////////+5+v//RQX+f0UFAABFBf5/RQX//0UF/n+5+gAARQX+f0UF//9FBVTVRQUAALn6VNVFBf//ufpU1UUFAABFBVTVVNVU1VTVVNVU1VTVVNVU1f+//7//v/+//7//v/+//7+qKqoqqiqqKqoqqiqqKqoq/////////////////////1TVVNVU1VTVVNVU1VTVVNX///9/////f////3////9/AAD/fwAA/38AAP9/AAD/fwAA/38AAP9/AAD/fwAA/3//f/+//3//v/9//7//f/+//3//v/9//7//f/+//3//v/9/////f////3////9///+qKqoqqiqqKqoqqiqqKqoq")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_0jsxj")
+
+[sub_resource type="Curve" id="Curve_bits_grow"]
+_data = [Vector2(0, 0.35), 0.0, 0.0, 0, 0, Vector2(0.15, 1), 0.0, 0.0, 0, 0, Vector2(1, 1.15), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_bits_grow"]
+curve = SubResource("Curve_bits_grow")
+metadata/uniform_name = "u_m1_scale"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bits"]
+shader = ExtResource("8_bits")
+shader_parameter/scatter_radius = 0.55
+shader_parameter/spawn_height_min = 0.05
+shader_parameter/spawn_height_max = 0.35
+shader_parameter/drift = 0.25
+shader_parameter/rise_speed_min = 1.9
+shader_parameter/rise_speed_max = 2.7
+shader_parameter/bit_size = 1.0
+shader_parameter/u_m1_scale = SubResource("CurveTexture_bits_grow")
+shader_parameter/u_m2_rgb = SubResource("GradientTexture1D_rise")
+shader_parameter/u_m2_alpha = SubResource("CurveTexture_m2a")
+
+[sub_resource type="BoxMesh" id="BoxMesh_bits"]
+size = Vector3(0.06, 0.16, 0.025)
+
+[node name="SpawnDigitalRise" type="Node3D" unique_id=945310400]
+script = ExtResource("1_scr")
+Color = SubResource("GradientTexture1D_rise")
+
+[node name="Squares" type="GPUParticles3D" parent="." unique_id=2147022500]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+material_override = SubResource("ShaderMaterial_add")
+cast_shadow = 0
+lifetime = 1.8
+fixed_fps = 60
+interpolate = false
+fract_delta = false
+local_coords = true
+process_material = SubResource("ShaderMaterial_process")
+draw_pass_1 = SubResource("ArrayMesh_5atko")
+
+[node name="Bits" type="GPUParticles3D" parent="." unique_id=2147022502]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+material_override = SubResource("ShaderMaterial_add")
+cast_shadow = 0
+amount = 12
+lifetime = 1.1
+fixed_fps = 60
+interpolate = false
+fract_delta = false
+local_coords = true
+process_material = SubResource("ShaderMaterial_bits")
+draw_pass_1 = SubResource("BoxMesh_bits")

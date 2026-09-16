@@ -83,7 +83,9 @@ func _apply_vfx_configuration(vfx_instance: Node, spawn_position: Vector3, targe
 		vfx_instance.scale = vfx_scale
 	
 	# Apply color modulation
-	if vfx_instance.has_method("set_modulate"):
+	if vfx_instance is VFXInstance:
+		vfx_instance.set_vfx_color(vfx_color)
+	elif vfx_instance.has_method("set_modulate"):
 		vfx_instance.set_modulate(vfx_color)
 	elif vfx_instance is MeshInstance3D:
 		if vfx_instance.get_surface_override_material(0):
@@ -94,9 +96,14 @@ func _apply_vfx_configuration(vfx_instance: Node, spawn_position: Vector3, targe
 		target_node.add_child(vfx_instance)
 		vfx_instance.global_position = final_position # Reset position after reparenting
 	
-	# Handle particle systems
-	if vfx_instance.has_method("set_emitting"):
+	# Handle particle systems & VFXInstance
+	if vfx_instance is VFXInstance:
+		vfx_instance.emitting = true
+		vfx_instance.play()
+	elif vfx_instance.has_method("set_emitting"):
 		vfx_instance.set_emitting(true)
+	elif vfx_instance.has_method("start"):
+		vfx_instance.start()
 	
 	if vfx_instance is GPUParticles3D:
 		vfx_instance.emitting = true
