@@ -214,8 +214,15 @@ func _on_button_up() -> void:
 
 func _on_button_pressed() -> void:
 	animate_press()
-	await get_tree().create_timer(press_duration).timeout
-	animate_release()
+	
+	# If the button is pressed, we want to show the press then release
+	# We check if we are still in the tree because the button might have triggered
+	# a scene change or been freed immediately upon being pressed.
+	if is_inside_tree():
+		var timer = get_tree().create_timer(press_duration)
+		await timer.timeout
+		if is_inside_tree():
+			animate_release()
 
 func _on_mouse_entered() -> void:
 	animate_hover()

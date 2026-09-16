@@ -5,6 +5,7 @@ extends MainMenu
 ## If true, have the player confirm before starting a new game if a game is in progress.
 @export var confirm_new_game : bool = true
 
+@onready var continue_game_wrapper = %ContinueGameWrapper
 @onready var continue_game_button = %ContinueGameButton
 @onready var new_game_confirmation = %NewGameConfirmation
 
@@ -13,7 +14,7 @@ func load_game_scene() -> void:
 	super.load_game_scene()
 
 func new_game() -> void:
-	if confirm_new_game and continue_game_button.visible:
+	if confirm_new_game and continue_game_wrapper.visible:
 		new_game_confirmation.show()
 	else:
 		GameState.reset()
@@ -21,7 +22,7 @@ func new_game() -> void:
 
 func _show_continue_if_set() -> void:
 	if GameState.get_current_level_path().is_empty(): return
-	continue_game_button.show()
+	continue_game_wrapper.show()
 
 func _ready() -> void:
 	super._ready()

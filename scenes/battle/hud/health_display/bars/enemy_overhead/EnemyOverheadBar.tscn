@@ -1,123 +1,139 @@
 [gd_scene format=3 uid="uid://dn2ev8cdq1ltm"]
 
 [ext_resource type="Script" uid="uid://cthhtd76g07uu" path="res://scenes/battle/hud/health_display/bars/enemy_overhead/enemy_overhead_bar.gd" id="1_script"]
-[ext_resource type="Shader" path="res://assets/shaders/ui_background_shader.gdshader" id="2_72fot"]
-[ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="3_hey3j"]
-[ext_resource type="Texture2D" uid="uid://dfkkycfn3xtaf" path="res://assets/images/ui/enemy_bar_over.png" id="4_w53xi"]
-[ext_resource type="Texture2D" uid="uid://dy8paujgo1jsd" path="res://assets/images/ui/enemy_bar_progress.png" id="5_6rsgd"]
-[ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="6_0478o"]
+[ext_resource type="Texture2D" uid="uid://bno6x6v8jc6j2" path="res://assets/images/ui/health_bars/enemy_health_background.png" id="2_b6t5a"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="3_48yd8"]
+[ext_resource type="Texture2D" uid="uid://bp0vbjbyrj3tl" path="res://assets/images/ui/health_bars/enemy_health_bar.png" id="4_sq1mc"]
+[ext_resource type="Shader" uid="uid://bqjakqnxy45o1" path="res://assets/shaders/breathing_effect.gdshader" id="6_i2ed6"]
 [ext_resource type="Script" uid="uid://domq7ntx86pay" path="res://scripts/juice/progress/progress_bar_juice.gd" id="7_juice"]
+[ext_resource type="Texture2D" uid="uid://n0e72skevc4m" path="res://assets/images/ui/character_portrait.png" id="7_r2in4"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_r3a75"]
-shader = ExtResource("2_72fot")
-shader_parameter/base_color = Color(0.1, 0.1, 0.15, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_n2pa8"]
+shader = ExtResource("6_i2ed6")
+shader_parameter/breath_strength = 0.05
+shader_parameter/breath_speed = 0.8
+shader_parameter/face_center = Vector2(0.75, 0.4)
+shader_parameter/face_radius = 2.0
 
 [node name="EnemyOverheadBar" type="Control" unique_id=109527511]
-custom_minimum_size = Vector2(160, 44)
+custom_minimum_size = Vector2(100, 40)
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -50.0
+offset_top = -20.0
+offset_right = 50.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_script")
 
-[node name="BackgroundShader" type="ColorRect" parent="." unique_id=1568274281]
+[node name="Background" type="TextureRect" parent="." unique_id=888702772]
 z_index = -1
-material = SubResource("ShaderMaterial_r3a75")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.1, 0.1, 0.15, 1)
+texture = ExtResource("2_b6t5a")
+expand_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="." unique_id=174802602]
-layout_mode = 0
-offset_left = 6.0
-offset_top = 4.0
-offset_right = 154.0
-offset_bottom = 40.0
+[node name="VBox" type="VBoxContainer" parent="Background" unique_id=174802602]
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = -8.0
+offset_bottom = 8.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/separation = 3
 
-[node name="NameLabel" type="Label" parent="VBox" unique_id=934402160]
+[node name="NameLabel" type="Label" parent="Background/VBox" unique_id=898090939]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_fonts/font = ExtResource("3_hey3j")
-theme_override_font_sizes/font_size = 16
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("3_48yd8")
+theme_override_font_sizes/font_size = 12
 text = "Enemy"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="HPBarRow" type="Control" parent="VBox" unique_id=1810864295]
+[node name="HPContainer" type="Control" parent="Background/VBox" unique_id=1346277613]
 layout_mode = 2
-size_flags_vertical = 3
+size_flags_horizontal = 4
 
-[node name="HPDamageBar" type="TextureProgressBar" parent="VBox/HPBarRow" unique_id=2009045112]
-custom_minimum_size = Vector2(0, 8)
-layout_mode = 1
-anchors_preset = 14
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_top = -8.5
-offset_bottom = 8.5
-grow_horizontal = 2
-grow_vertical = 2
-size_flags_horizontal = 3
-value = 100.0
-nine_patch_stretch = true
-stretch_margin_left = 12
-stretch_margin_top = 9
-stretch_margin_right = 13
-stretch_margin_bottom = 10
-texture_over = ExtResource("4_w53xi")
-texture_progress = ExtResource("5_6rsgd")
-tint_progress = Color(0.7, 0.15, 0.18, 1)
-
-[node name="HPBar" type="TextureProgressBar" parent="VBox/HPBarRow" unique_id=1009045112]
-custom_minimum_size = Vector2(0, 8)
-layout_mode = 1
-anchors_preset = 14
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_top = -8.5
-offset_bottom = 8.5
-grow_horizontal = 2
-grow_vertical = 2
-size_flags_horizontal = 3
-value = 100.0
-nine_patch_stretch = true
-stretch_margin_left = 12
-stretch_margin_top = 9
-stretch_margin_right = 13
-stretch_margin_bottom = 10
-texture_over = ExtResource("4_w53xi")
-texture_progress = ExtResource("5_6rsgd")
-tint_progress = Color(1, 0.23137255, 0.24705882, 1)
-
-[node name="HPNumLabel" type="Label" parent="VBox/HPBarRow" unique_id=1334882622]
+[node name="HPDamageBar" type="TextureProgressBar" parent="Background/VBox/HPContainer" unique_id=1121714474]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_shadow_color = Color(0.35686275, 0, 0, 1)
-theme_override_constants/shadow_offset_y = 2
-theme_override_fonts/font = ExtResource("6_0478o")
+value = 100.0
+stretch_margin_left = 5
+stretch_margin_right = 4
+texture_progress = ExtResource("4_sq1mc")
+tint_progress = Color(0.40146014, 0.40146008, 0.40146035, 1)
+
+[node name="HPBar" type="TextureProgressBar" parent="Background/VBox/HPContainer" unique_id=1973342961]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+value = 100.0
+stretch_margin_left = 5
+stretch_margin_right = 4
+texture_progress = ExtResource("4_sq1mc")
+
+[node name="HPNumLabel" type="Label" parent="Background/VBox/HPContainer/HPBar" unique_id=915570234]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -13.0
+offset_top = -1.0
+offset_right = 13.0
+offset_bottom = 10.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_colors/font_shadow_color = Color(0.18072194, 0.18072197, 0.18072191, 1)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("3_48yd8")
 theme_override_font_sizes/font_size = 10
-text = "100/100"
+text = "171/171"
 horizontal_alignment = 1
 vertical_alignment = 1
+uppercase = true
 
-[node name="HPJuice" type="Node" parent="VBox/HPBarRow" unique_id=1864643431 node_paths=PackedStringArray("main_bar", "trailing_bar", "associated_label")]
+[node name="HPJuice" type="Node" parent="Background/VBox/HPContainer" unique_id=458617675 node_paths=PackedStringArray("main_bar", "trailing_bar", "associated_label")]
 script = ExtResource("7_juice")
 main_bar = NodePath("../HPBar")
 trailing_bar = NodePath("../HPDamageBar")
-associated_label = NodePath("../HPNumLabel")
-trail_duration = 1.0
+associated_label = NodePath("../HPBar/HPNumLabel")
+
+[node name="PortraitBackground" type="TextureRect" parent="Background" unique_id=2035844666]
+material = SubResource("ShaderMaterial_n2pa8")
+custom_minimum_size = Vector2(25, 25)
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -10.0
+offset_right = 25.0
+offset_bottom = 15.0
+grow_vertical = 2
+texture = ExtResource("7_r2in4")
+expand_mode = 1
+stretch_mode = 4

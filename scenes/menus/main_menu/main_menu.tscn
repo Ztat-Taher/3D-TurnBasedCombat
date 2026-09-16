@@ -6,9 +6,15 @@
 [ext_resource type="PackedScene" uid="uid://cagbvv7rb2yve" path="res://scenes/windows/main_menu_credits_window.tscn" id="4_m0ubd"]
 [ext_resource type="PackedScene" uid="uid://bkcsjsk2ciff" path="res://addons/maaacks_game_template/base/nodes/music_players/background_music_player.tscn" id="5_7j6ce"]
 [ext_resource type="PackedScene" uid="uid://cwt4p3bufkke5" path="res://addons/maaacks_game_template/base/nodes/windows/confirmation_popup_window_panel.tscn" id="5_627ab"]
-[ext_resource type="Script" uid="uid://bkwlopi4qn32o" path="res://addons/maaacks_game_template/base/nodes/labels/config_name_label.gd" id="6_qwqm5"]
+[ext_resource type="Texture2D" uid="uid://dv8sw5grcwj77" path="res://assets/images/ui/corner_piece_background.png" id="6_3nv00"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="7_dc6ug"]
 [ext_resource type="Script" uid="uid://1nf36h0gms3q" path="res://addons/maaacks_game_template/base/nodes/utilities/capture_focus.gd" id="7_q0yg5"]
 [ext_resource type="Script" uid="uid://dmkubt2nsnsbn" path="res://addons/maaacks_game_template/base/nodes/labels/config_version_label.gd" id="8_88r3n"]
+[ext_resource type="Texture2D" uid="uid://wtg10385wjtv" path="res://assets/images/ui/menu/title.png" id="9_title_tex"]
+[ext_resource type="Texture2D" uid="uid://b2nrjutwl7rx7" path="res://assets/images/ui/menu/button_normal.png" id="10_button_normal"]
+[ext_resource type="Texture2D" uid="uid://mivsro58mpwj" path="res://assets/images/ui/menu/button_pressed.png" id="10_dc6ug"]
+[ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://scripts/juice/buttons/button_juice.gd" id="12_button_juice"]
+[ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://scripts/systems/effects/visual/shadows/drop_shadow.gd" id="12_dc6ug"]
 
 [node name="MainMenu" type="Control" unique_id=869232425]
 layout_mode = 3
@@ -45,50 +51,72 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="TitleMargin" type="MarginContainer" parent="MenuContainer" unique_id=2112060331]
+[node name="Background" type="TextureRect" parent="MenuContainer" unique_id=1729972973]
 layout_mode = 2
-theme_override_constants/margin_top = 24
+size_flags_horizontal = 8
+texture = ExtResource("6_3nv00")
+expand_mode = 2
+flip_h = true
 
-[node name="TitleContainer" type="Control" parent="MenuContainer/TitleMargin" unique_id=556427956]
+[node name="TitleMargin" type="Control" parent="MenuContainer" unique_id=1870119146]
 layout_mode = 2
-mouse_filter = 2
 
-[node name="TitleLabel" type="Label" parent="MenuContainer/TitleMargin/TitleContainer" unique_id=359406872]
+[node name="TitleTextureRect" type="TextureRect" parent="MenuContainer/TitleMargin" unique_id=556427956]
+custom_minimum_size = Vector2(300, 150)
+layout_mode = 0
+offset_left = 48.0
+offset_top = 48.0
+offset_right = 992.0
+offset_bottom = 345.0
+texture = ExtResource("9_title_tex")
+stretch_mode = 5
+
+[node name="TitleLabel" type="Label" parent="MenuContainer/TitleMargin/TitleTextureRect" unique_id=359406872]
 layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 67.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -360.5
+offset_top = -11.5
+offset_right = 360.5
+offset_bottom = 59.5
 grow_horizontal = 2
-theme_override_font_sizes/font_size = 48
+grow_vertical = 2
+rotation = -0.0826168
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = -15
+theme_override_constants/shadow_offset_y = 15
+theme_override_fonts/font = ExtResource("7_dc6ug")
+theme_override_font_sizes/font_size = 70
 text = "Turn-Based Combat"
 horizontal_alignment = 1
 vertical_alignment = 1
-script = ExtResource("6_qwqm5")
+uppercase = true
 
-[node name="SubTitleMargin" type="MarginContainer" parent="MenuContainer" unique_id=1510335937]
-layout_mode = 2
-theme_override_constants/margin_top = 92
-
-[node name="SubTitleContainer" type="Control" parent="MenuContainer/SubTitleMargin" unique_id=930520368]
-layout_mode = 2
-mouse_filter = 2
-
-[node name="SubTitleLabel" type="Label" parent="MenuContainer/SubTitleMargin/SubTitleContainer" unique_id=1037003361]
+[node name="Shadow" type="TextureRect" parent="MenuContainer/TitleMargin/TitleTextureRect" unique_id=853794552]
+z_index = -1
 layout_mode = 1
-anchors_preset = 10
+anchors_preset = 15
 anchor_right = 1.0
-offset_bottom = 34.0
+anchor_bottom = 1.0
 grow_horizontal = 2
-theme_override_font_sizes/font_size = 24
-text = "Subtitle"
-horizontal_alignment = 1
-vertical_alignment = 1
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("12_dc6ug")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
 
 [node name="MenuButtonsMargin" type="MarginContainer" parent="MenuContainer" unique_id=210553886]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/margin_top = 136
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_left = 48
+theme_override_constants/margin_top = 48
+theme_override_constants/margin_right = 48
+theme_override_constants/margin_bottom = 48
 
 [node name="MenuButtonsContainer" type="Control" parent="MenuContainer/MenuButtonsMargin" unique_id=116448484]
 layout_mode = 2
@@ -97,16 +125,16 @@ mouse_filter = 2
 [node name="MenuButtonsBoxContainer" type="BoxContainer" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer" unique_id=2017477786]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
+anchors_preset = 6
+anchor_left = 1.0
 anchor_top = 0.5
-anchor_right = 0.5
+anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = -64.0
-offset_top = -104.0
-offset_right = 64.0
-offset_bottom = 104.0
-grow_horizontal = 2
+offset_left = -294.0
+offset_top = -168.0
+offset_right = -44.0
+offset_bottom = 278.0
+grow_horizontal = 0
 grow_vertical = 2
 size_flags_horizontal = 4
 theme_override_constants/separation = 16
@@ -114,31 +142,320 @@ alignment = 1
 vertical = true
 script = ExtResource("7_q0yg5")
 
-[node name="NewGameButton" type="Button" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=2044537792]
-unique_name_in_owner = true
+[node name="NewGameWrapper" type="Control" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=2044537792]
+custom_minimum_size = Vector2(122, 44)
 layout_mode = 2
-text = "New Game"
+size_flags_vertical = 3
 
-[node name="ContinueGameButton" type="Button" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=1495566523]
+[node name="NewGameButton" type="TextureButton" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/NewGameWrapper" unique_id=2044537793]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("10_button_normal")
+texture_pressed = ExtResource("10_dc6ug")
+stretch_mode = 5
+
+[node name="NewGameLabel" type="Label" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/NewGameWrapper/NewGameButton" unique_id=2044537794]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -76.0
+offset_top = -18.0
+offset_right = 44.0
+offset_bottom = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
+theme_override_constants/shadow_offset_x = -5
+theme_override_constants/shadow_offset_y = 5
+theme_override_fonts/font = ExtResource("7_dc6ug")
+theme_override_font_sizes/font_size = 30
+text = "New Game"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
+
+[node name="ButtonJuice" type="Node" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/NewGameWrapper/NewGameButton" unique_id=2044537795]
+script = ExtResource("12_button_juice")
+enable_sliding = false
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Shadow" type="TextureRect" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/NewGameWrapper/NewGameButton" unique_id=763590313]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("12_dc6ug")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
+
+[node name="ContinueGameWrapper" type="Control" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=1495566523]
 unique_name_in_owner = true
 visible = false
+custom_minimum_size = Vector2(122, 44)
 layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ContinueGameButton" type="TextureButton" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ContinueGameWrapper" unique_id=1495566524]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("10_button_normal")
+texture_pressed = ExtResource("10_dc6ug")
+stretch_mode = 5
+
+[node name="ContinueGameLabel" type="Label" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ContinueGameWrapper/ContinueGameButton" unique_id=1024480393]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -90.0
+offset_top = -18.0
+offset_right = 58.0
+offset_bottom = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
+theme_override_constants/shadow_offset_x = -5
+theme_override_constants/shadow_offset_y = 5
+theme_override_fonts/font = ExtResource("7_dc6ug")
+theme_override_font_sizes/font_size = 30
 text = "Continue"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
 
-[node name="OptionsButton" type="Button" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=1486236076]
-unique_name_in_owner = true
+[node name="ButtonJuice" type="Node" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ContinueGameWrapper/ContinueGameButton" unique_id=1495566526]
+script = ExtResource("12_button_juice")
+enable_sliding = false
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Shadow" type="TextureRect" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ContinueGameWrapper/ContinueGameButton" unique_id=1199606433]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("12_dc6ug")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
+
+[node name="OptionsWrapper" type="Control" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=1486236076]
+custom_minimum_size = Vector2(122, 44)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="OptionsButton" type="TextureButton" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/OptionsWrapper" unique_id=1486236077]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("10_button_normal")
+texture_pressed = ExtResource("10_dc6ug")
+stretch_mode = 5
+
+[node name="OptionsLabel" type="Label" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/OptionsWrapper/OptionsButton" unique_id=1339979794]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -90.0
+offset_top = -18.0
+offset_right = 58.0
+offset_bottom = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
+theme_override_constants/shadow_offset_x = -5
+theme_override_constants/shadow_offset_y = 5
+theme_override_fonts/font = ExtResource("7_dc6ug")
+theme_override_font_sizes/font_size = 30
 text = "Options"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
 
-[node name="CreditsButton" type="Button" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=301223169]
-unique_name_in_owner = true
+[node name="ButtonJuice" type="Node" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/OptionsWrapper/OptionsButton" unique_id=1486236079]
+script = ExtResource("12_button_juice")
+enable_sliding = false
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Shadow" type="TextureRect" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/OptionsWrapper/OptionsButton" unique_id=433864179]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("12_dc6ug")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
+
+[node name="CreditsWrapper" type="Control" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=301223169]
+custom_minimum_size = Vector2(250, 60)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="CreditsButton" type="TextureButton" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/CreditsWrapper" unique_id=301223170]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("10_button_normal")
+texture_pressed = ExtResource("10_dc6ug")
+stretch_mode = 5
+
+[node name="CreditsLabel" type="Label" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/CreditsWrapper/CreditsButton" unique_id=816516570]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -90.0
+offset_top = -18.0
+offset_right = 58.0
+offset_bottom = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
+theme_override_constants/shadow_offset_x = -5
+theme_override_constants/shadow_offset_y = 5
+theme_override_fonts/font = ExtResource("7_dc6ug")
+theme_override_font_sizes/font_size = 30
 text = "Credits"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
 
-[node name="ExitButton" type="Button" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=1750454379]
-unique_name_in_owner = true
+[node name="ButtonJuice" type="Node" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/CreditsWrapper/CreditsButton" unique_id=301223172]
+script = ExtResource("12_button_juice")
+enable_sliding = false
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Shadow" type="TextureRect" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/CreditsWrapper/CreditsButton" unique_id=63614268]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("12_dc6ug")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
+
+[node name="ExitWrapper" type="Control" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" unique_id=1750454379]
+custom_minimum_size = Vector2(122, 44)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ExitButton" type="TextureButton" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ExitWrapper" unique_id=1750454380]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+texture_normal = ExtResource("10_button_normal")
+texture_pressed = ExtResource("10_dc6ug")
+stretch_mode = 5
+
+[node name="ExitLabel" type="Label" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ExitWrapper/ExitButton" unique_id=1070071282]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -90.0
+offset_top = -18.0
+offset_right = 58.0
+offset_bottom = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
+theme_override_constants/shadow_offset_x = -5
+theme_override_constants/shadow_offset_y = 5
+theme_override_fonts/font = ExtResource("7_dc6ug")
+theme_override_font_sizes/font_size = 30
 text = "Exit"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
+
+[node name="ButtonJuice" type="Node" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ExitWrapper/ExitButton" unique_id=1750454382]
+script = ExtResource("12_button_juice")
+enable_sliding = false
+metadata/_custom_type_script = "uid://1mbdi00spy5j"
+
+[node name="Shadow" type="TextureRect" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ExitWrapper/ExitButton" unique_id=1254514251]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("12_dc6ug")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
 
 [node name="VersionMargin" type="MarginContainer" parent="." unique_id=1732528471]
 layout_mode = 1
@@ -199,10 +516,10 @@ ui_cancel_closes = false
 title = "Exit Game?"
 text = "Really exit the game?"
 
-[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/NewGameButton" to="." method="_on_new_game_button_pressed"]
-[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ContinueGameButton" to="." method="_on_continue_game_button_pressed"]
-[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/OptionsButton" to="." method="_on_options_button_pressed"]
-[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/CreditsButton" to="." method="_on_credits_button_pressed"]
-[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ExitButton" to="." method="_on_exit_button_pressed"]
+[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/NewGameWrapper/NewGameButton" to="." method="_on_new_game_button_pressed"]
+[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ContinueGameWrapper/ContinueGameButton" to="." method="_on_continue_game_button_pressed"]
+[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/OptionsWrapper/OptionsButton" to="." method="_on_options_button_pressed"]
+[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/CreditsWrapper/CreditsButton" to="." method="_on_credits_button_pressed"]
+[connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ExitWrapper/ExitButton" to="." method="_on_exit_button_pressed"]
 [connection signal="confirmed" from="NewGameConfirmation" to="." method="_on_new_game_confirmation_confirmed"]
 [connection signal="confirmed" from="ExitConfirmation" to="." method="_on_exit_confirmation_confirmed"]
