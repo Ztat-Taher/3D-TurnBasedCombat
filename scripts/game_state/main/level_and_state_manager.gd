@@ -5,7 +5,7 @@ extends LevelManager
 ## step. Completing the final map node ends the run.
 
 ## Scene shown as the run map hub between battles.
-@export_file("*.tscn") var map_level_path : String = "res://scenes/menus/map_menu/map_menu.tscn"
+@export_file("*.tscn") var map_level_path : String = "res://scenes/menus/map_menu/map_menu_3d.tscn"
 ## Full-screen interstitial shown after winning a level, before the map.
 ## Meant to double as the future reward screen.
 @export_file("*.tscn") var level_complete_scene_path : String = "res://scenes/windows/level_complete_screen.tscn"

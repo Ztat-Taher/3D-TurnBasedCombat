@@ -1,6 +1,6 @@
 [gd_resource type="ShaderMaterial" format=3 uid="uid://d1k8nelecovl2"]
 
-[ext_resource type="Shader" uid="uid://bqcwo3dpcjx63" path="res://assets/effects/shaders/electric_aura.gdshader" id="1_elec"]
+[ext_resource type="Shader" uid="uid://c1hcaf48ibv10" path="res://assets/effects/shaders/electric_aura.gdshader" id="1_elec"]
 
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_elec"]
 noise_type = 0

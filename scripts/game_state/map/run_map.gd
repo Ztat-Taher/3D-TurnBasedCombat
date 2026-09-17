@@ -37,52 +37,151 @@ func get_available_node_ids(completed_nodes : Array) -> Array[String]:
 				available.append(next_id)
 	return available
 
-## The built-in default map: three floors of combat with branching paths,
-## ending at the summit gate. Author a RunMap resource in the inspector and
-## assign it (to the map menu or the level manager) to replace this later.
+## The built-in default map: Complex, intertwining paths that all lead to boss
+## Starting from bottom center, with varied branching, no dead ends
 static func create_default() -> RunMap:
 	var map := RunMap.new()
-	map.starting_node_ids.assign(["crossroads", "ambush"])
+	
+	# Load NodeConfig resources
+	var combat_config = load("res://scripts/game_state/map/node_config_combat.tres") as NodeConfig
+	var boss_config = load("res://scripts/game_state/map/node_config_boss.tres") as NodeConfig
 
-	var crossroads := RunMapNode.new()
-	crossroads.id = "crossroads"
-	crossroads.display_name = "Combat"
-	crossroads.node_type = "Combat"
-	crossroads.level_path = "res://scenes/game/levels/battle_level_1.tscn"
-	crossroads.next_node_ids.assign(["hill_pass", "ruined_outpost"])
-	crossroads.map_position = Vector2(0.25, 0.15)
-
-	var ambush := RunMapNode.new()
-	ambush.id = "ambush"
-	ambush.display_name = "Combat"
-	ambush.node_type = "Combat"
-	ambush.level_path = "res://scenes/game/levels/battle_level_2.tscn"
-	ambush.next_node_ids.assign(["ruined_outpost"])
-	ambush.map_position = Vector2(0.75, 0.15)
-
-	var hill_pass := RunMapNode.new()
-	hill_pass.id = "hill_pass"
-	hill_pass.display_name = "Combat"
-	hill_pass.node_type = "Combat"
-	hill_pass.level_path = "res://scenes/game/levels/battle_level_3.tscn"
-	hill_pass.next_node_ids.assign(["summit_gate"])
-	hill_pass.map_position = Vector2(0.3, 0.5)
-
-	var ruined_outpost := RunMapNode.new()
-	ruined_outpost.id = "ruined_outpost"
-	ruined_outpost.display_name = "Combat"
-	ruined_outpost.node_type = "Combat"
-	ruined_outpost.level_path = "res://scenes/game/levels/battle_level_2.tscn"
-	ruined_outpost.next_node_ids.assign(["summit_gate"])
-	ruined_outpost.map_position = Vector2(0.7, 0.5)
-
-	var summit_gate := RunMapNode.new()
-	summit_gate.id = "summit_gate"
-	summit_gate.display_name = "Boss"
-	summit_gate.node_type = "Boss"
-	summit_gate.level_path = "res://scenes/game/levels/battle_level_3.tscn"
-	summit_gate.next_node_ids.assign([])
-	summit_gate.map_position = Vector2(0.5, 0.85)
-
-	map.nodes = [crossroads, ambush, hill_pass, ruined_outpost, summit_gate]
+	# Starting node at bottom center
+	var start_node := RunMapNode.new()
+	start_node.id = "start"
+	start_node.display_name = "Start"
+	start_node.node_config = combat_config
+	start_node.level_path = ""
+	start_node.next_node_ids.assign(["river_path", "ancient_bridge", "foggy_road"])
+	start_node.map_position = Vector2(0.5, 0.92)
+	
+	# Bottom layer - diverse branching
+	var river_path := RunMapNode.new()
+	river_path.id = "river_path"
+	river_path.display_name = "Combat"
+	river_path.node_config = combat_config
+	river_path.level_path = "res://scenes/game/levels/battle_level_1.tscn"
+	river_path.next_node_ids.assign(["marsh_lands", "twisted_forest"])
+	river_path.map_position = Vector2(0.28, 0.75)
+	
+	var ancient_bridge := RunMapNode.new()
+	ancient_bridge.id = "ancient_bridge"
+	ancient_bridge.display_name = "Combat"
+	ancient_bridge.node_config = combat_config
+	ancient_bridge.level_path = "res://scenes/game/levels/battle_level_1.tscn"
+	ancient_bridge.next_node_ids.assign(["twisted_forest", "stone_gate"])
+	ancient_bridge.map_position = Vector2(0.52, 0.71)
+	
+	var foggy_road := RunMapNode.new()
+	foggy_road.id = "foggy_road"
+	foggy_road.display_name = "Combat"
+	foggy_road.node_config = combat_config
+	foggy_road.level_path = "res://scenes/game/levels/battle_level_1.tscn"
+	foggy_road.next_node_ids.assign(["stone_gate", "mountain_pass"])
+	foggy_road.map_position = Vector2(0.78, 0.73)
+	
+	# Middle layer - intertwining paths
+	var marsh_lands := RunMapNode.new()
+	marsh_lands.id = "marsh_lands"
+	marsh_lands.display_name = "Combat"
+	marsh_lands.node_config = combat_config
+	marsh_lands.level_path = "res://scenes/game/levels/battle_level_2.tscn"
+	marsh_lands.next_node_ids.assign(["crystal_cave", "sunken_ruins"])
+	marsh_lands.map_position = Vector2(0.18, 0.54)
+	
+	var twisted_forest := RunMapNode.new()
+	twisted_forest.id = "twisted_forest"
+	twisted_forest.display_name = "Combat"
+	twisted_forest.node_config = combat_config
+	twisted_forest.level_path = "res://scenes/game/levels/battle_level_2.tscn"
+	twisted_forest.next_node_ids.assign(["sunken_ruins", "windy_cliff"])
+	twisted_forest.map_position = Vector2(0.42, 0.48)
+	
+	var stone_gate := RunMapNode.new()
+	stone_gate.id = "stone_gate"
+	stone_gate.display_name = "Combat"
+	stone_gate.node_config = combat_config
+	stone_gate.level_path = "res://scenes/game/levels/battle_level_2.tscn"
+	stone_gate.next_node_ids.assign(["windy_cliff", "summit_path"])
+	stone_gate.map_position = Vector2(0.62, 0.52)
+	
+	var mountain_pass := RunMapNode.new()
+	mountain_pass.id = "mountain_pass"
+	mountain_pass.display_name = "Combat"
+	mountain_pass.node_config = combat_config
+	mountain_pass.level_path = "res://scenes/game/levels/battle_level_2.tscn"
+	mountain_pass.next_node_ids.assign(["summit_path", "hidden_valley"])
+	mountain_pass.map_position = Vector2(0.85, 0.55)
+	
+	# Upper layer - all paths converge to boss
+	var crystal_cave := RunMapNode.new()
+	crystal_cave.id = "crystal_cave"
+	crystal_cave.display_name = "Combat"
+	crystal_cave.node_config = combat_config
+	crystal_cave.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	crystal_cave.next_node_ids.assign(["final_gate"])  # No dead end
+	crystal_cave.map_position = Vector2(0.25, 0.35)
+	
+	var sunken_ruins := RunMapNode.new()
+	sunken_ruins.id = "sunken_ruins"
+	sunken_ruins.display_name = "Combat"
+	sunken_ruins.node_config = combat_config
+	sunken_ruins.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	sunken_ruins.next_node_ids.assign(["final_gate", "summit_alt"])  # Converges to boss
+	sunken_ruins.map_position = Vector2(0.38, 0.32)
+	
+	var windy_cliff := RunMapNode.new()
+	windy_cliff.id = "windy_cliff"
+	windy_cliff.display_name = "Combat"
+	windy_cliff.node_config = combat_config
+	windy_cliff.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	windy_cliff.next_node_ids.assign(["summit_alt", "final_gate"])  # Converges to boss
+	windy_cliff.map_position = Vector2(0.55, 0.28)
+	
+	var summit_path := RunMapNode.new()
+	summit_path.id = "summit_path"
+	summit_path.display_name = "Combat"
+	summit_path.node_config = combat_config
+	summit_path.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	summit_path.next_node_ids.assign(["final_gate", "hidden_valley"])  # Converges to boss
+	summit_path.map_position = Vector2(0.72, 0.36)
+	
+	var hidden_valley := RunMapNode.new()
+	hidden_valley.id = "hidden_valley"
+	hidden_valley.display_name = "Combat"
+	hidden_valley.node_config = combat_config
+	hidden_valley.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	hidden_valley.next_node_ids.assign(["final_gate"])  # Converges to boss
+	hidden_valley.map_position = Vector2(0.88, 0.32)
+	
+	# Additional convergence node
+	var summit_alt := RunMapNode.new()
+	summit_alt.id = "summit_alt"
+	summit_alt.display_name = "Combat"
+	summit_alt.node_config = combat_config
+	summit_alt.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	summit_alt.next_node_ids.assign(["final_gate"])  # Converges to boss
+	summit_alt.map_position = Vector2(0.48, 0.15)
+	
+	# Final convergence to boss
+	var final_gate := RunMapNode.new()
+	final_gate.id = "final_gate"
+	final_gate.display_name = "Combat"
+	final_gate.node_config = combat_config
+	final_gate.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	final_gate.next_node_ids.assign(["boss"])
+	final_gate.map_position = Vector2(0.65, 0.18)
+	
+	# Boss at top
+	var boss := RunMapNode.new()
+	boss.id = "boss"
+	boss.display_name = "Boss"
+	boss.node_config = boss_config
+	boss.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	boss.next_node_ids.assign([])
+	boss.map_position = Vector2(0.58, 0.08)
+	
+	# Set starting node and add all nodes
+	map.starting_node_ids.assign(["start"])
+	map.nodes = [start_node, river_path, ancient_bridge, foggy_road, marsh_lands, twisted_forest, stone_gate, mountain_pass, crystal_cave, sunken_ruins, windy_cliff, summit_path, hidden_valley, summit_alt, final_gate, boss]
 	return map

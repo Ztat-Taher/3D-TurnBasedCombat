@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://d2nt213thaby7"]
+
+[ext_resource type="ArrayMesh" uid="uid://fryb2f5jtv6w" path="res://assets/models/pawns/player_pawn.obj" id="1_1uib2"]
+[ext_resource type="Script" uid="uid://bxwc1ari7anqe" path="res://scenes/menus/map_menu/map_pawn.gd" id="1_pawn_script"]
+
+[node name="PlayerPawn" type="MeshInstance3D" unique_id=149876272]
+transform = Transform3D(0.15, 0, 0, 0, 0.15, 0, 0, 0, 0.15, 0, 0, 0)
+mesh = ExtResource("1_1uib2")
+script = ExtResource("1_pawn_script")

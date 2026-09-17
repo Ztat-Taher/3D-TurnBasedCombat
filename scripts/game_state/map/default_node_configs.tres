@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="NodeConfig" load_steps=2 format=3 uid="uid://default_node_configs"]
+
+[ext_resource type="Script" path="res://scripts/game_state/map/node_config.gd" id="1_node_config"]
+
+[resource]
+script = ExtResource("1_node_config")
+node_type = "Combat"
+difficulty_level = 1
+reward_multiplier = 1.0
+description = "Standard combat encounter"
+node_color = Color(1, 0.2, 0.2, 1)
+glow_color = Color(1, 0.5, 0.5, 1)
+glow_intensity = 0.3

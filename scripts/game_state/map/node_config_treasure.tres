@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3 uid="uid://node_config_treasure"]
+
+[ext_resource type="Script" path="res://scripts/game_state/map/node_config.gd" id="1_node_config"]
+[ext_resource type="Texture2D" path="res://assets/images/map/icon_treasure.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_node_config")
+node_type = "Treasure"
+icon_texture = ExtResource("2_icon")
+node_color = Color(1, 1, 1, 1)

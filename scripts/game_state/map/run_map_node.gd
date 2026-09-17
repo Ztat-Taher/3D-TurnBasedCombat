@@ -4,7 +4,7 @@ extends Resource
 
 @export var id : String = ""
 @export var display_name : String = "Combat"
-@export_enum("Combat", "Elite", "Boss", "Rest", "Shop", "Treasure") var node_type : String = "Combat"
+@export var node_config : NodeConfig
 ## Path to the level scene this node opens (e.g. a battle level wrapper).
 @export_file("*.tscn") var level_path : String = ""
 ## IDs of the nodes the player can travel to after completing this one.

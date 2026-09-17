@@ -1,0 +1,50 @@
+[gd_scene format=3 uid="uid://bwcovym6viowr"]
+
+[ext_resource type="Script" uid="uid://dsb0dpqbyeoee" path="res://scenes/menus/map_menu/map_menu_3d.gd" id="1_map_menu_3d"]
+[ext_resource type="PackedScene" uid="uid://d2nt213thaby7" path="res://scenes/menus/map_menu/pawns/pawn_player.tscn" id="2_p1035"]
+[ext_resource type="Texture2D" uid="uid://f44jyxit6ht3" path="res://assets/images/map/map_background.png" id="2_rayjf"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_rayjf"]
+size = Vector2(3.62, 2)
+
+[node name="MapMenu3D" type="Node3D" unique_id=1714182536]
+script = ExtResource("1_map_menu_3d")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1057489359]
+transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 1, 1.25)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1451366115]
+transform = Transform3D(1, 0, 0, 0, 0.64278764, 0.76604444, 0, -0.76604444, 0.64278764, 0, 1.75, 1.75)
+shadow_enabled = true
+sky_mode = 1
+
+[node name="MapPlane" type="MeshInstance3D" parent="." unique_id=1256966515]
+mesh = SubResource("PlaneMesh_rayjf")
+
+[node name="PlayerPawn" parent="." unique_id=149876272 instance=ExtResource("2_p1035")]
+hop_height = 0.25
+hop_duration = 0.8
+
+[node name="MapUIViewport" type="SubViewport" parent="." unique_id=1291046295]
+transparent_bg = true
+handle_input_locally = false
+anisotropic_filtering_level = 0
+canvas_item_default_texture_filter = 0
+size = Vector2i(1230, 680)
+
+[node name="MapUI" type="Control" parent="MapUIViewport" unique_id=1098054941]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="TextureRect" parent="MapUIViewport/MapUI" unique_id=952907324]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_rayjf")
