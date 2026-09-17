@@ -5,15 +5,11 @@ extends Control
 
 var boss_battler: Battler = null
 
-@onready var boss_name_label: Label = $VBox/BossNameLabel
-@onready var boss_hp_bar: TextureProgressBar = $VBox/HPBarContainer/HPBar
-@onready var boss_hp_damage_bar: TextureProgressBar = $VBox/HPBarContainer/HPDamageBar
-@onready var boss_hp_label: Label = $VBox/HPBarContainer/HPNumLabel
-@onready var background_shader: ColorRect = $BackgroundShader
-
-@onready var boss_hp_juice: ProgressBarJuice = $VBox/HPBarContainer/HPJuice
-
-var card_shader: Shader = null
+@onready var boss_name_label: Label = $NameLabel
+@onready var boss_hp_bar: TextureProgressBar = $HPBar
+@onready var boss_hp_damage_bar: TextureProgressBar = $HPDamageBar
+@onready var boss_hp_label: Label = $HPNumLabel
+@onready var boss_hp_juice: ProgressBarJuice = $HPJuice
 
 func _ready() -> void:
 	visible = false
@@ -24,15 +20,7 @@ func show_boss(battler: Battler) -> void:
 		boss_battler.health_changed.disconnect(_on_boss_health_changed)
 
 	boss_battler = battler
-	
-	# Create unique shader material for this boss bar
-	if background_shader:
-		if not card_shader:
-			card_shader = load("res://assets/shaders/ui_background_shader.gdshader")
-		var unique_material = ShaderMaterial.new()
-		unique_material.shader = card_shader
-		background_shader.material = unique_material
-	
+
 	# Setup juice component if it exists
 	if boss_hp_juice:
 		boss_hp_juice.setup(boss_hp_bar, boss_hp_damage_bar, boss_hp_label)

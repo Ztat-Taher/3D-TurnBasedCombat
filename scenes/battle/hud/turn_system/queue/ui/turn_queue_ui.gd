@@ -4,9 +4,8 @@ extends Control
 @export var turn_queue_card_scene: PackedScene
 @export var turn_queue_card_wrapper_scene: PackedScene
 
-@onready var scroll_container: ScrollContainer = $ScrollContainer
-@onready var queue_container: VBoxContainer = $ScrollContainer/QueueContainer
-@onready var container_juice: ContainerJuice = $ScrollContainer/QueueContainer/ContainerJuice
+@onready var queue_container: VBoxContainer = $QueueContainer
+@onready var container_juice: ContainerJuice = $QueueContainer/ContainerJuice
 
 var current_turn_order: Array = []
 var current_turn_idx: int = 0
@@ -101,6 +100,18 @@ func update_queue(turn_order: Array, turn_idx: int) -> void:
 		var current_index = queue_container.get_children().find(wrapper)
 		if current_index != i:
 			queue_container.move_child(wrapper, i)
+		
+		# Set z_index so top cards are drawn over bottom cards
+		# Higher index in VBox (lower down) gets lower z_index
+		# We use a higher base and DISABLE z_as_relative to force absolute Z order
+		wrapper.z_index = 100 + (total - i)
+		wrapper.z_as_relative = false
+		
+		# Also apply to children
+		for child in wrapper.get_children():
+			if child is Control:
+				child.z_index = wrapper.z_index
+				child.z_as_relative = true # Children relative to wrapper
 	
 	# Force layout update after state changes
 	await get_tree().process_frame
@@ -145,6 +156,8 @@ func update_queue(turn_order: Array, turn_idx: int) -> void:
 		var card = turn_queue_card_scene.instantiate()
 		if card is TurnQueueCard:
 			wrapper.add_child(card)
+			# Ensure card handles its own layout within wrapper
+			card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		else:
 			push_error("Instantiated node is not a TurnQueueCard!")
 	

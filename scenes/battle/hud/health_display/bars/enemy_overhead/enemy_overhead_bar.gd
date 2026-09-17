@@ -11,12 +11,13 @@ var _is_dying: bool = false
 # Height offset (world units) above the battler's origin
 const HEIGHT_OFFSET := 2.4
 
-@onready var hp_bar: TextureProgressBar = $VBox/HPBarRow/HPBar
-@onready var hp_damage_bar: TextureProgressBar = $VBox/HPBarRow/HPDamageBar
-@onready var name_label: Label = $VBox/NameLabel
-@onready var hp_label: Label = $VBox/HPBarRow/HPNumLabel
-
-@onready var hp_juice: ProgressBarJuice = $VBox/HPBarRow/HPJuice
+@onready var background: TextureRect = $Background
+@onready var name_label: Label = $Background/VBox/NameLabel
+@onready var hp_bar: TextureProgressBar = $Background/VBox/HPContainer/HPBar
+@onready var hp_damage_bar: TextureProgressBar = $Background/VBox/HPContainer/HPDamageBar
+@onready var hp_label: Label = $Background/VBox/HPContainer/HPBar/HPNumLabel
+@onready var hp_juice: ProgressBarJuice = $Background/VBox/HPContainer/HPJuice
+@onready var portrait_background: TextureRect = $Background/PortraitBackground
 
 func _ready() -> void:
 	# Start invisible until we have a valid battler
@@ -42,6 +43,14 @@ func setup(battler: Battler) -> void:
 		hp_damage_bar.value = battler.current_health
 	name_label.text = battler.character_name
 	_update_hp_label(battler.current_health, battler.max_health)
+	
+	# Set portrait if it exists on battler stats
+	if portrait_background and battler.stats and battler.stats.thumbnail:
+		portrait_background.texture = battler.stats.thumbnail
+
+	# Ensure pivot is centered for scaling (use custom_minimum_size since
+	# the layout may not have been computed yet at setup time)
+	pivot_offset = custom_minimum_size / 2.0
 
 	# Dramatic fade in with scale
 	modulate.a = 0.0
@@ -60,7 +69,12 @@ func _process(_delta: float) -> void:
 		return
 
 	# Project world position to screen
-	var world_pos := enemy_battler.global_position + Vector3(0, HEIGHT_OFFSET, 0)
+	# We use the battler's character height if available, or a default offset
+	var height = HEIGHT_OFFSET
+	if "height" in enemy_battler:
+		height = enemy_battler.height
+	
+	var world_pos := enemy_battler.global_position + Vector3(0, height, 0)
 	if _camera.is_position_behind(world_pos):
 		modulate.a = 0.0
 		return

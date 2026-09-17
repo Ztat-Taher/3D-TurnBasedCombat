@@ -1,23 +1,20 @@
 class_name PartyStatusCard
 extends Control
 
-@onready var name_label: Label = $MainVBox/BarsContainer/NameLabel
-@onready var active_tag: Label = $MainVBox/ActiveTag # unique_id=786705469
-@onready var hp_bar: TextureProgressBar = $MainVBox/BarsContainer/HPContainer/HPBar
-@onready var hp_damage_bar: TextureProgressBar = $MainVBox/BarsContainer/HPContainer/HPDamageBar
-@onready var hp_num_label: Label = $MainVBox/BarsContainer/HPContainer/HPNumLabel # unique_id=540534169
-@onready var ap_bar: TextureProgressBar = $MainVBox/BarsContainer/APContainer/APBar
-@onready var ap_damage_bar: TextureProgressBar = $MainVBox/BarsContainer/APContainer/APDamageBar
-@onready var ap_num_label: Label = $MainVBox/BarsContainer/APContainer/APNumLabel
-@onready var level_label: Label = $MainVBox/PortraitContainer/Level/LevelLabel
-@onready var portrait_background: TextureRect = $MainVBox/PortraitContainer/PortraitBackground
-@onready var background_shader: ColorRect = $BackgroundShader
+@onready var name_label: Label = $BackgroundContainer/NameLabel
+@onready var active_tag: Label = $BackgroundContainer/ActiveTag
+@onready var hp_bar: TextureProgressBar = $BackgroundContainer/HPContainer/HPBar
+@onready var hp_damage_bar: TextureProgressBar = $BackgroundContainer/HPContainer/HPDamageBar
+@onready var hp_num_label: Label = $BackgroundContainer/HPContainer/HPBar/HPNumLabel
+@onready var ap_bar_container: HBoxContainer = $BackgroundContainer/APContainer/APBarContainer
+@onready var ap_num_label: Label = $BackgroundContainer/APContainer/APNumContainer/APNumBackground/APNumLabel
+@onready var portrait_background: TextureRect = $BackgroundContainer/PortraitBackground
 
-@onready var hp_juice: ProgressBarJuice = $MainVBox/BarsContainer/HPContainer/HPJuice
-@onready var ap_juice: ProgressBarJuice = $MainVBox/BarsContainer/APContainer/APJuice
+@onready var hp_juice: ProgressBarJuice = $BackgroundContainer/HPContainer/HPJuice
+
+@export var ap_bar_template: PackedScene # If you want to use a template, otherwise we'll duplicate the existing child
 
 var is_active: bool = false
-var card_shader: Shader = null
 
 func setup(ally: Battler) -> void:
 	if not ally:
@@ -26,10 +23,6 @@ func setup(ally: Battler) -> void:
 	# Ensure nodes are ready before accessing them
 	if not name_label:
 		await ready
-	
-	# Use the existing shader material from the scene if available
-	if background_shader and background_shader.material:
-		card_shader = background_shader.material.shader
 	
 	if name_label:
 		name_label.text = ally.character_name
@@ -40,31 +33,23 @@ func setup(ally: Battler) -> void:
 		hp_juice.enable_healing_feedback = true
 		hp_juice.enable_critical_health = true
 	
-	if ap_juice:
-		ap_juice.setup(ap_bar, ap_damage_bar, ap_num_label)
-		ap_juice.enable_healing_feedback = false
-		ap_juice.enable_critical_health = false
-	
 	update_hp(ally.current_health, ally.max_health)
 	
 	# Read AP directly from ally battler
-	var ally_cur_ap = ally.current_ap if "current_ap" in ally else 3
-	var ally_max_ap = ally.max_ap if "max_ap" in ally else 3
-	update_ap(ally_cur_ap, ally_max_ap)
+	var current_ap = 3
+	var max_ap = 3
+	if "current_ap" in ally:
+		current_ap = ally.current_ap
+	if "max_ap" in ally:
+		max_ap = ally.max_ap
+	elif ally.has_method("get_max_ap"):
+		max_ap = ally.get_max_ap()
+	
+	update_ap(current_ap, max_ap)
 	
 	# Connect to ally AP changes if signal exists
 	if ally.has_signal("ap_changed") and not ally.ap_changed.is_connected(update_ap):
 		ally.ap_changed.connect(update_ap)
-	
-	# Read level from ally stats
-	var level = 1
-	if ally.stats and "level" in ally.stats:
-		level = ally.stats.level
-	elif "level" in ally:
-		level = ally.level
-	elif ally.has_method("get_level"):
-		level = ally.get_level()
-	update_level(level)
 	
 	# Entrance animation
 	modulate.a = 0.0
@@ -86,31 +71,23 @@ func set_active(is_active_battler: bool) -> void:
 	if active_tag:
 		active_tag.visible = is_active
 	
-	# Update shader color and scale based on active state
-	if background_shader and background_shader.material:
-		var shader_material = background_shader.material as ShaderMaterial
-		if shader_material:
-			var target_color: Color
-			var target_scale: Vector2
-			var target_modulate: Color
-			
-			if is_active:
-				# Active: brighter blue, larger scale from bottom center
-				target_color = Color(0.15, 0.3, 0.5, 0.95)
-				target_scale = Vector2(1.1, 1.1)
-				target_modulate = Color.WHITE
-			else:
-				# Inactive: darker, smaller scale, slightly translucent
-				target_color = Color(0.06, 0.09, 0.16, 0.85)
-				target_scale = Vector2(1.0, 1.0)
-				target_modulate = Color(0.8, 0.8, 0.8, 0.85)
-			
-			# Animate the transitions
-			var tween = create_tween()
-			tween.set_parallel(true)
-			tween.tween_property(shader_material, "shader_parameter/base_color", target_color, 0.2).set_ease(Tween.EASE_OUT)
-			tween.tween_property(self, "scale", target_scale, 0.2).set_ease(Tween.EASE_OUT)
-			tween.tween_property(self, "modulate", target_modulate, 0.2).set_ease(Tween.EASE_OUT)
+	var target_scale: Vector2
+	var target_modulate: Color
+	
+	if is_active:
+		# Active: larger scale from bottom center
+		target_scale = Vector2(1.1, 1.1)
+		target_modulate = Color.WHITE
+	else:
+		# Inactive: smaller scale, slightly translucent
+		target_scale = Vector2(1.0, 1.0)
+		target_modulate = Color(0.8, 0.8, 0.8, 0.85)
+	
+	# Animate the transitions
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(self, "scale", target_scale, 0.2).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "modulate", target_modulate, 0.2).set_ease(Tween.EASE_OUT)
 
 func update_hp(current_health: int, max_health: int) -> void:
 	if hp_juice:
@@ -125,20 +102,41 @@ func update_hp(current_health: int, max_health: int) -> void:
 			hp_num_label.text = "%d/%d" % [current_health, max_health]
 
 func update_ap(current_ap: int, max_ap: int) -> void:
-	if ap_juice:
-		ap_juice.update_value(float(current_ap), float(max_ap))
-	elif ap_bar:
-		ap_bar.max_value = max_ap
-		ap_bar.value = float(current_ap)
-		if ap_damage_bar:
-			ap_damage_bar.max_value = max_ap
-			ap_damage_bar.value = float(current_ap)
-		if ap_num_label:
-			ap_num_label.text = "%d/%d" % [current_ap, max_ap]
-
-func update_level(level: int) -> void:
-	if level_label:
-		level_label.text = str(level)
+	if ap_num_label:
+		ap_num_label.text = str(current_ap)
+	
+	if ap_bar_container:
+		# Ensure we have the correct number of AP bar nodes
+		var current_child_count = ap_bar_container.get_child_count()
+		
+		# If no children, we can't do anything unless we have a template
+		if current_child_count == 0:
+			return
+			
+		# Adjust number of bars to match max_ap
+		if current_child_count < max_ap:
+			var template = ap_bar_container.get_child(0)
+			for i in range(max_ap - current_child_count):
+				var new_bar = template.duplicate()
+				ap_bar_container.add_child(new_bar)
+		elif current_child_count > max_ap:
+			for i in range(current_child_count - 1, max_ap - 1, -1):
+				var child = ap_bar_container.get_child(i)
+				child.queue_free()
+		
+		# Update visibility/tint of bars based on current_ap
+		# Wait a frame if we just added/removed children to ensure count is correct
+		# Or just use the children we have now and assume the next call will fix it
+		for i in range(ap_bar_container.get_child_count()):
+			var bar = ap_bar_container.get_child(i) as CanvasItem
+			if bar:
+				if i < current_ap:
+					bar.modulate = Color.WHITE
+					bar.show()
+				else:
+					# Dim or hide inactive AP bars
+					bar.modulate = Color(0.3, 0.3, 0.3, 0.5)
+					# bar.hide() # Or keep them visible but dimmed
 
 func set_portrait_texture(texture: Texture2D) -> void:
 	if portrait_background:

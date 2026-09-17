@@ -2,13 +2,13 @@
 
 [ext_resource type="Script" uid="uid://cq3o50hp8k2t0" path="res://scenes/battle/hud/action_system/action_buttons/action_buttons.gd" id="1_action_buttons_script"]
 [ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_ui_theme"]
-[ext_resource type="Texture2D" uid="uid://yp7lgpib21q3" path="res://assets/images/ui/attack.png" id="3_attack_tex"]
+[ext_resource type="Texture2D" uid="uid://yp7lgpib21q3" path="res://assets/images/ui/action_buttons/attack.png" id="3_attack_tex"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://scripts/juice/buttons/button_juice.gd" id="5_21sk8"]
 [ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://scenes/battle/hud/action_system/input/input_prompt.gd" id="5_input_prompt"]
-[ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="6_1ky24"]
-[ext_resource type="Texture2D" uid="uid://canwm08m3musu" path="res://assets/images/ui/items.png" id="6_items_tex"]
-[ext_resource type="Texture2D" uid="uid://bramr4vhhulsw" path="res://assets/images/ui/run.png" id="7_run_tex"]
-[ext_resource type="Texture2D" uid="uid://dmqu76l8ut0f4" path="res://assets/images/ui/end.png" id="8_end_tex"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="6_4m6nw"]
+[ext_resource type="Texture2D" uid="uid://canwm08m3musu" path="res://assets/images/ui/action_buttons/items.png" id="6_items_tex"]
+[ext_resource type="Texture2D" uid="uid://bramr4vhhulsw" path="res://assets/images/ui/action_buttons/run.png" id="7_run_tex"]
+[ext_resource type="Texture2D" uid="uid://dmqu76l8ut0f4" path="res://assets/images/ui/action_buttons/end.png" id="8_end_tex"]
 [ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://scripts/systems/effects/visual/shadows/drop_shadow.gd" id="8_mnswn"]
 [ext_resource type="Script" uid="uid://rwcygibspbd8" path="res://scripts/juice/containers/container_juice.gd" id="9_container_juice"]
 
@@ -76,7 +76,8 @@ grow_vertical = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_constants/shadow_offset_y = 2
-theme_override_fonts/font = ExtResource("6_1ky24")
+theme_override_fonts/font = ExtResource("6_4m6nw")
+theme_override_font_sizes/font_size = 30
 text = "Attack"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -142,7 +143,8 @@ grow_vertical = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_constants/shadow_offset_y = 2
-theme_override_fonts/font = ExtResource("6_1ky24")
+theme_override_fonts/font = ExtResource("6_4m6nw")
+theme_override_font_sizes/font_size = 30
 text = "Items"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -209,7 +211,8 @@ grow_vertical = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_constants/shadow_offset_y = 2
-theme_override_fonts/font = ExtResource("6_1ky24")
+theme_override_fonts/font = ExtResource("6_4m6nw")
+theme_override_font_sizes/font_size = 30
 text = "Run"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -276,8 +279,9 @@ grow_vertical = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_constants/shadow_offset_y = 2
-theme_override_fonts/font = ExtResource("6_1ky24")
-text = "End Turn"
+theme_override_fonts/font = ExtResource("6_4m6nw")
+theme_override_font_sizes/font_size = 30
+text = "End"
 horizontal_alignment = 1
 vertical_alignment = 1
 

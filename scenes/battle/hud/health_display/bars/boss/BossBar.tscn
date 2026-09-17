@@ -1,16 +1,10 @@
 [gd_scene format=3 uid="uid://bsdjvwbf7iv4s"]
 
 [ext_resource type="Script" uid="uid://ddc5b88r6h5rt" path="res://scenes/battle/hud/health_display/bars/boss/boss_bar.gd" id="1_script"]
-[ext_resource type="Script" path="res://scripts/juice/progress/progress_bar_juice.gd" id="6_juice"]
-[ext_resource type="Shader" path="res://assets/shaders/ui_background_shader.gdshader" id="2_wxggt"]
-[ext_resource type="FontFile" uid="uid://bd4qixbmetm6f" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BrilliantStrength.ttf" id="3_uds32"]
-[ext_resource type="Texture2D" uid="uid://qxkfeymmevwl" path="res://assets/images/ui/boss_bar_over.png" id="3_yunph"]
-[ext_resource type="FontFile" uid="uid://c6labvhxtf1v7" path="res://assets/fonts/antiquity-print.ttf" id="4_uds32"]
-[ext_resource type="Texture2D" uid="uid://c41c7p4ystmlc" path="res://assets/images/ui/boss_bar_progress.png" id="5_uds32"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_tcqlk"]
-shader = ExtResource("2_wxggt")
-shader_parameter/base_color = Color(0.1, 0.1, 0.15, 1)
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="2_0miqf"]
+[ext_resource type="Texture2D" uid="uid://bqk04km7e44ab" path="res://assets/images/ui/health_bars/boss_health_under.png" id="3_eseqp"]
+[ext_resource type="Texture2D" uid="uid://bwr5ka34ts4ae" path="res://assets/images/ui/health_bars/boss_health_progress.png" id="4_8gwdn"]
+[ext_resource type="Script" uid="uid://domq7ntx86pay" path="res://scripts/juice/progress/progress_bar_juice.gd" id="6_juice"]
 
 [node name="BossBar" type="Control" unique_id=2045697659]
 layout_mode = 3
@@ -24,101 +18,93 @@ grow_horizontal = 2
 mouse_filter = 2
 script = ExtResource("1_script")
 
-[node name="BackgroundShader" type="ColorRect" parent="." unique_id=115854848]
-z_index = -1
-material = SubResource("ShaderMaterial_tcqlk")
+[node name="NameLabel" type="Label" parent="." unique_id=154119014]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -111.5
+offset_top = 4.0
+offset_right = -16.5
+offset_bottom = 35.0
 grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.1, 0.1, 0.15, 1)
-
-[node name="VBox" type="VBoxContainer" parent="." unique_id=1817837019]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 8.0
-offset_right = 582.0
-offset_bottom = 70.0
-theme_override_constants/separation = 6
-
-[node name="BossNameLabel" type="Label" parent="VBox" unique_id=538660397]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_fonts/font = ExtResource("3_uds32")
-theme_override_font_sizes/font_size = 16
-text = "BOSS"
+theme_override_constants/shadow_outline_size = 10
+theme_override_fonts/font = ExtResource("2_0miqf")
+theme_override_font_sizes/font_size = 30
+text = "Boss"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="HPBarContainer" type="Control" parent="VBox" unique_id=990044871]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="HPDamageBar" type="TextureProgressBar" parent="VBox/HPBarContainer" unique_id=560003079]
-clip_contents = true
+[node name="HPNumLabel" type="Label" parent="." unique_id=1522448395]
 layout_mode = 1
-anchors_preset = 14
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_top = -13.5
-offset_bottom = 8.0
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = 35.0
+offset_top = 12.0
+offset_right = 93.0
+offset_bottom = 33.0
 grow_horizontal = 2
-grow_vertical = 2
-size_flags_horizontal = 3
-value = 100.0
-nine_patch_stretch = true
-stretch_margin_left = 18
-stretch_margin_top = 10
-stretch_margin_right = 18
-stretch_margin_bottom = 6
-texture_over = ExtResource("3_yunph")
-texture_progress = ExtResource("5_uds32")
-tint_progress = Color(0.7, 0.15, 0.18, 1)
-
-[node name="HPBar" type="TextureProgressBar" parent="VBox/HPBarContainer" unique_id=460003079]
-clip_contents = true
-layout_mode = 1
-anchors_preset = 14
-anchor_top = 0.5
-anchor_right = 1.0
-anchor_bottom = 0.5
-offset_top = -13.5
-offset_bottom = 8.0
-grow_horizontal = 2
-grow_vertical = 2
-size_flags_horizontal = 3
-value = 100.0
-nine_patch_stretch = true
-stretch_margin_left = 18
-stretch_margin_top = 10
-stretch_margin_right = 18
-stretch_margin_bottom = 6
-texture_over = ExtResource("3_yunph")
-texture_progress = ExtResource("5_uds32")
-tint_progress = Color(1, 0.23137255, 0.24705882, 1)
-
-[node name="HPNumLabel" type="Label" parent="VBox/HPBarContainer" unique_id=1950074513]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_shadow_color = Color(0.35686275, 0, 0, 1)
-theme_override_constants/shadow_offset_y = 2
-theme_override_fonts/font = ExtResource("4_uds32")
-theme_override_font_sizes/font_size = 13
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_outline_size = 10
+theme_override_fonts/font = ExtResource("2_0miqf")
+theme_override_font_sizes/font_size = 20
 text = "100/100"
 horizontal_alignment = 1
 vertical_alignment = 1
+uppercase = true
 
-[node name="HPJuice" type="Node" parent="VBox/HPBarContainer"]
+[node name="HPDamageBar" type="TextureProgressBar" parent="." unique_id=560003079]
+clip_contents = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -112.0
+offset_top = -16.0
+offset_right = 112.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+value = 100.0
+stretch_margin_left = 18
+stretch_margin_top = 10
+stretch_margin_right = 18
+stretch_margin_bottom = 6
+texture_under = ExtResource("3_eseqp")
+texture_progress = ExtResource("4_8gwdn")
+
+[node name="HPBar" type="TextureProgressBar" parent="." unique_id=460003079]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -112.0
+offset_top = -16.0
+offset_right = 112.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+value = 99.0
+stretch_margin_left = 18
+stretch_margin_top = 10
+stretch_margin_right = 18
+stretch_margin_bottom = 6
+texture_under = ExtResource("3_eseqp")
+texture_progress = ExtResource("4_8gwdn")
+
+[node name="HPJuice" type="Node" parent="." unique_id=1522935228 node_paths=PackedStringArray("main_bar", "trailing_bar", "associated_label")]
 script = ExtResource("6_juice")
+main_bar = NodePath("../HPBar")
+trailing_bar = NodePath("../HPDamageBar")
+associated_label = NodePath("../HPNumLabel")
