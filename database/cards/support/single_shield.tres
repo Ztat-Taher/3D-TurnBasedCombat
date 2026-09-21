@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://single_shield_card"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+[ext_resource type="Resource" path="res://database/card_configs/single_shield_config.tres" id="2"]
+[ext_resource type="Script" path="res://addons/card_combat/spell_effect.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+card_id = "single_shield"
+name = "Shield"
+cost = 2
+health = 0
+description = "Grants a protective shield to a single ally that ignores the next hit."
+metadata = {
+"card_type": "support"
+}
+card_config = ExtResource("2")

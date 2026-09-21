@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="BleedState" format=3 uid="uid://bbmoj0a8xmwyb"]
+
+[ext_resource type="Script" uid="uid://bgtxyg6qgsttv" path="res://database/states/bleed_state.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://0jnrcke6v5ap" path="res://assets/images/ui/status_effects/bleeding.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+state_name = "Bleed"
+state_description = "Accumulates bleed from damage taken. Triggers massive damage when full."
+icon_texture = ExtResource("2")

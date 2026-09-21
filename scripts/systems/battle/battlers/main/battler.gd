@@ -5,6 +5,12 @@ signal anim_damage()
 signal hit_moment(attacker: Battler)
 signal health_changed(current_health: int, max_health: int)
 signal ap_changed(current_ap: int, max_ap: int)
+signal state_applied(state_name: String)
+signal state_removed(state_name: String)
+signal bleed_proc_triggered(damage: int)
+signal shield_broken()
+signal shield_changed(shield_count: int)
+signal burn_stack_changed(stack_count: int)
 enum TEAM {ALLY, ENEMY}
 
 @export_range(0.0, 1.0, 0.01) var hit_frame_ratio: float = 0.55 ## Default contact frame ratio for attacks (e.g. 0.55 = 55% of animation duration)
@@ -34,7 +40,23 @@ var max_ap: int = 3
 var current_ap: int = 3
 var ap_regen_per_turn: int = 3
 
-var current_health: int
+var _current_health_internal: int
+var _old_health: int = 0  # Track previous health for healing detection
+var _cached_effect_center: Vector3 = Vector3.ZERO  # Cached effect center position
+var _effect_center_cached: bool = false  # Whether the cache is valid
+
+var current_health: int:
+	get:
+		return _current_health_internal
+	set(value):
+		if _current_health_internal != value:
+			var old_value = _current_health_internal
+			_current_health_internal = value
+			health_changed.emit(_current_health_internal, max_health)
+			
+			# Play healing effect if health increased
+			if value > old_value:
+				_play_healing_effect()
 var is_defending: bool = false
 var current_target = null
 var is_counter_stunned: bool = false  # Stunned by being hit with a counter attack
@@ -96,17 +118,72 @@ func _collect_meshes() -> void:
 					child.material_override = StandardMaterial3D.new()
 			_highlight_meshes.append(child)
 
-## Applies a ShaderMaterial as next_pass on every collected mesh.
-func _apply_next_pass(shader_mat: ShaderMaterial) -> void:
-	for mesh in _highlight_meshes:
-		if is_instance_valid(mesh) and mesh.material_override:
-			mesh.material_override.next_pass = shader_mat
+## Overlay Management System
+## Manages stacking of multiple shader overlays (status effects, highlights, etc.)
 
-## Clears next_pass on every collected mesh.
-func _clear_next_pass() -> void:
+enum OverlayType {
+	STATUS = 0,
+	HIGHLIGHT = 1
+}
+
+class OverlayEntry:
+	var overlay_type: OverlayType
+	var material: ShaderMaterial
+	var priority: int
+	var key: String  # Unique identifier for this overlay
+
+	func _init(p_type: OverlayType, p_material: ShaderMaterial, p_priority: int, p_key: String):
+		overlay_type = p_type
+		material = p_material
+		priority = p_priority
+		key = p_key
+
+var _active_overlays: Array[OverlayEntry] = []
+
+## Add an overlay to the stack
+func add_overlay(overlay_type: OverlayType, material: ShaderMaterial, priority: int, key: String) -> void:
+	# Remove existing overlay with same key
+	remove_overlay(key)
+	
+	# Add new overlay
+	var entry = OverlayEntry.new(overlay_type, material, priority, key)
+	_active_overlays.append(entry)
+	
+	# Rebuild overlay chain
+	_rebuild_overlay_chain()
+
+## Remove an overlay by key
+func remove_overlay(key: String) -> void:
+	_active_overlays = _active_overlays.filter(func(entry): return entry.key != key)
+	_rebuild_overlay_chain()
+
+## Rebuild the overlay chain based on priority (lower priority = closer to base material)
+func _rebuild_overlay_chain() -> void:
+	if _highlight_meshes.is_empty():
+		return
+	
+	# Sort overlays by priority
+	_active_overlays.sort_custom(func(a, b): return a.priority < b.priority)
+	
 	for mesh in _highlight_meshes:
-		if is_instance_valid(mesh) and mesh.material_override:
-			mesh.material_override.next_pass = null
+		if not is_instance_valid(mesh) or not mesh.material_override:
+			continue
+		
+		# Ensure mesh has material_override
+		if not mesh.material_override:
+			var surf_mat = mesh.get_active_material(0)
+			if surf_mat:
+				mesh.material_override = surf_mat.duplicate()
+		
+		# Clear existing chain
+		mesh.material_override.next_pass = null
+		
+		# Chain overlays in priority order
+		var current = mesh.material_override
+		for entry in _active_overlays:
+			var overlay_instance = entry.material.duplicate()
+			current.next_pass = overlay_instance
+			current = overlay_instance
 
 @onready var select_outline: Shader = preload("res://assets/shaders/battler_select_shader.gdshader")
 var is_selectable: bool = false:
@@ -114,7 +191,6 @@ var is_selectable: bool = false:
 		is_selectable = value
 		if !is_selectable:
 			is_targeted = false
-			_clear_next_pass()
 		_update_highlight()
 
 var is_targeted: bool = false:
@@ -136,12 +212,11 @@ func _update_highlight() -> void:
 	if _highlight_meshes.is_empty():
 		return
 	
-	if !is_selectable or !is_valid_target:
-		_clear_next_pass()
-		return
+	# Remove existing highlight overlay
+	remove_overlay("highlight")
 	
-	# Clear any existing highlight first
-	_clear_next_pass()
+	if !is_selectable or !is_valid_target:
+		return
 	
 	# Mouse hover takes priority over everything else
 	if mouse_hover and is_selectable:
@@ -151,7 +226,7 @@ func _update_highlight() -> void:
 		hover_mat.set_shader_parameter("color", Color.WHITE)
 		hover_mat.set_shader_parameter("thickness", 0.02)
 		hover_mat.set_shader_parameter("alpha", 0.6)
-		_apply_next_pass(hover_mat)
+		add_overlay(OverlayType.HIGHLIGHT, hover_mat, 10, "highlight")
 	elif is_targeted or is_mouse_selected or is_keyboard_selected or is_default_target:
 		# Main selection outline (cyan for all input methods)
 		var shader_mat = ShaderMaterial.new()
@@ -159,7 +234,7 @@ func _update_highlight() -> void:
 		shader_mat.set_shader_parameter("color", Color.CYAN)
 		shader_mat.set_shader_parameter("thickness", 0.025)
 		shader_mat.set_shader_parameter("alpha", 1.0)
-		_apply_next_pass(shader_mat)
+		add_overlay(OverlayType.HIGHLIGHT, shader_mat, 10, "highlight")
 
 @export_group("Special Dependencies")
 ## Deprecated — kept only for backwards compatibility with older card/skill code.
@@ -214,7 +289,6 @@ func _ready():
 		attack = enemy_stats.attack
 		defense = enemy_stats.defense
 		agility = enemy_stats.agility
-		health_changed.emit(current_health, max_health)
 	elif stats:
 		# Basic stats for ally
 		character_name = stats.character_name
@@ -324,7 +398,7 @@ func clear_all_selections() -> void:
 	is_keyboard_selected = false
 	is_default_target = false
 	mouse_hover = false
-	_clear_next_pass()
+	remove_overlay("highlight")
 
 
 func is_defeated() -> bool:
@@ -336,6 +410,25 @@ func get_attack_damage(target) -> int:
 
 @onready var floating_damage_num:PackedScene = preload("res://scenes/battle/effects/damage/damage_number.tscn")
 func take_damage(amount: int, attacker: Battler = null) -> void:
+	# Check for Protected state (shield) - ignores hit entirely
+	if active_states.has("Protected"):
+		var protected_state = active_states["Protected"] as ProtectedState
+		if protected_state and protected_state.has_shield():
+			# Consume one shield hit
+			protected_state.consume_shield()
+			# Show shield break visual (0 damage)
+			var shield_num: DamageNumber = floating_damage_num.instantiate()
+			shield_num.value = 0
+			if damage_indicator_subviewport:
+				damage_indicator_subviewport.add_child(shield_num)
+			# Emit signal for UI update
+			shield_changed.emit(protected_state.get_remaining_shields())
+			# Remove state if no shields left
+			if not protected_state.has_shield():
+				remove_state("Protected")
+			# Return early - no damage taken, no effects applied
+			return
+	
 	var damage_taken = max(1, amount) if amount > 0 else 0
 	if is_defending:
 		damage_taken = max(1, int(damage_taken * 0.5))
@@ -348,6 +441,9 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 	
 	damage_taken = int(float(damage_taken) * weakness_multiplier)
 	
+	# Add bleed accumulation when taking damage
+	add_bleed_accumulation(damage_taken)
+	
 	var damage_num: DamageNumber = floating_damage_num.instantiate()
 	damage_num.value = damage_taken
 	if damage_indicator_subviewport:
@@ -355,8 +451,6 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 	current_health -= damage_taken
 	if current_health < 0:
 		current_health = 0
-	
-	health_changed.emit(current_health, max_health)
 	
 	# WAKE UP FROM SLEEP WHEN ATTACKED
 	if active_states.has("Sleep"):
@@ -419,7 +513,6 @@ func take_healing(amount: int):
 	var healing = min(amount, max_health - current_health)
 
 	current_health += healing
-	health_changed.emit(current_health, max_health)
 	return healing
 
 func defend():
@@ -961,15 +1054,198 @@ var active_states: Dictionary = {}  # {state_name: State}
 func apply_state(state: State) -> void:
 	if state == null:
 		return
-	var state_copy = state.duplicate()
-	# Force state_name to be set properly after duplication
-	state_copy.state_name = state.state_name
-	var key = state_copy.state_name
-	active_states[key] = state_copy
+	
+	var key = state.state_name
+	var existing_state = active_states.get(key) as State
+	
+	if existing_state:
+		# State already exists - handle stacking/refreshing
+		if "stack_count" in state and existing_state.has_method("add_stacks"):
+			# For stacking states like Burning
+			# The incoming state has the NEW stack count to add, not the total
+			if state.stack_count > 0:
+				existing_state.add_stacks(state.stack_count)
+				# Emit signal for UI update
+				if key == "Burning":
+					burn_stack_changed.emit(existing_state.stack_count)
+		# For Protected state, add shield hits (stacking)
+		if key == "Protected" and existing_state.has_method("set_shield_hits"):
+			if "shield_hits" in state:
+				var current_shields = existing_state.get_remaining_shields()
+				var new_shields = current_shields + state.shield_hits
+				existing_state.set_shield_hits(new_shields)
+				shield_changed.emit(existing_state.get_remaining_shields())
+			# Also emit if shield state is refreshed without adding shields
+			elif existing_state.has_method("get_remaining_shields"):
+				shield_changed.emit(existing_state.get_remaining_shields())
+		# Refresh duration
+		if state.turns_active > 0:
+			existing_state.turns_active = state.turns_active
+		# Preserve icon texture
+		if state.icon_texture and not existing_state.icon_texture:
+			existing_state.icon_texture = state.icon_texture
+	else:
+		# New state - apply directly
+		var state_copy = state.duplicate()
+		# Force state_name to be set properly after duplication
+		state_copy.state_name = state.state_name
+		# Preserve stack_count from incoming state
+		if "stack_count" in state and "stack_count" in state_copy:
+			state_copy.stack_count = state.stack_count
+		active_states[key] = state_copy
+		
+		# Apply visual overlay if the state supports it
+		if state_copy.has_method("apply_overlay_to_battler"):
+			state_copy.apply_overlay_to_battler(self)
+		
+		# Apply aura effect if the state supports it
+		if state_copy.has_method("apply_aura_effect"):
+			state_copy.apply_aura_effect(self)
+		
+		# Emit shield_changed signal for new Protected state
+		if key == "Protected" and state_copy.has_method("get_remaining_shields"):
+			shield_changed.emit(state_copy.get_remaining_shields())
+	
+	state_applied.emit(key)
 
 func remove_state(state_name: String) -> void:
 	if active_states.has(state_name):
+		var state = active_states[state_name]
+		
+		# Remove visual overlay if the state supports it
+		if state.has_method("remove_overlay_from_battler"):
+			state.remove_overlay_from_battler(self)
+		
+		# Remove aura effect if the state supports it
+		if state.has_method("remove_aura_effect"):
+			state.remove_aura_effect(self)
+		
 		active_states.erase(state_name)
+		state_removed.emit(state_name)
+
+# Helper methods for specific state types
+func add_burn_stacks(amount: int) -> void:
+	if active_states.has("Burning"):
+		var burning_state = active_states["Burning"] as BurningState
+		if burning_state:
+			burning_state.add_stacks(amount)
+			burn_stack_changed.emit(burning_state.stack_count)
+
+func add_bleed_accumulation(amount: int) -> void:
+	if active_states.has("Bleed"):
+		var bleed_state = active_states["Bleed"] as BleedState
+		if bleed_state:
+			bleed_state.add_accumulation_from_damage(amount)
+
+func trigger_bleed_proc() -> void:
+	if active_states.has("Bleed"):
+		var bleed_state = active_states["Bleed"] as BleedState
+		if bleed_state and bleed_state.should_proc_bleed():
+			# Play bleed aura effect when proc triggers
+			if bleed_state.has_method("load_aura_effect"):
+				var aura = bleed_state.load_aura_effect()
+				if aura:
+					var aura_instance = apply_aura_effect(aura)
+					# Bleed aura is one-shot, it auto-cleans
+					# No need to store reference or play animation
+			
+			var proc_damage = bleed_state.trigger_bleed_proc(max_health)
+			current_health -= proc_damage
+			if current_health < 0:
+				current_health = 0
+			bleed_proc_triggered.emit(proc_damage)
+
+func break_shield() -> void:
+	if active_states.has("Protected"):
+		remove_state("Protected")
+		shield_broken.emit()
+
+## Get the center position for visual effects (auras, particles, etc.)
+## Returns the vertical center of the battler's mesh in local coordinates
+## Combines AABBs of all MeshInstance3D children for accurate center calculation
+## Uses caching to avoid recalculating on every call
+func get_effect_center_position() -> Vector3:
+	# Return cached value if available
+	if _effect_center_cached:
+		return _cached_effect_center
+	
+	var combined_aabb = AABB()
+	var has_mesh = false
+	
+	# Combine AABBs of all MeshInstance3D children
+	for child in find_children("*", "MeshInstance3D", true, false):
+		if child is MeshInstance3D:
+			var mesh_aabb = child.get_aabb()
+			if mesh_aabb != AABB():
+				if not has_mesh:
+					combined_aabb = mesh_aabb
+					has_mesh = true
+				else:
+					combined_aabb = combined_aabb.merge(mesh_aabb)
+	
+	# If no meshes found, use default height
+	if not has_mesh:
+		_cached_effect_center = Vector3(0, 0.75, 0)  # Default center for 1.5 height
+	else:
+		# Calculate center from combined AABB
+		_cached_effect_center = Vector3(0, combined_aabb.position.y + combined_aabb.size.y / 2.0, 0)
+	
+	_effect_center_cached = true
+	return _cached_effect_center
+
+## Invalidate the cached effect center position
+## Call this when meshes are added/removed from the battler
+func invalidate_effect_center_cache() -> void:
+	_effect_center_cached = false
+
+## Apply an aura effect to this battler at the height center
+## aura_scene: PackedScene to instantiate
+## Returns the created aura instance
+func apply_aura_effect(aura_scene: PackedScene) -> Node3D:
+	if not aura_scene:
+		return null
+	
+	var aura_instance = aura_scene.instantiate()
+	var center_pos = get_effect_center_position()
+	
+	add_child(aura_instance)
+	aura_instance.position = center_pos
+	
+	return aura_instance
+
+## Remove an aura effect from this battler
+## aura_instance: The aura node to remove
+func remove_aura_effect(aura_instance: Node3D) -> void:
+	if is_instance_valid(aura_instance):
+		# Play close animation if available
+		if aura_instance.has_node("AnimationPlayer"):
+			var anim_player = aura_instance.get_node("AnimationPlayer")
+			if anim_player:
+				anim_player.play("close")
+				await anim_player.animation_finished
+		aura_instance.queue_free()
+
+## Play healing effect when health increases
+func _play_healing_effect() -> void:
+	var healing_effect = load("res://assets/effects/auras/aura_healing.tscn") as PackedScene
+	if not healing_effect:
+		return
+	
+	var healing_instance = apply_aura_effect(healing_effect)
+	if not healing_instance:
+		return
+	
+	# Play open animation
+	if healing_instance.has_node("AnimationPlayer"):
+		var anim_player = healing_instance.get_node("AnimationPlayer")
+		if anim_player:
+			anim_player.play("open")
+	
+	# Auto-cleanup after effect finishes
+	get_tree().create_timer(1.2).timeout.connect(func():
+		if is_instance_valid(healing_instance):
+			remove_aura_effect(healing_instance)
+	)
 
 func process_states() -> void:
 	var states_to_remove = []
@@ -977,8 +1253,29 @@ func process_states() -> void:
 	for state_name in active_states:
 		var state = active_states[state_name]
 		
-		# Handle DOT/HOT effects with damage multiplier based on target defense
-		if state.damage_per_turn != 0:
+		# Handle Burning state (stack-based damage)
+		if state_name == "Burning":
+			var burning_state = state as BurningState
+			if burning_state and burning_state.stack_count > 0:
+				var burn_damage = burning_state.get_burn_damage()
+				if burn_damage > 0:
+					var damage_num: DamageNumber = floating_damage_num.instantiate()
+					damage_num.value = burn_damage
+					if damage_indicator_subviewport:
+						damage_indicator_subviewport.add_child(damage_num)
+					current_health -= burn_damage
+					if current_health < 0:
+						current_health = 0
+				# Decay stacks by 1 each turn
+				if burning_state.has_method("process_turn_end"):
+					var old_stacks = burning_state.stack_count
+					burning_state.process_turn_end()
+					# Emit signal if stacks changed
+					if burning_state.stack_count != old_stacks:
+						burn_stack_changed.emit(burning_state.stack_count)
+		
+		# Handle other DOT/HOT effects with damage multiplier based on target defense
+		elif state.damage_per_turn != 0:
 			# Apply power multiplier and defense reduction: base_damage * power_mult * (1 - (defense / 100))
 			var defense_multiplier = max(0.1, 1.0 - (float(defense) / 100.0))
 			var actual_damage = int(state.damage_per_turn * state.power_multiplier * defense_multiplier)
@@ -1002,6 +1299,12 @@ func process_states() -> void:
 		if state.turns_active > 0:
 			state.turns_active -= 1
 			if state.turns_active <= 0:
+				states_to_remove.append(state_name)
+		
+		# For Burning, also remove if stacks reach 0
+		if state_name == "Burning":
+			var burning_state = state as BurningState
+			if burning_state and burning_state.stack_count <= 0:
 				states_to_remove.append(state_name)
 	
 	# Remove expired states

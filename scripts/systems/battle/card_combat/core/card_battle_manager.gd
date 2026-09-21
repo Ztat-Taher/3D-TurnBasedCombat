@@ -62,6 +62,9 @@ func setup_card_combat(player_battler: Battler, card_data_resources: Array[CardD
 	if not player_battler:
 		return
 	
+	print("Setting up card combat for player: ", player_battler.character_name)
+	print("Card data resources provided: ", card_data_resources.size())
+	
 	# Create combat session with player as side 0
 	var player_combatant = Combatant.new()
 	player_combatant.max_health = player_battler.max_health
@@ -83,6 +86,8 @@ func setup_card_combat(player_battler: Battler, card_data_resources: Array[CardD
 	sessions_by_battler[player_battler] = session
 	var deck = session.decks[0]
 	decks_by_battler[player_battler] = deck
+	
+	print("Deck setup complete. Initial deck size: ", deck._draw_pile.size() if deck else 0)
 	
 	# Connect deck signals
 	if not deck.card_played.is_connected(_on_card_played):
@@ -787,13 +792,21 @@ func apply_card_states(card: CardData, _target: Battler) -> void:
 
 func draw_card_for_deck(deck: CombatDeck) -> CardData:
 	if not deck:
+		print("draw_card_for_deck: Deck is null")
 		return null
+	
+	print("draw_card_for_deck: Draw pile size: ", deck._draw_pile.size(), ", Graveyard size: ", deck._graveyard.size())
+	
 	# If draw pile is empty, recycle graveyard back into draw pile and shuffle
 	if deck._draw_pile.is_empty() and not deck._graveyard.is_empty():
+		print("draw_card_for_deck: Recycling graveyard to draw pile")
 		deck._draw_pile.append_array(deck._graveyard)
 		deck._graveyard.clear()
 		deck.shuffle()
-	return deck.draw_card()
+	
+	var drawn_card = deck.draw_card()
+	print("draw_card_for_deck: Drew card: ", drawn_card.name if drawn_card else "null")
+	return drawn_card
 
 func start_player_turn() -> void:
 	# Always sync to the currently acting player from battle_manager
@@ -830,8 +843,13 @@ func start_player_turn() -> void:
 		
 		# Draw a fresh hand up to initial_hand_size
 		var hand_size = card_battle_config.initial_hand_size if card_battle_config else 3
+		var cards_drawn = 0
 		for i in range(hand_size):
-			draw_card_for_deck(deck)
+			var drawn_card = draw_card_for_deck(deck)
+			if drawn_card:
+				cards_drawn += 1
+		
+		print("Start player turn: Drew %d cards out of %d requested" % [cards_drawn, hand_size])
 	
 	# Clear queued cards from previous turn
 	queued_cards.clear()
@@ -839,7 +857,11 @@ func start_player_turn() -> void:
 	# --- Step 3: Update CardUI display for the new hand and notify HUD ---
 	if battle_manager and battle_manager.hud:
 		if card_ui:
+			# Force a full rebuild by resetting the previous hand size
 			if card_ui.has_method("update_hand_display"):
+				# Access the internal variable to force rebuild
+				if "previous_hand_size" in card_ui:
+					card_ui.previous_hand_size = 0
 				card_ui.update_hand_display()
 		if battle_manager.hud.has_method("update_party_status"):
 			var ap_info = get_ap_info()

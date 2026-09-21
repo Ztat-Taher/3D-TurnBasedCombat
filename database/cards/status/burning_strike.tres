@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://n7siqcucpwb1"]
+
+[ext_resource type="Script" uid="uid://bey7off4hhc5m" path="res://addons/card_combat/card_data.gd" id="1"]
+[ext_resource type="Resource" uid="uid://cmdw1g0rsydv7" path="res://database/card_configs/burning_card_config.tres" id="2"]
+[ext_resource type="Script" uid="uid://diw3hm0lae551" path="res://addons/card_combat/spell_effect.gd" id="3_5f4e4"]
+
+[resource]
+script = ExtResource("1")
+card_id = "burning_strike"
+name = "Burning Strike"
+cost = 2
+attack = 5
+card_config = ExtResource("2")
+description = "Applies 3 stacks of burning to target, dealing fire damage each turn."

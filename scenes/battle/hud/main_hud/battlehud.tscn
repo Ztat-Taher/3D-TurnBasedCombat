@@ -15,7 +15,6 @@
 [ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://scripts/systems/effects/visual/shadows/drop_shadow.gd" id="13_dab75"]
 [ext_resource type="PackedScene" uid="uid://d1n1invd7ckr8" path="res://scenes/battle/hud/turn_system/queue/ui/turn_queue_ui.tscn" id="13_turn_queue_ui"]
 [ext_resource type="PackedScene" uid="uid://d0g1vty6xfk1y" path="res://scenes/battle/card_combat/main_ui/card_ui.tscn" id="13_xkcqd"]
-[ext_resource type="Texture2D" uid="uid://dv8sw5grcwj77" path="res://assets/images/ui/corner_piece_background.png" id="16_4ei2w"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -30,39 +29,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_uiugx")
-
-[node name="Background" type="Control" parent="Control" unique_id=286723573]
-modulate = Color(1, 1, 1, 0.7490196)
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="TopLeftCorner" type="TextureRect" parent="Control/Background" unique_id=788151123]
-layout_mode = 1
-offset_left = -56.0
-offset_right = 237.0
-offset_bottom = 443.0
-texture = ExtResource("16_4ei2w")
-
-[node name="BottomRightCorner" type="TextureRect" parent="Control/Background" unique_id=451687622]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -323.0
-offset_top = -220.0
-offset_right = 64.0
-offset_bottom = 64.0
-grow_horizontal = 0
-grow_vertical = 0
-texture = ExtResource("16_4ei2w")
-flip_h = true
-flip_v = true
 
 [node name="CardUI" parent="Control" unique_id=1376086127 instance=ExtResource("13_xkcqd")]
 visible = false

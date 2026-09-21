@@ -381,6 +381,11 @@ func initialize_cards_for_players():
 			card_integration.initialize_for_player(player)
 
 func _input(event: InputEvent) -> void:
+	if !in_target_selection or valid_targets.is_empty():
+		return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_handle_mouse_click_target_selection()
+		get_viewport().set_input_as_handled()
 	# Handle speed key
 	if speed_is_toggle:
 		# Toggle mode - press once to toggle on/off
@@ -403,11 +408,22 @@ func _input(event: InputEvent) -> void:
 		elif in_menu_selection:
 			_cancel_menu_selection()
 	# Confirm is currently bound to Enter key
-	elif event.is_action_pressed("Confirm") and in_target_selection and current_target:
-		if queued_item:
+	elif event.is_action_pressed("Confirm") and in_target_selection and (current_target or current_controller_target):
+		var target = current_target if current_target else current_controller_target
+		current_target = target
+		var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
+		if pending_card:
+			if battle_camera:
+				battle_camera.set_target_focus(current_target)
+			var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+			if card_battle_manager:
+				_execute_card_async(card_battle_manager, pending_card, current_target)
+			set_meta("pending_card", null)
+			exit_targeting_mode()
+		elif queued_item:
 			_use_action_on_target()
 		else:
-			printerr("MANAGER: No item queued!")
+			printerr("MANAGER: No item or card queued!")
 
 func initialize_battle():
 	# Get all nodes and convert to Battler arrays
@@ -442,6 +458,9 @@ func initialize_battle():
 		player.battle_idle()
 		if not player.anim_damage.is_connected(_on_anim_damage):
 			player.anim_damage.connect(_on_anim_damage)
+		
+		# Play spawn effect for allies
+		_play_spawn_effect(player)
 	
 	# Ensure players are at the start of the turn order
 	turn_order = players + enemies
@@ -508,7 +527,7 @@ func target_selected(target: Battler) -> void:
 		return
 	
 	# Check if there's a pending card from card combat
-	var pending_card = get_meta("pending_card")
+	var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
 	
 	# Check if this is AOE mode (no individual targeting)
 	var is_aoe_mode = get_meta("is_aoe_mode") if has_meta("is_aoe_mode") else false
@@ -603,6 +622,19 @@ func start_next_turn():
 			if counter_state:
 				counter_state.reset_turn_usage()
 	
+	# Process states at the start of the turn (for Burning damage, etc.)
+	if current_battler and current_battler.has_method("process_states"):
+		current_battler.process_states()
+	
+	# Check for Chilled state (skip turn)
+	if current_character.active_states.has("Chilled"):
+		var chilled_state = current_character.active_states["Chilled"] as ChilledState
+		if chilled_state and chilled_state.skip_turn:
+			# Skip this battler's turn
+			print("%s is Chilled and skips their turn!" % current_character.character_name)
+			end_turn()
+			return
+	
 	if current_character.is_defeated():
 		turn_order.erase(current_character)
 		current_turn = current_turn % turn_order.size()
@@ -669,6 +701,48 @@ var valid_targets: Array = []  # Array of Battler objects
 var current_default_selector: Battler = null  # Track who has the default selection
 var last_selected_target: Battler = null  # Remember last target for next selection
 var keyboard_target_index: int = 0  # Track keyboard navigation position
+
+@onready var spawn_effect: PackedScene = preload("res://assets/effects/ground/spawn_digital_rise.tscn")
+@onready var healing_effect: PackedScene = preload("res://assets/effects/auras/aura_healing.tscn")
+
+## Play spawn effect for an ally
+func _play_spawn_effect(battler: Battler) -> void:
+	if not spawn_effect:
+		return
+	
+	var spawn_instance = spawn_effect.instantiate()
+	get_tree().current_scene.add_child(spawn_instance)
+	spawn_instance.global_position = battler.global_position
+	
+	# Auto-cleanup after effect finishes
+	await get_tree().create_timer(2.0).timeout
+	if is_instance_valid(spawn_instance):
+		spawn_instance.queue_free()
+
+## Play healing effect for a battler
+func _play_healing_effect(battler: Battler) -> void:
+	if not healing_effect:
+		return
+	
+	var healing_instance = healing_effect.instantiate()
+	battler.add_child(healing_instance)
+	
+	# Play open animation
+	if healing_instance.has_node("AnimationPlayer"):
+		var anim_player = healing_instance.get_node("AnimationPlayer")
+		if anim_player:
+			anim_player.play("open")
+	
+	# Auto-cleanup after effect finishes
+	await get_tree().create_timer(1.0).timeout
+	if is_instance_valid(healing_instance):
+		if healing_instance.has_node("AnimationPlayer"):
+			var anim_player = healing_instance.get_node("AnimationPlayer")
+			if anim_player:
+				anim_player.play("close")
+		await get_tree().create_timer(0.2).timeout
+		if is_instance_valid(healing_instance):
+			healing_instance.queue_free()
 
 ## Populates [member valid_targets] based on the queued item's target type and highlights the default.
 ## For multi-target items, skips manual selection and targets all valid targets immediately.
@@ -738,6 +812,13 @@ func _do_item_target_selection() -> void:
 		current_default_selector = current_controller_target
 		current_controller_target.set_as_default_target()
 	
+	# Enable mouse input for item targeting (lets Battler._input_event fire on click)
+	mouse_input_toggle = true
+	
+	# Switch cursor to targeting mode
+	if hud and hud.has_method("set_targeting_mode"):
+		hud.set_targeting_mode(true)
+	
 	SignalBus.allow_select_target.emit(true)
 
 # Helper function for multiple target selection
@@ -751,7 +832,10 @@ func _auto_select_multiple_targets() -> void:
 		current_target = valid_targets[0]
 		_use_action_on_target()
 
-# Enhanced controller input handling with better visual feedback
+# Mouse clicks are handled in _input (not _unhandled_input) because the
+# BattleHUD's full-screen Control node consumes mouse events during GUI
+# processing, which runs AFTER _input but BEFORE _unhandled_input.
+# Enhanced controller/keyboard input handling during targeting
 func _unhandled_input(event: InputEvent) -> void:
 	# Only process targeting mode inputs
 	if !in_target_selection or valid_targets.is_empty():
@@ -759,15 +843,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	
 	# Only process key press events, not key release events
 	if event is InputEventKey and not event.pressed:
-		return
-	
-	# Only process mouse press events, not mouse release events
-	if event is InputEventMouseButton and not event.pressed:
-		return
-	
-	# Handle mouse clicks via camera raycasting
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		_handle_mouse_click_target_selection()
 		return
 	
 	var handled = false
@@ -835,49 +910,99 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # Camera raycasting for mouse target selection
 func _handle_mouse_click_target_selection() -> void:
+	print("[MouseTarget] _handle_mouse_click_target_selection called. battle_camera=", battle_camera)
 	if not battle_camera:
+		push_warning("[MouseTarget] battle_camera is null — assign it in the Inspector!")
 		return
 	
-	var viewport = get_viewport()
-	var mouse_pos = viewport.get_mouse_position()
+	var cam: Camera3D = battle_camera.get_camera()
+	if not cam:
+		return
 	
-	# Raycast from camera through mouse position
-	var ray_origin = battle_camera.project_ray_origin(mouse_pos)
-	var ray_direction = battle_camera.project_ray_normal(mouse_pos)
+	# Use the camera's own viewport for the mouse position so SubViewport
+	# offset/scale is already accounted for by BattleCamera.screen_to_viewport().
+	var root_mouse_pos = get_viewport().get_mouse_position()
+	
+	# project_ray_origin/normal already convert from root HUD space → SubViewport space
+	var ray_origin = battle_camera.project_ray_origin(root_mouse_pos)
+	var ray_direction = battle_camera.project_ray_normal(root_mouse_pos)
 	
 	# Create ray parameters
 	var ray_params = PhysicsRayQueryParameters3D.new()
 	ray_params.from = ray_origin
 	ray_params.to = ray_origin + ray_direction * 1000
-	ray_params.collision_mask = 1  # Layer 1 for enemies
+	ray_params.collision_mask = 0xFFFFFFFF  # All layers — must hit enemies AND allies
 	
-	# Perform raycast
-	var space_state = get_world_3d().direct_space_state
+	# Resolve the 3D physics space state (critical when inside a SubViewport)
+	var space_state: PhysicsDirectSpaceState3D = null
+	if cam.get_world_3d():
+		space_state = cam.get_world_3d().direct_space_state
+	elif cam.get_viewport() and cam.get_viewport().find_world_3d():
+		space_state = cam.get_viewport().find_world_3d().direct_space_state
+	elif get_world_3d():
+		space_state = get_world_3d().direct_space_state
+	
+	if not space_state:
+		push_warning("[MouseTarget] Could not obtain PhysicsDirectSpaceState3D for raycasting!")
+		return
+		
 	var result = space_state.intersect_ray(ray_params)
+	print("[MouseTarget] Raycast result: ", result)
 	
 	if result.has("collider"):
 		var collider = result["collider"]
-		# Find the Battler parent node
-		var battler = collider.get_parent()
-		while battler and not battler is Battler:
-			battler = battler.get_parent()
+		# Find the Battler node: collider itself or one of its ancestors
+		var battler: Battler = null
+		if collider is Battler:
+			battler = collider
+		else:
+			var curr = collider.get_parent()
+			while curr:
+				if curr is Battler:
+					battler = curr
+					break
+				curr = curr.get_parent()
+		
+		print("[MouseTarget] Hit collider: ", collider.name, " -> Battler: ", battler, " is_selectable: ", (battler.is_selectable if battler else false), " is_valid_target: ", (battler.is_valid_target if battler else false))
 		
 		if battler and battler is Battler:
 			# Check if this is a valid target
 			if battler.is_selectable and battler.is_valid_target:
+				# If this battler is already the currently selected target, execute action/card
+				if current_controller_target == battler or battler.is_keyboard_selected or battler.is_default_target:
+					current_target = battler
+					var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
+					if pending_card:
+						if battle_camera:
+							battle_camera.set_target_focus(current_target)
+						var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+						if card_battle_manager:
+							_execute_card_async(card_battle_manager, pending_card, current_target)
+						set_meta("pending_card", null)
+						exit_targeting_mode()
+					else:
+						_use_action_on_target()
+					return
+				
+				# Otherwise: first click selects and focuses the target
+				# Clear ALL targets' selection states first - only ONE highlight allowed
+				for t in valid_targets:
+					if t is Battler:
+						t.deselect_as_target()
+				
+				# Update index if the clicked target is in valid_targets
+				var idx = valid_targets.find(battler)
+				if idx != -1:
+					keyboard_target_index = idx
+				
+				current_controller_target = battler
+				current_default_selector = battler
 				current_target = battler
-				# Check pending card first (card combat system)
-				var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
-				if pending_card:
-					if battle_camera:
-						battle_camera.set_target_focus(current_target)
-					var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
-					if card_battle_manager:
-						_execute_card_async(card_battle_manager, pending_card, current_target)
-					set_meta("pending_card", null)
-					exit_targeting_mode()
-				else:
-					_use_action_on_target()
+				battler.set_as_keyboard_target()
+				
+				# Move camera to focus on the newly selected target
+				if battle_camera:
+					battle_camera.set_target_focus(battler)
 
 func _cycle_controller_target(direction: int) -> void:
 	# Clear ALL targets' selection states first - only ONE highlight allowed
@@ -1015,6 +1140,22 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 	
 	damage = Formulas.physical_damage(attacker, target, damage)
 	
+	# Apply Electrocuted and Berserk damage multipliers from attacker
+	var attacker_damage_multiplier = 1.0
+	for state_name in attacker.active_states:
+		var state = attacker.active_states[state_name] as State
+		if state and state.damage_dealt_multiplier != 1.0:
+			attacker_damage_multiplier *= state.damage_dealt_multiplier
+	
+	if attacker_damage_multiplier != 1.0:
+		damage = int(damage * attacker_damage_multiplier)
+	
+	# Apply Marked state bonus damage to target
+	if target.active_states.has("Marked"):
+		var marked_state = target.active_states["Marked"] as MarkedState
+		if marked_state:
+			damage = int(damage * marked_state.get_damage_multiplier())
+	
 	# Check for reactive defense (Dodge / Parry / Perfect Parry Counter / Jump) if target is player ally
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 	if card_battle_manager and target in players:
@@ -1023,6 +1164,53 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 	
 	# Only apply if damage is still positive after calculation
 	if damage > 0:
+		# Apply Protected state shield absorption
+		if target.active_states.has("Protected"):
+			var protected_state = target.active_states["Protected"] as ProtectedState
+			if protected_state and protected_state.has_shield():
+				var remaining_damage = protected_state.absorb_damage(damage)
+				damage = remaining_damage
+				# Remove state if shield is broken
+				if not protected_state.has_shield():
+					target.remove_state("Protected")
+		
+		# Apply Electrocuted and Berserk damage taken multipliers to target
+		var target_damage_multiplier = 1.0
+		for state_name in target.active_states:
+			var state = target.active_states[state_name] as State
+			if state and state.damage_taken_multiplier != 1.0:
+				target_damage_multiplier *= state.damage_taken_multiplier
+		
+		if target_damage_multiplier != 1.0:
+			damage = int(damage * target_damage_multiplier)
+		
+		# Track bleed accumulation on target
+		if target.active_states.has("Bleed"):
+			var bleed_state = target.active_states["Bleed"] as BleedState
+			if bleed_state:
+				bleed_state.add_accumulation_from_damage(damage)
+				# Check for bleed proc
+				if bleed_state.should_proc_bleed():
+					var bleed_proc_damage = bleed_state.trigger_bleed_proc(target.max_health)
+					# Apply bleed proc damage immediately
+					await target.take_damage(bleed_proc_damage, null)
+					if hud and hud.battle_text_display:
+						hud.battle_text_display.show_text("%s bleeds for %d damage!" % [target.character_name, bleed_proc_damage])
+		
+		# Track damage for Taunt state
+		if target.active_states.has("Taunt"):
+			var taunt_state = target.active_states["Taunt"] as TauntState
+			if taunt_state:
+				taunt_state.add_damage_taken(damage)
+				# Check if taunt should break
+				if taunt_state.should_break_from_damage():
+					target.remove_state("Taunt")
+		
+		# Remove Marked state after hit if configured
+		if target.active_states.has("Marked"):
+			var marked_state = target.active_states["Marked"] as MarkedState
+			if marked_state and marked_state.should_remove_after_hit():
+				target.remove_state("Marked")
 		# Trigger game feel effects based on damage
 		if effect_manager:
 			# Check for critical hit (damage > 20% of target's max HP)
@@ -1099,10 +1287,9 @@ func end_turn():
 		is_animating = false
 		start_next_turn()
 	else:
-		# Process states before SP regen
-		if current_battler:
-			current_battler.process_states()
-		
+		# State processing now happens at turn start in start_next_turn()
+		# not here at turn end
+
 		# ADVANCE the turn index FIRST, before cleanup removes entries
 		# This ensures we always move forward in the queue
 		if not turn_order.is_empty():

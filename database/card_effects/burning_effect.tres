@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CardEffect" format=3 uid="uid://burning_card_effect"]
+
+[ext_resource type="Script" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+effect_type = 4  # DEBUFF
+value = 3  # 3 burn stacks
+targeting = 1  # TARGET
+stack_count = 3

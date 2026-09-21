@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardConfig" format=3 uid="uid://cmdw1g0rsydv7"]
+
+[ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
+[ext_resource type="Resource" path="res://database/card_effects/burning_effect.tres" id="2"]
+[ext_resource type="Resource" uid="uid://dx6ml2vjyv2tf" path="res://database/state_configs/burning_state_config.tres" id="3"]
+
+[resource]
+script = ExtResource("1")
+actor_animation = "ranged_cast_1"
+animation_priority = 5
+fallback_animation = "ranged_cast_1"
+primary_effect = ExtResource("2")
+applies_states = Array[Resource]([ExtResource("3")])
+card_description = "Applies 3 stacks of burning to target, dealing fire damage each turn."

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ChilledState" format=3 uid="uid://sbnf76wvb2xt"]
+
+[ext_resource type="PackedScene" uid="uid://bmxukw6g6tpxl" path="res://assets/effects/auras/aura_chilled.tscn" id="1_blw65"]
+[ext_resource type="Script" uid="uid://c0lcmn4o3hfld" path="res://database/states/chilled_state.gd" id="1_chill"]
+[ext_resource type="Texture2D" uid="uid://dpr6tjyq66ija" path="res://assets/images/ui/status_effects/chilled.png" id="1_ynhol"]
+[ext_resource type="Material" uid="uid://hagqjaiw403v" path="res://assets/effects/overlays/ice_overlay.tres" id="3_kltv6"]
+
+[resource]
+script = ExtResource("1_chill")
+overlay_material = ExtResource("3_kltv6")
+aura_effect = ExtResource("1_blw65")
+state_name = "Chilled"
+state_description = "Frozen solid - skips their next turn"
+icon_texture = ExtResource("1_ynhol")
+turns_active = 1
+skip_turn = true

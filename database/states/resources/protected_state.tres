@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ProtectedState" load_steps=2 format=3 uid="uid://protected_state_res"]
+
+[ext_resource type="Script" path="res://database/states/protected_state.gd" id="1_protect"]
+
+[resource]
+script = ExtResource("1_protect")
+state_name = "Protected"
+state_description = "Ignores the next hit (damage and effects)"
+shield_hits = 1

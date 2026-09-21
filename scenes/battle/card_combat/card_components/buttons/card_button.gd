@@ -49,6 +49,7 @@ var description_popup: Control = null
 var description_popup_scene: PackedScene = null
 var hover_timer: float = 0.0
 const HOVER_THRESHOLD: float = 0.5  # Seconds before showing description
+var status_info_popup_scene: PackedScene = null
 
 var hover_tween: Tween
 var return_tween: Tween
@@ -133,6 +134,45 @@ func setup(card: CardData) -> void:
 	if card.description and not card.description.is_empty():
 		_setup_description_popup()
 
+func _get_card_status_effects() -> Array[State]:
+	## Get status effects that this card applies
+	var status_effects: Array[State] = []
+	
+	# Check if card has config with applies_states
+	if card_data.card_config and card_data.card_config.applies_states:
+		for state_config in card_data.card_config.applies_states:
+			if state_config and state_config.has_method("get"):
+				var state_id = state_config.get("state_id")
+				if not state_id.is_empty():
+					# Load the state resource
+					var state = _load_state_from_id(state_id)
+					if state:
+						status_effects.append(state)
+	
+	return status_effects
+
+func _load_state_from_id(state_id: String) -> State:
+	## Load a state resource from its ID
+	var state_paths = {
+		"Burning": "res://database/states/resources/burning_state.tres",
+		"Electrocuted": "res://database/states/resources/electrocuted_state.tres",
+		"Bleed": "res://database/states/resources/bleed_state.tres",
+		"Chilled": "res://database/states/resources/chilled_state.tres",
+		"Berserk": "res://database/states/resources/berserk_state.tres",
+		"Taunt": "res://database/states/resources/taunt_state.tres",
+		"Marked": "res://database/states/resources/marked_state.tres",
+		"Protected": "res://database/states/resources/protected_state.tres"
+	}
+	
+	var state_path = state_paths.get(state_id, "")
+	if state_path.is_empty():
+		return null
+	
+	if ResourceLoader.exists(state_path):
+		return ResourceLoader.load(state_path) as State
+	
+	return null
+
 func set_fan_parameters(rot_deg: float, y_offset: float, z_idx: int) -> void:
 	base_rotation = rot_deg
 	base_y_offset = y_offset
@@ -185,6 +225,11 @@ func _ready():
 	var popup_path = "res://scenes/battle/card_combat/card_components/popups/card_description_popup.tscn"
 	if ResourceLoader.exists(popup_path):
 		description_popup_scene = load(popup_path)
+	
+	# Load status info popup scene
+	var status_popup_path = "res://scenes/battle/hud/status_info_popup.tscn"
+	if ResourceLoader.exists(status_popup_path):
+		status_info_popup_scene = load(status_popup_path)
 
 	_setup_shader()
 	_pop_in()
@@ -274,14 +319,21 @@ func _setup_description_popup():
 	
 	description_popup = description_popup_scene.instantiate()
 	
-	# Add as child of the card itself so it inherits position and z-index
-	add_child(description_popup)
+	# Add to PopUpContainer if exists on card, otherwise add to self
+	var popup_container = get_node_or_null("PopUpContainer")
+	if popup_container:
+		popup_container.add_child(description_popup)
+	else:
+		add_child(description_popup)
 	
 	# Set high z-index within the card's children to ensure it's on top
 	description_popup.z_index = 100
 	
+	# Get status effects from card
+	var status_effects = _get_card_status_effects()
+	
 	if description_popup.has_method("setup"):
-		description_popup.setup(self, card_data.description)
+		description_popup.setup(self, card_data.description, status_effects)
 	
 	description_popup.visible = false
 

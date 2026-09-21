@@ -17,6 +17,7 @@ enum StackingBehavior {
 @export var chance: float = 1.0                      ## Application chance (0.0-1.0)
 @export var stacking_behavior: StackingBehavior = StackingBehavior.REFRESH
 @export var max_stacks: int = 1                      ## Maximum number of stacks
+@export var stacks_per_application: int = 1          ## How many stacks to add per application (for ADDITIVE stacking)
 @export var can_dispel: bool = true                  ## Whether state can be dispelled
 @export var is_purgeable: bool = true                ## Whether state can be purged
 @export var applies_to_actor: bool = false           ## Whether state applies to actor instead of target
@@ -56,29 +57,67 @@ func apply_state(target: Node, actor: Node = null) -> Dictionary:
 		result["message"] = "Target is immune to this state"
 		return result
 	
+	# Load the state resource based on state_id
+	var state_resource = _load_state_resource()
+	if not state_resource:
+		result["message"] = "Could not load state resource: " + state_id
+		return result
+	
 	# Handle stacking
 	var current_stacks = _get_current_stacks(actual_target)
 	var new_stacks = _calculate_new_stacks(current_stacks)
+	
+	# For ADDITIVE stacking (like Burning), calculate how many stacks to ADD
+	var stacks_to_add = 0
+	if stacking_behavior == StackingBehavior.ADDITIVE:
+		stacks_to_add = stacks_per_application
+		# Calculate what the new total would be
+		new_stacks = current_stacks + stacks_to_add
+		if new_stacks > max_stacks:
+			new_stacks = max_stacks
+			# Adjust stacks_to_add if we're at cap
+			stacks_to_add = max_stacks - current_stacks
+	
+	# Handle Bleed accumulation - set initial accumulation for new states
+	if state_id == "Bleed" and not actual_target.active_states.has("Bleed"):
+		# New bleed state starts at 0 accumulation
+		var initial_accum = 0
 	
 	if new_stacks == 0 and stacking_behavior == StackingBehavior.NONE:
 		result["message"] = "State already applied and no stacking allowed"
 		return result
 	
-	# Apply the state
+	# Apply the state using the new status effect system
 	if actual_target.has_method("apply_state"):
-		var state_data = {
-			"state_id": state_id,
-			"state_name": state_name,
-			"duration": duration,
-			"stacks": new_stacks,
-			"tick_damage": tick_damage,
-			"tick_interval": tick_interval,
-			"tick_count": tick_count,
-			"remove_on_damage": remove_on_damage,
-			"remove_on_move": remove_on_move
-		}
+		# Create a copy of the state resource
+		var state_instance = state_resource.duplicate()
 		
-		actual_target.apply_state(state_data)
+		# Configure the state instance with our config values
+		if state_instance.has_method("set"):
+			state_instance.turns_active = duration
+		
+		# Handle stacking for Burning state
+		# For ADDITIVE stacking, set stack_count to the AMOUNT TO ADD (not total)
+		if stacking_behavior == StackingBehavior.ADDITIVE and "stack_count" in state_instance:
+			state_instance.stack_count = stacks_to_add
+		elif state_id == "Burning" and state_instance.has_method("apply_stacks"):
+			# Legacy fallback
+			state_instance.apply_stacks(stacks_to_add)
+		
+		# Handle Protected state - set shield hits
+		if state_id == "Protected" and "shield_hits" in state_instance:
+			state_instance.shield_hits = 1  # Default 1 shield hit
+		
+		# Handle Bleed state - set initial accumulation
+		if state_id == "Bleed" and "accumulation_value" in state_instance:
+			state_instance.accumulation_value = 0  # Start at 0, accumulates from damage
+		
+		# Ensure icon_texture is preserved (duplicate() may not preserve exported resources)
+		if state_resource.icon_texture and not state_instance.icon_texture:
+			state_instance.icon_texture = state_resource.icon_texture
+		
+		# Apply the state to the target
+		actual_target.apply_state(state_instance)
 		result["success"] = true
 		result["state_applied"] = true
 		result["stacks"] = new_stacks
@@ -88,6 +127,29 @@ func apply_state(target: Node, actor: Node = null) -> Dictionary:
 		result["message"] = "Target does not support state application"
 	
 	return result
+
+## Load the state resource based on state_id
+func _load_state_resource() -> State:
+	# Map state_id to resource paths
+	var state_paths = {
+		"Burning": "res://database/states/resources/burning_state.tres",
+		"Electrocuted": "res://database/states/resources/electrocuted_state.tres",
+		"Bleed": "res://database/states/resources/bleed_state.tres",
+		"Chilled": "res://database/states/resources/chilled_state.tres",
+		"Berserk": "res://database/states/resources/berserk_state.tres",
+		"Taunt": "res://database/states/resources/taunt_state.tres",
+		"Marked": "res://database/states/resources/marked_state.tres",
+		"Protected": "res://database/states/resources/protected_state.tres"
+	}
+	
+	var state_path = state_paths.get(state_id, "")
+	if state_path.is_empty():
+		return null
+	
+	if ResourceLoader.exists(state_path):
+		return ResourceLoader.load(state_path) as State
+	
+	return null
 
 ## Check if target is immune to this state
 func _is_immune(target: Node) -> bool:

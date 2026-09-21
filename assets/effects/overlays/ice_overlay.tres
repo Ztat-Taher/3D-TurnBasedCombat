@@ -1,0 +1,18 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://hagqjaiw403v"]
+
+[ext_resource type="Shader" uid="uid://bt602mgskodjf" path="res://assets/effects/shaders/ice_aura.gdshader" id="1_lmgum"]
+[ext_resource type="Texture2D" uid="uid://bg4hs81yvyljx" path="res://assets/effects/textures/T_Noise1_tiled.png" id="2_lmgum"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_lmgum")
+shader_parameter/FresnelPower = 3.0
+shader_parameter/FresnelColor = Color(0.7, 0.85, 1, 1)
+shader_parameter/Color = Color(0.8, 0.9, 1, 0.85)
+shader_parameter/Tiling = Vector3(2, 2, 0)
+shader_parameter/Offset = Vector3(0, 0, 0)
+shader_parameter/Ice_Texture = ExtResource("2_lmgum")
+shader_parameter/RefractionAmount = 0.5
+shader_parameter/Metallic = 0.1
+shader_parameter/Smoothness = 0.9
+shader_parameter/Normals = 0.6

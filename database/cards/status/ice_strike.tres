@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://4j7s70kuli4b"]
+
+[ext_resource type="Script" uid="uid://bey7off4hhc5m" path="res://addons/card_combat/card_data.gd" id="1"]
+[ext_resource type="Resource" path="res://database/card_configs/ice_strike_config.tres" id="2"]
+[ext_resource type="Script" uid="uid://diw3hm0lae551" path="res://addons/card_combat/spell_effect.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+card_id = "ice_strike"
+name = "Ice Strike"
+cost = 2
+metadata = {
+"card_type": "status"
+}
+card_config = ExtResource("2")
+description = "Freezes the target, causing them to skip their next turn."

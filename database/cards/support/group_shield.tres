@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://group_shield_card"]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+[ext_resource type="Resource" path="res://database/card_configs/group_shield_config.tres" id="2"]
+[ext_resource type="Script" path="res://addons/card_combat/spell_effect.gd" id="3"]
+
+[resource]
+script = ExtResource("1")
+card_id = "group_shield"
+name = "Group Shield"
+cost = 4
+health = 0
+description = "Grants protective shields to all allies that ignore the next hit."
+metadata = {
+"card_type": "support"
+}
+card_config = ExtResource("2")

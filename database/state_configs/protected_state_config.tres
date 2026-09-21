@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="StateConfig" format=3 uid="uid://protected_state_config"]
+
+[ext_resource type="Script" uid="uid://cd7tt8brac0qt" path="res://scenes/battle/card_combat/resources/states/state_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+state_id = "Protected"
+state_name = "Protected"
+duration = -1
+chance = 1.0
+stacking_behavior = 1
+max_stacks = 1
+can_dispel = true

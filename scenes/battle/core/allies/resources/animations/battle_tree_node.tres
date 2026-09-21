@@ -10,7 +10,7 @@ animation = &"sword_02/sword_combo_attack_01_var003"
 animation = &"sword_02/sword_combo_attack_01_var004"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_1"]
-animation = &"Locomotion-Library/attack1"
+animation = &"sword_02/sword_attack_up_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_2"]
 animation = &"skill-animations/strong-attack"
@@ -57,7 +57,7 @@ states/ranged_cast_1/position = Vector2(300, 280)
 states/ranged_cast_2/node = SubResource("anim_ranged_cast_2")
 states/ranged_cast_2/position = Vector2(300, 360)
 transitions = ["Start", "melee_combo_1", SubResource("ca_start_to_melee1"), "Start", "melee_combo_2", SubResource("ca_start_to_melee2"), "Start", "melee_combo_3", SubResource("ca_start_to_melee3"), "Start", "ranged_cast_1", SubResource("ca_start_to_ranged1"), "Start", "ranged_cast_2", SubResource("ca_start_to_ranged2"), "melee_combo_1", "End", SubResource("AnimationNodeStateMachineTransition_4vh7f"), "melee_combo_2", "End", SubResource("AnimationNodeStateMachineTransition_m5yw2"), "melee_combo_3", "End", SubResource("AnimationNodeStateMachineTransition_thekq"), "ranged_cast_1", "End", SubResource("AnimationNodeStateMachineTransition_csrss"), "ranged_cast_2", "End", SubResource("AnimationNodeStateMachineTransition_jex2m")]
-graph_offset = Vector2(-12, -119.79018)
+graph_offset = Vector2(-89, 107.20982)
 
 [sub_resource type="AnimationNodeAnimation" id="anim_death"]
 animation = &"sword_02/sword_hit_death_var001"

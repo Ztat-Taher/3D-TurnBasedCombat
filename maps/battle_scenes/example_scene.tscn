@@ -34,6 +34,7 @@ speed_key = "Tab"
 speed_increase_amount = 2.0
 speed_is_toggle = true
 formation_spacing = 4.0
+instant_turning = true
 active_troop = ExtResource("3_yxp8s")
 enemy_markers = NodePath("SubViewportContainer/SubViewport/FRONTROW")
 use_procedural_formation = false
@@ -75,4 +76,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.261, -1.006)
 transform = Transform3D(-0.73058707, -0.2284613, 0.6434656, -0.033112805, 0.953111, 0.30080417, -0.6820161, 0.19845673, -0.7038955, 2.48554, 3.00572, -3.08627)
 
 [node name="FRONTROW" type="Marker3D" parent="SubViewportContainer/SubViewport" index="4" unique_id=952362055 groups=["FRONTROW"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 3.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 2)

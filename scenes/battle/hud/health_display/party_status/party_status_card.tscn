@@ -5,9 +5,12 @@
 [ext_resource type="Shader" uid="uid://bqjakqnxy45o1" path="res://assets/shaders/breathing_effect.gdshader" id="3_8sbpx"]
 [ext_resource type="FontFile" uid="uid://ggllarrqs0ao" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-FineFantasyStrategies.ttf" id="4_font"]
 [ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="5_lrais"]
+[ext_resource type="Texture2D" uid="uid://n6bka4p6sbsi" path="res://assets/images/ui/status_effects/shield.png" id="7_i84ie"]
 [ext_resource type="Script" uid="uid://domq7ntx86pay" path="res://scripts/juice/progress/progress_bar_juice.gd" id="9_juice"]
 [ext_resource type="Texture2D" uid="uid://c2ohq62uuh7ac" path="res://assets/images/ui/party_card/party_card_ap_container.png" id="9_kyqa2"]
+[ext_resource type="Texture2D" uid="uid://b87whs5bl045n" path="res://assets/images/ui/status_effects/burning.png" id="11_i84ie"]
 [ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://scripts/systems/effects/visual/shadows/drop_shadow.gd" id="11_nwmgd"]
+[ext_resource type="Script" uid="uid://j2dcg5itprtb" path="res://scenes/battle/hud/status_icons_container.gd" id="12_x3c72"]
 [ext_resource type="Texture2D" uid="uid://ohxvmtb18v7i" path="res://assets/images/ui/party_card/party_card_container.png" id="14_3omii"]
 [ext_resource type="Texture2D" uid="uid://c580adfln04c4" path="res://assets/images/ui/party_card/party_card_hp_bar.png" id="15_5qc4c"]
 [ext_resource type="Texture2D" uid="uid://2mbkqpxf4w7r" path="res://assets/images/ui/party_card/party_card_ap_bar.png" id="16_3ga36"]
@@ -120,16 +123,30 @@ offset_top = -7.0
 offset_right = 47.0
 offset_bottom = 9.0
 grow_vertical = 2
-theme_override_colors/font_color = Color(0, 0, 0, 1)
-theme_override_colors/font_shadow_color = Color(0.18072194, 0.18072197, 0.18072191, 1)
-theme_override_constants/shadow_offset_x = 0
-theme_override_constants/shadow_offset_y = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 10
 theme_override_fonts/font = ExtResource("5_lrais")
 theme_override_font_sizes/font_size = 15
 text = "171/171"
 horizontal_alignment = 1
 vertical_alignment = 1
 uppercase = true
+
+[node name="ShieldContainer" type="HBoxContainer" parent="BackgroundContainer/HPContainer/HPBar" unique_id=71430586]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="Shield" type="TextureRect" parent="BackgroundContainer/HPContainer/HPBar/ShieldContainer" unique_id=959999825]
+visible = false
+layout_mode = 2
+texture = ExtResource("7_i84ie")
+stretch_mode = 4
 
 [node name="HPJuice" type="Node" parent="BackgroundContainer/HPContainer" unique_id=108872733 node_paths=PackedStringArray("main_bar", "trailing_bar", "associated_label")]
 script = ExtResource("9_juice")
@@ -218,6 +235,59 @@ theme_override_colors/font_color = Color(0.2, 0.9, 1, 1)
 theme_override_fonts/font = ExtResource("4_font")
 theme_override_font_sizes/font_size = 10
 text = "●"
+
+[node name="PopUpContainer" type="VBoxContainer" parent="BackgroundContainer" unique_id=1107993688]
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 258.0
+offset_top = -35.0
+offset_right = 518.0
+offset_bottom = 35.0
+grow_vertical = 2
+theme_override_constants/separation = 6
+
+[node name="StatusIconsContainer" type="HBoxContainer" parent="BackgroundContainer" unique_id=786705470]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -16.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("12_x3c72")
+
+[node name="StatusIconTemplate" type="TextureRect" parent="BackgroundContainer/StatusIconsContainer" unique_id=1440618111]
+visible = false
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+texture = ExtResource("11_i84ie")
+expand_mode = 3
+stretch_mode = 4
+
+[node name="StatusCount" type="Label" parent="BackgroundContainer/StatusIconsContainer/StatusIconTemplate" unique_id=1322079691]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -3.0
+offset_top = -11.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 5
+theme_override_fonts/font = ExtResource("5_lrais")
+theme_override_font_sizes/font_size = 20
+text = "1"
+horizontal_alignment = 2
+uppercase = true
 
 [node name="Shadow" type="TextureRect" parent="BackgroundContainer" unique_id=1859769514]
 z_index = -1

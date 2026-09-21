@@ -52,7 +52,7 @@ var _pending_discard_button: CardButton = null
 # True when cards are laid out but waiting for the UI to become visible before animating
 var _draw_anim_pending: bool = false
 # Track the previous hand size to detect newly added cards
-var _previous_hand_size: int = 0
+var previous_hand_size: int = 0
 # Track the starting index for new card animations
 var _new_card_start_index: int = 0
 
@@ -96,7 +96,7 @@ func _deferred_ready():
 	card_battle_manager.card_played.connect(_on_card_played)
 	
 	# Reset hand size tracking for initial load
-	_previous_hand_size = 0
+	previous_hand_size = 0
 	
 	# Initial UI update
 	update_hand_display()
@@ -335,9 +335,13 @@ func _on_draw_pile_pressed() -> void:
 	# Draw a card from the deck
 	var drawn_card = card_battle_manager.draw_card_for_deck(deck)
 	if drawn_card:
+		# Force a full rebuild to ensure the new card appears
+		previous_hand_size = 0
 		# Update the hand display to show the new card
 		update_hand_display()
 		update_pile_counts()
+		# Force card playability update
+		update_card_playability()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DRAW ANIMATION  (pile → hand fan position)
@@ -539,13 +543,13 @@ func update_hand_display():
 	
 	var hand = card_battle_manager.get_hand()
 	var current_hand_size = hand.size()
-	var is_adding_card = current_hand_size > _previous_hand_size
+	var is_adding_card = current_hand_size > previous_hand_size
 	
 	# If we're adding cards (not rebuilding the whole hand), preserve existing cards
-	if is_adding_card and _previous_hand_size > 0:
+	if is_adding_card and previous_hand_size > 0:
 		# Store old positions of existing cards before fanning
 		var old_positions = []
-		for i in range(_previous_hand_size):
+		for i in range(previous_hand_size):
 			if i < card_buttons.size() and card_buttons[i] is CardButton:
 				var cb = card_buttons[i] as CardButton
 				old_positions.append({
@@ -556,7 +560,7 @@ func update_hand_display():
 				old_positions.append({"position": Vector2.ZERO, "rotation": 0.0})
 		
 		# Only add the new cards
-		var new_cards = hand.slice(_previous_hand_size)
+		var new_cards = hand.slice(previous_hand_size)
 		for i in range(new_cards.size()):
 			var card = new_cards[i]
 			var card_button = create_card_button(card)
@@ -583,8 +587,8 @@ func update_hand_display():
 				card_button.modulate.a = 0.0
 				card_container.add_child(card_button)
 		
-		# Store the start index for animation before updating _previous_hand_size
-		_new_card_start_index = _previous_hand_size
+		# Store the start index for animation before updating previous_hand_size
+		_new_card_start_index = previous_hand_size
 		
 		# Apply fanning to set new positions for all cards
 		apply_card_fanning()
@@ -637,7 +641,7 @@ func update_hand_display():
 	update_pile_counts()
 	
 	# Update previous hand size
-	_previous_hand_size = current_hand_size
+	previous_hand_size = current_hand_size
 	
 	# Defer draw animations so the HBoxContainer finishes layout first,
 	# giving us accurate global positions to calculate the pile → hand offset.
@@ -683,7 +687,7 @@ func _smoothly_reposition_existing_cards(old_positions: Array = []) -> void:
 		return
 	
 	# Get the number of existing cards (before new ones were added)
-	var existing_count = _previous_hand_size
+	var existing_count = previous_hand_size
 	
 	# Reposition existing cards
 	for i in range(existing_count):
@@ -950,7 +954,7 @@ func _on_card_played(_card = null, _target = null):
 	
 	# ── 2. Rebuild the remaining hand (draw animations play for unchanged cards) ──
 	# Reset previous hand size since we're doing a full rebuild
-	_previous_hand_size = 0
+	previous_hand_size = 0
 	update_hand_display()
 	update_pile_counts()
 

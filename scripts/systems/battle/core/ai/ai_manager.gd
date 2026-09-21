@@ -129,6 +129,19 @@ func choose_target(character:Battler, targets: Array) -> Node:
 	if valid_targets.is_empty():
 		return null
 	
+	# Check for Taunt state - prioritize taunting targets
+	var taunting_targets = []
+	for target:Battler in valid_targets:
+		if target.active_states.has("Taunt"):
+			var taunt_state = target.active_states["Taunt"] as TauntState
+			if taunt_state and taunt_state.is_taunting:
+				taunting_targets.append(target)
+	
+	# If there are taunting targets, prioritize them
+	if not taunting_targets.is_empty():
+		# Choose random taunting target (or could choose weakest)
+		return taunting_targets[randi() % taunting_targets.size()]
+	
 	# Use intelligence to determine targeting strategy
 	var intelligence = character.intelligence
 	var rand_value = randi() % 100

@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://c3q7f8kearnil"]
+[gd_scene format=3 uid="uid://dcrwmf4rl7n22"]
 
-[ext_resource type="Script" path="res://assets/effects/core/vfx_status.gd" id="1_5e04j"]
+[ext_resource type="Script" uid="uid://dx4laomb5rmio" path="res://assets/effects/core/vfx_status.gd" id="1_5e04j"]
 [ext_resource type="Shader" uid="uid://mfsasawk6uxn" path="res://assets/effects/shaders/aura_particle.gdshader" id="3_xrh64"]
 [ext_resource type="Shader" uid="uid://c5674yw0qj5md" path="res://assets/effects/shaders/texture_particle.gdshader" id="5_txtp"]
 [ext_resource type="Texture2D" uid="uid://cwe0b12le2ok1" path="res://assets/effects/textures/plus_icon.png" id="6_icon"]
@@ -17,23 +17,23 @@ seamless = true
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_2kt0u"]
 render_priority = 0
 shader = ExtResource("3_xrh64")
-shader_parameter/primary_color = Color(0.7019608, 1, 0.7019608, 1)
-shader_parameter/secondary_color = Color(0.21960784, 0.9019608, 0.34901962, 1)
+shader_parameter/primary_color = Color(1, 1, 1, 1)
+shader_parameter/secondary_color = Color(0.48235294, 0.92156863, 0.4862745, 1)
 shader_parameter/tertiary_color = Color(0.078431375, 0.5019608, 0.21960784, 1)
-shader_parameter/emission = 6.0
-shader_parameter/color_curve = 2.0
-shader_parameter/hue_variation = 0.2
+shader_parameter/emission = 8.0
+shader_parameter/color_curve = 1.0
+shader_parameter/hue_variation = 0.1
 shader_parameter/use_secondary = false
 shader_parameter/noise_texture = SubResource("NoiseTexture2D_rykdo")
 shader_parameter/noise_scale = Vector2(1.5, 0.5)
 shader_parameter/noise_scroll = Vector2(0, -0.1)
-shader_parameter/shape_curve = 3.0
+shader_parameter/shape_curve = 2.0
 shader_parameter/noise_twist = 0.0
-shader_parameter/waviness = 0.0
+shader_parameter/waviness = 0.2
 shader_parameter/edge_hardness = 0.0
 shader_parameter/edge_position = 0.0
 shader_parameter/proximity_fade = true
-shader_parameter/proximity_fade_distance = 0.5
+shader_parameter/proximity_fade_distance = 1.0
 
 [sub_resource type="Curve" id="Curve_bmm3d"]
 _data = [Vector2(0, 1), 0.0, -1.0083532, 0, 0, Vector2(1, 0), -0.97778255, 0.0, 0, 0]
@@ -78,11 +78,15 @@ curve = SubResource("Curve_ixpwx")
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_6iod6"]
 emission_shape = 1
 emission_sphere_radius = 1.0
+angle_min = -54.29999
+angle_max = -14.29999
 direction = Vector3(0, 1, 0)
+orbit_velocity_min = -0.3
+orbit_velocity_max = 0.3
 orbit_velocity_curve = SubResource("CurveXYZTexture_osit5")
 radial_velocity_min = 0.1
 radial_velocity_max = 0.1
-gravity = Vector3(0, 0, 0)
+gravity = Vector3(0, 0.4, 0)
 radial_accel_min = -0.3
 radial_accel_max = -0.3
 scale_min = 0.5
@@ -98,15 +102,15 @@ size = Vector2(2, 2)
 render_priority = 0
 shader = ExtResource("5_txtp")
 shader_parameter/icon_texture = ExtResource("6_icon")
-shader_parameter/primary_color = Color(0.7019608, 1, 0.7019608, 1)
-shader_parameter/secondary_color = Color(0.30588236, 1, 0.4862745, 1)
-shader_parameter/emission = 6.0
+shader_parameter/primary_color = Color(1, 1, 1, 1)
+shader_parameter/secondary_color = Color(0.48235294, 0.92156863, 0.4862745, 1)
+shader_parameter/emission = 8.0
 shader_parameter/color_curve = 1.0
-shader_parameter/hue_variation = 0.2
+shader_parameter/hue_variation = 0.1
 shader_parameter/edge_hardness = 0.0
 shader_parameter/edge_position = 0.0
 shader_parameter/proximity_fade = true
-shader_parameter/proximity_fade_distance = 0.5
+shader_parameter/proximity_fade_distance = 1.0
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_p7n9a"]
 emission_shape = 1
@@ -114,7 +118,11 @@ emission_sphere_radius = 1.0
 direction = Vector3(0, 1, 0)
 initial_velocity_min = 0.4
 initial_velocity_max = 1.2
-gravity = Vector3(0, 2, 0)
+orbit_velocity_min = -0.3
+orbit_velocity_max = 0.3
+gravity = Vector3(0, 0.4, 0)
+radial_accel_min = -0.3
+radial_accel_max = -0.3
 scale_min = 0.15
 scale_max = 0.45
 scale_curve = SubResource("CurveTexture_o24yk")
@@ -215,7 +223,7 @@ particles_radial = -0.3
 
 [node name="Aura" type="GPUParticles3D" parent="." unique_id=1556418046]
 material_override = SubResource("ShaderMaterial_2kt0u")
-amount = 32
+amount = 16
 lifetime = 2.0
 fixed_fps = 60
 transform_align = 3

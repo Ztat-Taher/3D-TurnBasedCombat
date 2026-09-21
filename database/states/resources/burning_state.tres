@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="BurningState" format=3 uid="uid://m34442o38e3v"]
+
+[ext_resource type="Script" uid="uid://bjnjk6lwgbeqc" path="res://database/states/burning_state.gd" id="1_burn"]
+[ext_resource type="Material" uid="uid://c3m7vfireovl1" path="res://assets/effects/overlays/fire_overlay.tres" id="2_4kqxw"]
+[ext_resource type="Texture2D" uid="uid://b87whs5bl045n" path="res://assets/images/ui/status_effects/burning.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_burn")
+overlay_material = ExtResource("2_4kqxw")
+state_name = "Burning"
+state_description = "Takes fire damage each turn. Damage increases with more stacks."
+icon_texture = ExtResource("2_icon")
+damage_per_turn = 3
+turns_active = 3

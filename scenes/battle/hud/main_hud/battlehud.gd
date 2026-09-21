@@ -43,10 +43,12 @@ func _resolve_cursor_system() -> CursorManager:
 
 var aoe_confirm_button: Button = null
 
+## Overhead health bar scene: native resolution Canvas UI with depth sorting & occlusion.
 const ENEMY_OVERHEAD_BAR_SCENE: PackedScene = preload("res://scenes/battle/hud/health_display/bars/enemy_overhead/EnemyOverheadBar.tscn")
 
 # Maps enemy battler -> overhead bar node
 var enemy_overhead_bar_map: Dictionary = {}
+
 
 var activeBattler: Node = null
 var enemy: Node = null
@@ -62,6 +64,7 @@ enum UIState {
 
 var current_ui_state: UIState = UIState.BASE_STATE
 var previous_ui_state: UIState = UIState.BASE_STATE
+var _just_restored_from_card: bool = false
 
 # Resolve the active BattleCamera controller for projecting 3D battler
 # positions into HUD screen space (handles the low-res SubViewport scaling).
@@ -156,6 +159,7 @@ func _ready():
 	# Listen for card battle manager AP changes
 	call_deferred("_connect_card_battle_manager")
 	
+
 	# Initialize cursor system
 	_initialize_cursor_system()
 
@@ -239,6 +243,9 @@ func _on_cbm_card_played(_card = null, _target = null) -> void:
 					action_buttons.hide_button("Attack")
 				if items_button:
 					action_buttons.show_button("Items")
+	
+	# Mark that we just restored from card execution to prevent update_hud from overriding
+	_just_restored_from_card = true
 
 func _process(_delta: float) -> void:
 	# Respect UI state system - hide action buttons during execution/targeting
@@ -378,6 +385,8 @@ func update_health_bars():
 	update_party_status()
 
 ## Spawn an overhead health bar for a given enemy (if not already spawned).
+## The bar is added to enemy_overhead_bars_container in the native-resolution CanvasLayer
+## and projects the enemy's 3D position with line-of-sight occlusion & depth sorting.
 func _spawn_enemy_overhead_bar(enemy_node: Node) -> void:
 	if not is_instance_valid(enemy_node):
 		return
@@ -388,6 +397,9 @@ func _spawn_enemy_overhead_bar(enemy_node: Node) -> void:
 	var bar = ENEMY_OVERHEAD_BAR_SCENE.instantiate()
 	enemy_overhead_bars_container.add_child(bar)
 	bar.setup(enemy_node as Battler)
+	bar.bar_died.connect(func() -> void:
+		enemy_overhead_bar_map.erase(enemy_node)
+	)
 	enemy_overhead_bar_map[enemy_node] = bar
 
 ## Check if enemy_node is a boss and show the boss bar if so.
@@ -431,8 +443,12 @@ func show_action_buttons(character: Node):
 				var target_pos = screen_pos + Vector2(70.0, -50.0)
 				action_buttons.position = target_pos
 	
-	# Always start in BASE_STATE (Attack button visible)
-	set_ui_state(UIState.BASE_STATE)
+	# Only set BASE_STATE if we didn't just restore from card execution
+	if not _just_restored_from_card:
+		set_ui_state(UIState.BASE_STATE)
+	else:
+		# Reset the flag after using it
+		_just_restored_from_card = false
 	
 	if end_turn_button:
 		end_turn_button.disabled = false
@@ -444,12 +460,19 @@ func show_action_buttons(character: Node):
 	action_buttons.show()
 	action_buttons.animate_buttons_in()
 	
-	# Set button states via juice system (Attack visible, Items visible in BASE_STATE)
+	# Set button states based on current state (respect restored state)
 	if action_buttons:
-		if attack_button:
-			action_buttons.show_button("Attack")
-		if items_button:
-			action_buttons.show_button("Items")
+		match current_ui_state:
+			UIState.BASE_STATE:
+				if attack_button:
+					action_buttons.show_button("Attack")
+				if items_button:
+					action_buttons.show_button("Items")
+			UIState.CARD_SELECT_STATE:
+				if attack_button:
+					action_buttons.hide_button("Attack")
+				if items_button:
+					action_buttons.show_button("Items")
 	
 	activeBattler = character
 	update_party_status()
@@ -467,15 +490,6 @@ func show_action_buttons(character: Node):
 				var screen_pos = battle_camera.world_to_screen(world_pos)
 				var target_pos = screen_pos + Vector2(70.0, -50.0)
 				action_buttons.position = target_pos
-	
-	# Always start in BASE_STATE (Attack button visible)
-	set_ui_state(UIState.BASE_STATE)
-	
-	if end_turn_button:
-		end_turn_button.disabled = false
-	
-	# Setup input prompts
-	_setup_input_prompts()
 	
 	# Use the new ActionButtons animation system
 	action_buttons.animate_buttons_in()

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardConfig" format=3 uid="uid://dhxajnj6xvr27"]
+
+[ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
+[ext_resource type="Resource" path="res://database/state_configs/protected_state_config.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+actor_animation = "ranged_cast_1"
+animation_priority = 5
+fallback_animation = "ranged_cast_1"
+target_type = 4
+effect_timing = 1
+projectile_lifetime = 2.0
+qte_difficulty = 0.0
+qte_window_duration = 0.0
+qte_success_multiplier = 1.0
+qte_mash_count = 0
+qte_mash_window = 0.0
+applies_states = Array[Resource]([ExtResource("2")])
+state_duration = -1
+card_rarity = 1
+card_tags = Array[String](["support", "shield", "aoe", "party"])
+card_description = "Grants protective shields to all allies that ignores the next hit."

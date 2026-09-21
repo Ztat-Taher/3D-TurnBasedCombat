@@ -9,16 +9,23 @@ extends Control
 @onready var ap_bar_container: HBoxContainer = $BackgroundContainer/APContainer/APBarContainer
 @onready var ap_num_label: Label = $BackgroundContainer/APContainer/APNumContainer/APNumBackground/APNumLabel
 @onready var portrait_background: TextureRect = $BackgroundContainer/PortraitBackground
+@onready var status_icons_container: StatusIconsContainer = $BackgroundContainer/StatusIconsContainer
+@onready var status_icon_template: TextureRect = $BackgroundContainer/StatusIconsContainer/StatusIconTemplate
 
 @onready var hp_juice: ProgressBarJuice = $BackgroundContainer/HPContainer/HPJuice
+@onready var shield_container: HBoxContainer = $BackgroundContainer/HPContainer/HPBar/ShieldContainer
+@onready var shield_template: TextureRect = $BackgroundContainer/HPContainer/HPBar/ShieldContainer/Shield
 
 @export var ap_bar_template: PackedScene # If you want to use a template, otherwise we'll duplicate the existing child
 
 var is_active: bool = false
+var current_ally: Battler = null
 
 func setup(ally: Battler) -> void:
 	if not ally:
 		return
+	
+	current_ally = ally
 	
 	# Ensure nodes are ready before accessing them
 	if not name_label:
@@ -50,6 +57,21 @@ func setup(ally: Battler) -> void:
 	# Connect to ally AP changes if signal exists
 	if ally.has_signal("ap_changed") and not ally.ap_changed.is_connected(update_ap):
 		ally.ap_changed.connect(update_ap)
+	
+	# Connect to ally shield changes if signal exists
+	if ally.has_signal("shield_changed") and not ally.shield_changed.is_connected(_on_shield_changed):
+		ally.shield_changed.connect(_on_shield_changed)
+	
+	# Connect to ally state changes if signal exists (for initial state application)
+	if ally.has_signal("state_applied") and not ally.state_applied.is_connected(_on_state_applied):
+		ally.state_applied.connect(_on_state_applied)
+	
+	# Setup status icons container with the reusable component
+	if status_icons_container and status_icon_template:
+		status_icons_container.setup(ally, status_icon_template)
+	
+	# Initial shield update
+	update_shields()
 	
 	# Entrance animation
 	modulate.a = 0.0
@@ -141,3 +163,31 @@ func update_ap(current_ap: int, max_ap: int) -> void:
 func set_portrait_texture(texture: Texture2D) -> void:
 	if portrait_background:
 		portrait_background.texture = texture
+
+func update_shields() -> void:
+	if not shield_container or not current_ally:
+		return
+	
+	# Clear existing shields
+	for child in shield_container.get_children():
+		if child != shield_template:
+			child.queue_free()
+	
+	# Check for Protected state
+	if current_ally.active_states.has("Protected"):
+		var protected_state = current_ally.active_states["Protected"] as ProtectedState
+		if protected_state and protected_state.has_shield():
+			var shield_count = protected_state.get_remaining_shields()
+			# Add shield icons for each remaining shield
+			for i in range(shield_count):
+				var shield = shield_template.duplicate()
+				shield.visible = true
+				shield_container.add_child(shield)
+
+func _on_shield_changed(shield_count: int) -> void:
+	update_shields()
+
+func _on_state_applied(state_name: String) -> void:
+	# Update shields when Protected state is applied
+	if state_name == "Protected":
+		update_shields()

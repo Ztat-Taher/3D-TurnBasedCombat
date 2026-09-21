@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MarkedState" load_steps=2 format=3 uid="uid://marked_state_res"]
+
+[ext_resource type="Script" path="res://database/states/marked_state.gd" id="1_marked"]
+
+[resource]
+script = ExtResource("1_marked")
+state_name = "Marked"
+state_description = "Next attack deals bonus damage"
+state_type = 3
+damage_per_turn = 0
+power_multiplier = 1.0
+hit_chance = 100.0
+turns_active = 3
+can_be_cured = true
+marked_damage_bonus = 1.5
+remove_after_hit = true
+can_stack = true

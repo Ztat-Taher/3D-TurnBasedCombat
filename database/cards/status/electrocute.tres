@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cuv6ss2lo6cyn"]
+
+[ext_resource type="Script" uid="uid://bey7off4hhc5m" path="res://addons/card_combat/card_data.gd" id="1"]
+[ext_resource type="Resource" uid="uid://buqu8mejciwfb" path="res://database/card_configs/electrocuted_card_config.tres" id="2"]
+[ext_resource type="Script" uid="uid://diw3hm0lae551" path="res://addons/card_combat/spell_effect.gd" id="3_d5i73"]
+
+[resource]
+script = ExtResource("1")
+card_id = "electrocute"
+name = "Electrocute"
+cost = 2
+attack = 8
+card_config = ExtResource("2")
+description = "Electrocutes target, making them take 50% more damage and deal 50% less damage for 2 turns."

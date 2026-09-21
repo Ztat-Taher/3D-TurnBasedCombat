@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ElectrocutedState" format=3 uid="uid://dsg4kkuxxddx7"]
+
+[ext_resource type="Script" uid="uid://bmhl6sg77o2kd" path="res://database/states/electrocuted_state.gd" id="1_electro"]
+[ext_resource type="Texture2D" uid="uid://uvv0pollh5i8" path="res://assets/images/ui/status_effects/electrocuted.png" id="1_vqoyg"]
+[ext_resource type="Material" uid="uid://d1k8nelecovl2" path="res://assets/effects/overlays/lightning_overlay.tres" id="2_nl7l2"]
+
+[resource]
+script = ExtResource("1_electro")
+overlay_material = ExtResource("2_nl7l2")
+state_name = "Electrocuted"
+state_description = "Takes 50% more damage and deals 50% less damage"
+icon_texture = ExtResource("1_vqoyg")
+turns_active = 2
+damage_taken_multiplier = 1.5
+damage_dealt_multiplier = 0.5

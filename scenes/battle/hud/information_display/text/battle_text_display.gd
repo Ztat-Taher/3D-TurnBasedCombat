@@ -145,3 +145,7 @@ func show_counter(attacker: Battler, _target: Battler, damage: int) -> void:
 ## Display jump evade text
 func show_jump(target: Battler) -> void:
 	display_battle_text("[color=#FFEE44][b]🦘 %s JUMPED OVER! 🦘[/b][/color]" % target.character_name)
+
+## Display custom text (for status effects, bleed, etc.)
+func show_text(custom_text: String) -> void:
+	display_battle_text(custom_text)

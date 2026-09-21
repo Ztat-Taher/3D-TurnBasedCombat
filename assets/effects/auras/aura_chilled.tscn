@@ -1,0 +1,220 @@
+[gd_scene format=3 uid="uid://bmxukw6g6tpxl"]
+
+[ext_resource type="Script" uid="uid://dx4laomb5rmio" path="res://assets/effects/core/vfx_status.gd" id="1_5e04j"]
+[ext_resource type="Texture2D" uid="uid://cul58meo4o6u1" path="res://assets/effects/textures/T_smoke_b7.png" id="3_s5uam"]
+[ext_resource type="Shader" uid="uid://ci6q1ktut6sa7" path="res://assets/effects/shaders/ice_particle.gdshader" id="4_m7i2c"]
+[ext_resource type="Shader" uid="uid://ct05cosi0fu5c" path="res://assets/effects/shaders/ice_aura_particle.gdshader" id="5_xrh64"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_aura"]
+render_priority = 0
+shader = ExtResource("5_xrh64")
+shader_parameter/Color = Color(0.8, 0.9, 1, 0.85)
+shader_parameter/Ice_Texture = ExtResource("3_s5uam")
+shader_parameter/Emission = 2.0
+shader_parameter/Scale = 1.0
+shader_parameter/ScrollSpeed = 0.2
+shader_parameter/RotationSpeed = 0.1
+shader_parameter/NoiseScale = 1.0
+shader_parameter/Frostiness = 0.5
+shader_parameter/Softness = 0.5
+
+[sub_resource type="Curve" id="Curve_alpha"]
+_data = [Vector2(0, 0), 0.0, 0.5, 0, 1, Vector2(0.15, 0.3), 0.0, 0.0, 0, 0, Vector2(0.35, 0.85), 0.0, 0.0, 0, 0, Vector2(0.5, 1), 0.0, 0.0, 0, 0, Vector2(0.65, 0.85), 0.0, 0.0, 0, 0, Vector2(0.85, 0.3), 0.0, -0.5, 0, 0, Vector2(1, 0), -0.5, 0.0, 0, 0]
+point_count = 7
+
+[sub_resource type="CurveTexture" id="CurveTexture_alpha"]
+curve = SubResource("Curve_alpha")
+
+[sub_resource type="Gradient" id="Gradient_snow"]
+colors = PackedColorArray(0.7, 0.85, 1, 1, 0.9, 0.95, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_snow"]
+gradient = SubResource("Gradient_snow")
+
+[sub_resource type="Curve" id="Curve_x"]
+_limits = [-1.0, 1.0, 0.0, 1.0]
+_data = [Vector2(0, 1.4901161e-08), 0.0, 0.0, 0, 0, Vector2(1, 1.4901161e-08), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_y"]
+_limits = [-1.0, 1.0, 0.0, 1.0]
+_data = [Vector2(0, -1), 0.0, 0.0, 0, 0, Vector2(1, -1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_z"]
+_limits = [-1.0, 1.0, 0.0, 1.0]
+_data = [Vector2(0, 1.4901161e-08), 0.0, 0.0, 0, 0, Vector2(1, 1.4901161e-08), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_orbit"]
+curve_x = SubResource("Curve_x")
+curve_y = SubResource("Curve_y")
+curve_z = SubResource("Curve_z")
+
+[sub_resource type="Curve" id="Curve_scale"]
+_data = [Vector2(0, 0.4), 0.0, 1.16129, 0, 0, Vector2(1, 1.5), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_scale"]
+curve = SubResource("Curve_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_aura"]
+emission_shape = 1
+emission_sphere_radius = 1.0
+direction = Vector3(0, 1, 0)
+initial_velocity_min = 0.1
+initial_velocity_max = 0.3
+orbit_velocity_curve = SubResource("CurveXYZTexture_orbit")
+radial_velocity_min = 0.05
+radial_velocity_max = 0.15
+gravity = Vector3(0, 0.1, 0)
+radial_accel_min = -0.2
+radial_accel_max = -0.1
+tangential_accel_min = 0.1
+tangential_accel_max = 0.3
+scale_min = 0.8
+scale_max = 2.0
+scale_curve = SubResource("CurveTexture_scale")
+color_initial_ramp = SubResource("GradientTexture1D_snow")
+alpha_curve = SubResource("CurveTexture_alpha")
+
+[sub_resource type="QuadMesh" id="QuadMesh_aura"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_snowflakes"]
+render_priority = 0
+shader = ExtResource("4_m7i2c")
+shader_parameter/primary_color = Color(0.8, 0.9, 1, 1)
+shader_parameter/secondary_color = Color(0.6, 0.8, 1, 1)
+shader_parameter/tertiary_color = Color(0.6, 0.1, 0.05, 1)
+shader_parameter/emission = 4.0
+shader_parameter/color_curve = 1.0
+shader_parameter/hue_variation = 0.1
+shader_parameter/edge_hardness = 0.0
+shader_parameter/edge_position = 0.0
+shader_parameter/proximity_fade = true
+shader_parameter/proximity_fade_distance = 0.5
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_snowflakes"]
+emission_shape = 1
+emission_sphere_radius = 1.0
+direction = Vector3(0, 1, 0)
+initial_velocity_min = 0.2
+initial_velocity_max = 0.6
+gravity = Vector3(0, -0.5, 0)
+scale_min = 0.1
+scale_max = 0.3
+scale_curve = SubResource("CurveTexture_scale")
+alpha_curve = SubResource("CurveTexture_alpha")
+
+[sub_resource type="QuadMesh" id="QuadMesh_snowflakes"]
+
+[sub_resource type="Animation" id="Animation_reset"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Aura:emitting")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [true]
+}
+
+[sub_resource type="Animation" id="Animation_close"]
+resource_name = "close"
+step = 0.1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Aura:emitting")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [true, false]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Snowflakes:emitting")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [true, false]
+}
+
+[sub_resource type="Animation" id="Animation_open"]
+resource_name = "open"
+step = 0.1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Aura:emitting")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [false, true]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Snowflakes:emitting")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [false, true]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"close": SubResource("Animation_close"),
+&"open": SubResource("Animation_open")
+}
+
+[node name="AuraChilled" type="Node3D" unique_id=1142072861]
+script = ExtResource("1_5e04j")
+primary_color = Color(0.8, 0.9, 1, 1)
+secondary_color = Color(0.6, 0.8, 1, 1)
+tertiary_color = Color(0.4, 0.6, 0.9, 1)
+emission = 4.0
+noise_scale = Vector2(1.5, 0.5)
+noise_scroll = Vector2(0, -0.1)
+emission_shape = Vector3(1, 1, 1)
+particles_radial = -0.3
+
+[node name="Aura" type="GPUParticles3D" parent="." unique_id=1556418048]
+material_override = SubResource("ShaderMaterial_aura")
+amount = 5
+lifetime = 5.0
+fixed_fps = 60
+transform_align = 3
+process_material = SubResource("ParticleProcessMaterial_aura")
+draw_pass_1 = SubResource("QuadMesh_aura")
+
+[node name="Snowflakes" type="GPUParticles3D" parent="." unique_id=1556418049]
+material_override = SubResource("ShaderMaterial_snowflakes")
+amount = 12
+lifetime = 1.5
+explosiveness = 0.1
+fixed_fps = 60
+transform_align = 3
+process_material = SubResource("ParticleProcessMaterial_snowflakes")
+draw_pass_1 = SubResource("QuadMesh_snowflakes")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1781055767]
+libraries/ = SubResource("AnimationLibrary")

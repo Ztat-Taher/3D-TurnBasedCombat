@@ -33,9 +33,8 @@ metadata/_custom_type_script = "uid://xut8pvgqpe8u"
 [resource]
 script = ExtResource("1_stats")
 enemy_name = "Bone Marauder"
-max_health = 120
-attack = 14
-defense = 6
+max_health = 200
+attack = 1
 agility = 8
 attacks = Array[ExtResource("2_atk")]([ExtResource("7_rib"), ExtResource("8_crush"), ExtResource("9_sweep"), ExtResource("10_frenzy")])
 exp_reward = 60
