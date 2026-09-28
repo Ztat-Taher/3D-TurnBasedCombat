@@ -1,13 +1,11 @@
 class_name QTEManager
 extends Node
-## Manages QTE (Quick Time Event) system for card combat & reactive dodge/parry defense
+## Manages QTE (Quick Time Event) system for card combat attack boosting
+## QTEs are purely for enhancing player attacks (damage/effects), no defensive mechanics
 
 signal qte_started(qte_type: String)
 signal qte_completed(success: bool, qte_type: String)
 signal qte_failed(qte_type: String)
-
-# Reactive Defense Signals
-signal reactive_defense_result(result_type: String) # "perfect_parry", "parry", "dodge", "none"
 
 var qte_config: QTEConfig
 var current_qte_type: String = ""
@@ -24,9 +22,7 @@ var last_qte_result: bool = false:
 # QTE types
 enum QTEType {
 	NONE,
-	CARD_ATTACK,		# QTE when playing attack cards
-	REACTIVE_DODGE,		# QTE when player is attacked (dodge opportunity)
-	REACTIVE_PARRY		# QTE when player is attacked (parry opportunity)
+	CARD_ATTACK		# QTE when playing attack cards for damage boosting
 }
 
 func _ready():
@@ -65,133 +61,31 @@ func start_card_qte(card: CardData) -> bool:
 	return start_qte(QTEType.CARD_ATTACK, metadata_diff)
 
 # ============================================================================
-# REACTIVE DEFENSE SYSTEM (TIME-WINDOW DODGE / PARRY / PERFECT PARRY)
-# ============================================================================
-
-## Awaits reactive input from player within the defense window.
-## Returns: "perfect_parry", "parry", "dodge", "jump", or "none"
-func await_reactive_defense(defender: Battler, attack_config: EnemyAttackConfig = null) -> String:
-	if not qte_config or not qte_config.reactive_defense_enabled:
-		return "none"
-	
-	# Determine which defenses are allowed for this attack
-	var allowed: Dictionary
-	if attack_config:
-		allowed = attack_config.get_allowed_defenses()
-	else:
-		allowed = {"jump": false, "dodge": true, "parry": true}
-	
-	var allowed_jump: bool = allowed.get("jump", false)
-	var allowed_dodge: bool = allowed.get("dodge", true)
-	var allowed_parry: bool = allowed.get("parry", true)
-	
-	var window_duration = qte_config.reactive_window_duration
-	var perfect_duration = qte_config.perfect_parry_window
-	var parry_action = qte_config.parry_action
-	var dodge_action = qte_config.dodge_action
-	var jump_action = qte_config.jump_action if qte_config.get("jump_action") != null else "jump"
-	
-	var hud = _get_hud()
-	if hud and hud.has_method("show_parry_window"):
-		hud.show_parry_window(window_duration, perfect_duration, defender.character_name if defender else "Ally",
-				allowed_parry, allowed_dodge, allowed_jump)
-	
-	var start_time = Time.get_ticks_msec() / 1000.0
-	var outcome = "none"
-	
-	while true:
-		var current_time = Time.get_ticks_msec() / 1000.0
-		var elapsed = current_time - start_time
-		var time_left = window_duration - elapsed
-		
-		if hud and hud.has_method("update_parry_window"):
-			hud.update_parry_window(max(0.0, time_left))
-		
-		# Check for Jump input (Space or jump action) — only valid if allowed
-		var jump_pressed = false
-		if InputMap.has_action(jump_action):
-			if Input.is_action_just_pressed(jump_action):
-				jump_pressed = true
-		if not jump_pressed:
-			if Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE):
-				jump_pressed = true
-		
-		# Check for Dodge input (E key or dodge action) — only valid if allowed
-		var dodge_pressed = false
-		if InputMap.has_action(dodge_action):
-			if Input.is_action_just_pressed(dodge_action):
-				dodge_pressed = true
-		if not dodge_pressed:
-			if Input.is_key_pressed(KEY_E) or Input.is_physical_key_pressed(KEY_E):
-				dodge_pressed = true
-		
-		# Check for Parry input (Q key or parry action) — only valid if allowed
-		var parry_pressed = false
-		if InputMap.has_action(parry_action):
-			if Input.is_action_just_pressed(parry_action):
-				parry_pressed = true
-		if not parry_pressed:
-			if Input.is_key_pressed(KEY_Q) or Input.is_physical_key_pressed(KEY_Q):
-				parry_pressed = true
-		
-		# Resolve outcome — only allowed defenses count
-		if jump_pressed and allowed_jump:
-			outcome = "jump"
-			break
-		
-		if parry_pressed and allowed_parry:
-			if elapsed <= perfect_duration:
-				outcome = "perfect_parry"
-			else:
-				outcome = "parry"
-			break
-		
-		if dodge_pressed and allowed_dodge:
-			outcome = "dodge"
-			break
-		
-		if elapsed >= window_duration:
-			outcome = "none"
-			break
-		
-		await get_tree().process_frame
-	
-	if hud and hud.has_method("hide_parry_window"):
-		hud.hide_parry_window()
-	
-	reactive_defense_result.emit(outcome)
-	return outcome
-
-func _get_hud() -> BattleHud:
-	var hud_node = get_tree().get_first_node_in_group("BattleHud")
-	if hud_node is BattleHud:
-		return hud_node
-	var bm = get_tree().get_first_node_in_group("battle_manager")
-	if bm and bm.hud is BattleHud:
-		return bm.hud
-	return null
-
-# ============================================================================
 # GENERIC QTE ENGINE
 # ============================================================================
 
 var qte_ui_panel: Control = null
 
-func start_qte(qte_type: QTEType, difficulty: float) -> bool:
+func start_qte(qte_type: QTEType, difficulty: float, custom_time_limit: float = 0.0) -> bool:
 	if is_qte_active:
 		return false
 	
 	is_qte_active = true
 	current_qte_type = QTEType.keys()[qte_type]
 	
-	# Calculate time based on difficulty (using the same logic as before)
-	var base_time = qte_config.base_qte_time if qte_config else 3.0
-	var min_time = qte_config.min_qte_time if qte_config else 0.5
-	var input_key = qte_config.qte_input_key if qte_config else "f"
+	# Use custom time limit if provided, otherwise calculate from difficulty
+	var time_limit: float
+	if custom_time_limit > 0.0:
+		time_limit = custom_time_limit
+	else:
+		# Calculate time based on difficulty (using the same logic as before)
+		var base_time = qte_config.base_qte_time if qte_config else 3.0
+		var min_time = qte_config.min_qte_time if qte_config else 0.5
+		var time_multiplier = 1.0 - (difficulty * 0.8)
+		var calculated_time = base_time * time_multiplier
+		time_limit = max(calculated_time, min_time)
 	
-	var time_multiplier = 1.0 - (difficulty * 0.8)
-	var calculated_time = base_time * time_multiplier
-	var time_limit = max(calculated_time, min_time)
+	var input_key = qte_config.qte_input_key if qte_config else "f"
 	
 	# Create the new self-contained visual UI on BattleHUD
 	_create_qte_ui(input_key, time_limit)

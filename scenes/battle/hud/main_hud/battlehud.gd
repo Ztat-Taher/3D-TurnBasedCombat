@@ -10,7 +10,6 @@ signal end_turn_pressed
 @onready var item_container = $Control/Items/ScrollContainer/BoxContainer
 @onready var turn_queue_ui: TurnQueueUI = $Control/TurnQueueUI
 @onready var party_status_card_scene: PackedScene = preload("res://scenes/battle/hud/health_display/party_status/party_status_card.tscn")
-@onready var parry_window_scene: PackedScene = preload("res://scenes/battle/hud/qte_system/parry/parry_window.tscn")
 
 @onready var action_buttons: ActionButtons = $Control/ActionButtons
 @onready var attack_button: TextureButton = $Control/ActionButtons.get_node("AttackWrapper/Attack")
@@ -617,16 +616,6 @@ func _on_items_pressed() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var handled = false
 	
-	# Check if reactive defense is active (B button = dodge, not end turn)
-	var qte_manager = get_tree().get_first_node_in_group("qte_manager")
-	var qte_active = qte_manager.is_qte_active if qte_manager else false
-	var qte_type = qte_manager.current_qte_type if qte_manager else ""
-	var reactive_defense_active = qte_active and (qte_type == "REACTIVE_DODGE" or qte_type == "REACTIVE_PARRY")
-	
-	# Don't handle B button when in reactive defense mode - let QTE manager handle it
-	if reactive_defense_active and event.is_action_pressed("ui_cancel"):
-		return
-	
 	# Only process action buttons when action buttons list is visible
 	if action_buttons and action_buttons.visible:
 		if event.is_action_pressed("attack"):
@@ -747,36 +736,6 @@ func _on_global_back_pressed() -> void:
 func update_ui():
 	update_character_info()
 	update_party_status()
-
-# ============================================================================
-# REACTIVE DEFENSE UI (DODGE / PARRY / PERFECT PARRY)
-# ============================================================================
-var _parry_window: ParryWindow = null
-
-func show_parry_window(duration: float, perfect_duration: float, defender_name: String,
-		allow_parry: bool = true, allow_dodge: bool = true, allow_jump: bool = false) -> void:
-	hide_parry_window()
-	
-	if not parry_window_scene:
-		push_error("Parry window scene not loaded!")
-		return
-	
-	_parry_window = parry_window_scene.instantiate() as ParryWindow
-	if not _parry_window:
-		push_error("Failed to instantiate parry window!")
-		return
-	
-	_parry_window.setup(defender_name, duration, perfect_duration, allow_parry, allow_dodge, allow_jump)
-	$Control.add_child(_parry_window)
-
-func update_parry_window(time_remaining: float) -> void:
-	if _parry_window and is_instance_valid(_parry_window):
-		_parry_window.update_progress(time_remaining)
-
-func hide_parry_window() -> void:
-	if _parry_window and is_instance_valid(_parry_window):
-		_parry_window.queue_free()
-		_parry_window = null
 
 # ============================================================================
 # MOVE ANNOUNCEMENT BANNER

@@ -309,31 +309,9 @@ var is_animating: bool = false
 var card_integration: CardIntegration
 var battle_camera: BattleCamera
 var effect_manager: EffectManager
+var real_time_defense_manager: RealTimeDefenseManager
 
 func _ready():
-	var file = FileAccess.open("res://database/card_configs/basic_attack_config.tres", FileAccess.READ)
-	if file:
-		print("--- TRES FILE CONTENT ---")
-		print(file.get_as_text())
-		print("-------------------------")
-		file.close()
-	
-	var test_config = load("res://database/card_configs/basic_attack_config.tres")
-	print("--- TEST LOAD CONFIG ---")
-	print("Config Object: ", test_config)
-	if test_config:
-		print("Config Class: ", test_config.get_class())
-		print("Config Script: ", test_config.get_script())
-		
-		# Print ALL properties on the loaded resource
-		print("Properties list:")
-		for prop in test_config.get_property_list():
-			var pname = prop["name"]
-			# Ignore built-in Resource/Object properties to keep output clean
-			if prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE:
-				print("  ", pname, " = ", test_config.get(pname))
-	print("------------------------")
-	
 	add_to_group("battle_manager")
 	SignalBus.select_target.connect(target_selected)
 	
@@ -346,6 +324,11 @@ func _ready():
 	effect_manager = EffectManager.new()
 	effect_manager.name = "EffectManager"
 	add_child(effect_manager)
+	
+	# Initialize real-time defense manager
+	real_time_defense_manager = RealTimeDefenseManager.new()
+	real_time_defense_manager.name = "RealTimeDefenseManager"
+	add_child(real_time_defense_manager)
 	
 	# Connect screen flash from HUD after a short delay to ensure HUD is ready
 	call_deferred("_connect_effect_screen_flash")
@@ -630,8 +613,9 @@ func start_next_turn():
 	if current_character.active_states.has("Chilled"):
 		var chilled_state = current_character.active_states["Chilled"] as ChilledState
 		if chilled_state and chilled_state.skip_turn:
-			# Skip this battler's turn
-			print("%s is Chilled and skips their turn!" % current_character.character_name)
+			# Skip this battler's turn - shown in the battle log instead of the console
+			if hud and hud.battle_text_display:
+				hud.battle_text_display.show_text("%s is Chilled and skips their turn!" % current_character.character_name)
 			end_turn()
 			return
 	
@@ -910,7 +894,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # Camera raycasting for mouse target selection
 func _handle_mouse_click_target_selection() -> void:
-	print("[MouseTarget] _handle_mouse_click_target_selection called. battle_camera=", battle_camera)
 	if not battle_camera:
 		push_warning("[MouseTarget] battle_camera is null — assign it in the Inspector!")
 		return
@@ -947,7 +930,6 @@ func _handle_mouse_click_target_selection() -> void:
 		return
 		
 	var result = space_state.intersect_ray(ray_params)
-	print("[MouseTarget] Raycast result: ", result)
 	
 	if result.has("collider"):
 		var collider = result["collider"]
@@ -962,8 +944,6 @@ func _handle_mouse_click_target_selection() -> void:
 					battler = curr
 					break
 				curr = curr.get_parent()
-		
-		print("[MouseTarget] Hit collider: ", collider.name, " -> Battler: ", battler, " is_selectable: ", (battler.is_selectable if battler else false), " is_valid_target: ", (battler.is_valid_target if battler else false))
 		
 		if battler and battler is Battler:
 			# Check if this is a valid target
@@ -1155,12 +1135,6 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 		var marked_state = target.active_states["Marked"] as MarkedState
 		if marked_state:
 			damage = int(damage * marked_state.get_damage_multiplier())
-	
-	# Check for reactive defense (Dodge / Parry / Perfect Parry Counter / Jump) if target is player ally
-	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
-	if card_battle_manager and target in players:
-		damage = await card_battle_manager.trigger_reactive_defense(attacker, damage, target, attack_config)
-
 	
 	# Only apply if damage is still positive after calculation
 	if damage > 0:

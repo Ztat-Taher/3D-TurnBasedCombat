@@ -1,3 +1,6 @@
+# DEPRECATED: This component is no longer used in the real-time defense system
+# Defense is now handled by RealTimeDefenseManager with no visual timing cues
+# Kept for reference only - can be safely removed
 class_name ParryWindow
 extends PanelContainer
 

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://addons/card_combat/card_data.gd" id="1"]
+[ext_resource type="Resource" path="res://database/card_configs/flurry_attack_config.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+card_id = "flurry_attack"
+name = "Flurry Attack"
+cost = 2
+attack = 15
+metadata = {
+"card_type": "attack"
+}
+card_config = ExtResource("2")
+description = "A rapid flurry of 3 strikes. Each strike has its own QTE for maximum damage."

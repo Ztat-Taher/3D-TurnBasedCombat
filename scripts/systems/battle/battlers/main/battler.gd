@@ -3,6 +3,8 @@ extends CharacterBody3D
 
 signal anim_damage()
 signal hit_moment(attacker: Battler)
+signal attack_start()
+signal attack_end()
 signal health_changed(current_health: int, max_health: int)
 signal ap_changed(current_ap: int, max_ap: int)
 signal state_applied(state_name: String)
@@ -12,8 +14,6 @@ signal shield_broken()
 signal shield_changed(shield_count: int)
 signal burn_stack_changed(stack_count: int)
 enum TEAM {ALLY, ENEMY}
-
-@export_range(0.0, 1.0, 0.01) var hit_frame_ratio: float = 0.55 ## Default contact frame ratio for attacks (e.g. 0.55 = 55% of animation duration)
 
 @export_group("Stats Configuration")
 @export var stats: BattlerStats ## Configuration for player/ally battlers
@@ -249,8 +249,6 @@ var state_machine: AnimationNodeStateMachinePlayback
 ## Duration (seconds) before recovering from being hit by a counter attack
 @export var counter_stun_duration: float = 1.5
 
-var _current_attack_duration: float = 1.0
-
 func _ready():
 	_collect_meshes()
 	
@@ -302,6 +300,25 @@ func _ready():
 		add_to_group("enemies")
 	elif team == TEAM.ALLY:
 		add_to_group("players")
+
+## Animation callback methods called by AnimationPlayer method tracks
+## These are the new reference point system replacing timer-based hit frames
+
+func _on_attack_start():
+	"""Called by AnimationPlayer method track at animation start frame"""
+	attack_start.emit()
+	print("[Battler] Attack start callback: %s" % character_name)
+
+func _on_attack_hit():
+	"""Called by AnimationPlayer method track at hit moment frame"""
+	hit_moment.emit(self)
+	anim_damage.emit()
+	print("[Battler] Attack hit callback: %s" % character_name)
+
+func _on_attack_end():
+	"""Called by AnimationPlayer method track at animation end frame"""
+	attack_end.emit()
+	print("[Battler] Attack end callback: %s" % character_name)
 
 func _input_event(_camera: Camera3D, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -545,43 +562,50 @@ func attack_anim(target, attack_config: EnemyAttackConfig = null) -> void:
 	
 	current_target = target
 	
+	print("[Battler] Enemy attack: attempting to advance to target %s" % target.character_name)
 	if advance_to_target(target):
 		_try_animation(AnimationMapping.WALK)
 		while is_advancing:
 			await get_tree().create_timer(0.016).timeout
+		print("[Battler] Enemy attack: advance complete")
+	else:
+		print("[Battler] Enemy attack: advance_to_target returned false")
 	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	var chosen_anim = AnimationMapping.MELEE_COMBO_1
 	if attack_config and not attack_config.animation_name.is_empty():
 		chosen_anim = attack_config.animation_name
 	
+	await _try_animation(chosen_anim)
 	if not _try_animation(chosen_anim):
-		_try_animation(AnimationMapping.MELEE_COMBO_1)
+		await _try_animation(AnimationMapping.MELEE_COMBO_1)
 	
-	# Wait for hit_moment (contact frame) to apply damage.
-	# Precedence: EnemyAttackConfig > AnimationMapping per-slot ratio > battler default.
-	var ratio = hit_frame_ratio
-	if attack_config and attack_config.hit_frame_ratio >= 0.0:
-		ratio = attack_config.hit_frame_ratio
-	elif animation_mapping:
-		var mapping_ratio = animation_mapping.get_hit_frame_ratio(chosen_anim)
-		if mapping_ratio >= 0.0:
-			ratio = mapping_ratio
-	
-	var hit_time = _current_attack_duration * ratio
-	var remaining_time = max(0.1, _current_attack_duration - hit_time)
-	
+	# Wait for hit_moment signal from animation track callback
+	# The _on_attack_hit() method is called by AnimationPlayer method track
 	await hit_moment
+	
+	# Calculate damage at exact contact frame (regardless of defense)
+	var base_atk = attack if attack > 0 else 15
+	var multiplier = attack_config.damage_multiplier if attack_config else 1.0
+	var atk_damage = int(base_atk * multiplier)
 	
 	# Apply damage at exact contact frame
 	if battle_manager and target:
-		var base_atk = attack if attack > 0 else 15
-		var multiplier = attack_config.damage_multiplier if attack_config else 1.0
-		var atk_damage = int(base_atk * multiplier)
 		await battle_manager.damage_calculation(self, target, atk_damage, attack_config)
 	
-	# Wait for follow-through of the attack animation
-	await get_tree().create_timer(remaining_time + 0.12).timeout
+	# Check for real-time defense input at hit frame (post-damage mitigation)
+	var defense_result = "none"
+	var real_time_defense_manager = get_tree().get_first_node_in_group("real_time_defense_manager")
+	if real_time_defense_manager and target.team == TEAM.ALLY:
+		# Start defense window for player allies and wait for result
+		defense_result = await real_time_defense_manager.start_defense_window(self, target, attack_config)
+		
+		# Apply damage mitigation after defense (reduce already-applied damage or heal if needed)
+		if defense_result != "none":
+			await _apply_defense_mitigation(target, atk_damage, defense_result)
+	
+	# Wait for attack animation to complete via callback
+	await attack_end
 	
 	# CRITICAL: Wait for damage callback and counters to complete before returning
 	await get_tree().process_frame
@@ -595,19 +619,42 @@ func attack_anim(target, attack_config: EnemyAttackConfig = null) -> void:
 	
 	# NOW return to original position after damage/counter completed
 	if original_position != Vector3.ZERO:
+		print("[Battler] Enemy attack: returning to original position")
 		return_to_original_position()
 		# Wait for return movement to complete
 		while is_advancing:
 			await get_tree().create_timer(0.1).timeout
+		print("[Battler] Enemy attack: return complete")
+	else:
+		print("[Battler] Enemy attack: skipping return (original_position is ZERO)")
 	
 	# Return to idle state
 	battle_idle()
 
+## Apply defense mitigation after damage has been applied
+func _apply_defense_mitigation(target: Battler, original_damage: int, defense_result: String) -> void:
+	match defense_result:
+		"perfect_parry":
+			# Heal back the full damage that was just applied
+			if original_damage > 0:
+				target.take_healing(original_damage)
+		"parry":
+			# Heal back 50% of the damage
+			if original_damage > 0:
+				var heal_amount = int(original_damage * 0.5)
+				target.take_healing(heal_amount)
+		"dodge", "jump":
+			# Heal back full damage (complete avoidance)
+			if original_damage > 0:
+				target.take_healing(original_damage)
+		_:
+			pass  # No defense, damage stands
+
 func wait_attack():
 	if self.is_defending:
 		return
-	# Wait for attack animation using duration read from AnimationPlayer at travel time
-	await get_tree().create_timer(_current_attack_duration).timeout
+	# Wait for attack animation to complete via animation callback
+	await attack_end
 	
 	# If we advanced to attack, return to original position
 	if original_position != Vector3.ZERO:
@@ -681,7 +728,10 @@ func advance_to_target(target: Battler) -> bool:
 	if distance_to_target <= movement_distance:
 		return false
 	
+	# Reset original_position to current position before moving
 	original_position = global_position
+	print("[Battler] advance_to_target: Setting original_position to %s" % str(original_position))
+	
 	var direction = (target.global_position - global_position).normalized()
 	advance_target_position = target.global_position - direction * movement_distance
 	
@@ -717,6 +767,7 @@ func _try_animation(anim_name: String) -> bool:
 
 	# Resolve via animation mapping (slot -> character-specific state name).
 	var resolved_name := get_resolved_animation(anim_name)
+	print("[Battler] _try_animation: requested='%s', resolved='%s', character='%s'" % [anim_name, resolved_name, character_name])
 
 	# Canonical offensive slots live inside the combat_actions sub-machine.
 	var combat_slots: Array = [
@@ -744,19 +795,31 @@ func _try_animation(anim_name: String) -> bool:
 			push_error("[Battler] Combat animation '%s' does not exist in combat_actions on '%s'" % [leaf_name, character_name])
 			return false
 
+		print("[Battler] Traveling to combat_actions -> %s" % leaf_name)
 		state_machine.travel("combat_actions")
+		
 		var ca_sm := anim_tree.get("parameters/combat_actions/playback") as AnimationNodeStateMachinePlayback
 		if not ca_sm:
 			push_warning("[Battler] Missing combat_actions/playback on '%s'" % character_name)
 			return false
+		
+		print("[Battler] Current state in combat_actions: %s" % ca_sm.get_current_node())
 		ca_sm.travel(leaf_name)
+		print("[Battler] New state in combat_actions: %s" % ca_sm.get_current_node())
 
 		# Resolve clip duration and schedule hit_moment at the correct frame.
-		_current_attack_duration = max(0.25, _get_animation_duration(leaf_name))
-		var ratio_override := -1.0
-		if animation_mapping:
-			ratio_override = animation_mapping.get_hit_frame_ratio(anim_name)
-		_schedule_hit_moment(_current_attack_duration, ratio_override)
+		var resolved_clip_name = _resolve_state_animation_name(leaf_name)
+		print("[Battler] Resolved clip name for '%s': '%s'" % [leaf_name, resolved_clip_name])
+		
+		# Check if animation clip actually exists in AnimationPlayer
+		var anim_player = get_node_or_null("AnimationPlayer")
+		if anim_player:
+			var clip_exists = anim_player.has_animation(resolved_clip_name)
+			print("[Battler] Animation clip '%s' exists: %s" % [resolved_clip_name, clip_exists])
+			if clip_exists:
+				var clip_length = anim_player.get_animation(resolved_clip_name).length
+				print("[Battler] Direct clip length: %s seconds" % clip_length)
+		
 		return true
 
 	# Root-level state — travel only when it actually exists on this tree.
@@ -772,19 +835,6 @@ func _try_animation(anim_name: String) -> bool:
 		return false
 	state_machine.travel(resolved_name)
 	return true
-
-var _hit_moment_timer: SceneTreeTimer = null
-
-## Schedules hit_moment signal based on hit_frame_ratio or explicit duration
-func _schedule_hit_moment(duration: float, ratio_override: float = -1.0) -> void:
-	var ratio = ratio_override if ratio_override >= 0.0 else hit_frame_ratio
-	var hit_delay = max(0.05, duration * ratio)
-	var _captured_duration = duration
-	_hit_moment_timer = get_tree().create_timer(hit_delay)
-	_hit_moment_timer.timeout.connect(func():
-		hit_moment.emit(self)
-		anim_damage.emit()
-	)
 
 ## Looks up the length of an animation from AnimationPlayer by state name.
 ## Searches all animation libraries if a direct match is not found.
@@ -811,6 +861,51 @@ func _get_animation_duration(anim_name: String) -> float:
 				var full_name = (lib_name + "/" + anim) if lib_name != "" else anim
 				return anim_player.get_animation(full_name).length
 	return 1.0  # Fallback if animation not found
+
+## Gets the time position of the hit moment from the animation method track.
+## Searches for the method track that calls "_on_attack_hit" and returns its time.
+## Returns 0.0 if no hit moment is found in the animation.
+func _get_hit_moment_time(anim_name: String) -> float:
+	var anim_player = get_node_or_null("AnimationPlayer")
+	if not anim_player:
+		return 0.0
+	
+	# Resolve state name -> actual animation clip name
+	var resolved_name = _resolve_state_animation_name(anim_name)
+	var anim_name_to_use = resolved_name if not resolved_name.is_empty() else anim_name
+	
+	# Try to get the animation
+	var animation = null
+	if anim_player.has_animation(anim_name_to_use):
+		animation = anim_player.get_animation(anim_name_to_use)
+	else:
+		# Search all libraries
+		for lib_name in anim_player.get_animation_library_list():
+			var lib = anim_player.get_animation_library(lib_name)
+			for anim in lib.get_animation_list():
+				if anim == anim_name:
+					var full_name = (lib_name + "/" + anim) if lib_name != "" else anim
+					animation = anim_player.get_animation(full_name)
+					break
+			if animation:
+				break
+	
+	if not animation:
+		return 0.0
+	
+	# Find the method track that calls "_on_attack_hit"
+	for track_idx in animation.get_track_count():
+		if animation.track_get_type(track_idx) == Animation.TYPE_METHOD:
+			for key_idx in animation.track_get_key_count(track_idx):
+				var key_time = animation.track_get_key_time(track_idx, key_idx)
+				var key_value = animation.track_get_key_value(track_idx, key_idx)
+				# Check if this key calls _on_attack_hit
+				if key_value is Dictionary and key_value.has("method"):
+					var method_name = key_value["method"]
+					if method_name == "_on_attack_hit":
+						return key_time
+	
+	return 0.0  # No hit moment found
 
 ## Resolves an AnimationTree state name to the actual AnimationPlayer clip name
 ## assigned inside the matching AnimationNodeAnimation node.
@@ -880,11 +975,14 @@ func _start_movement_timeout() -> void:
 	
 	# Check if still advancing (means it got stuck)
 	if is_advancing:
+		print("[Battler] Movement timeout - forcing advance to stop")
 		set_advancing(false)
-		return_to_original_position()
+		# Don't return to original position - this interrupts normal movement
+		# Just stop the advance and let the caller handle the next step
 
 func return_to_original_position():
 	if is_advancing or global_position.distance_to(original_position) < 0.05:
+		print("[Battler] return_to_original_position skipped - is_advancing: %s, distance: %.3f" % [is_advancing, global_position.distance_to(original_position)])
 		return
 		
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -894,6 +992,7 @@ func return_to_original_position():
 	var movement_speed = custom_movement_speed if custom_movement_speed > 0 else battle_manager.movement_speed
 	movement_speed *= battle_manager.speed_multiplier
 	
+	print("[Battler] Returning to original position from %s to %s" % [str(global_position), str(original_position)])
 	set_advancing(true)
 	_try_animation(AnimationMapping.WALK_BACK)
 	
@@ -925,8 +1024,9 @@ func perform_dodge_dash() -> void:
 	
 	set_advancing(true)
 	# Play the standardised dodge animation (falls back to walk if unavailable).
+	await _try_animation(AnimationMapping.DODGE)
 	if not _try_animation(AnimationMapping.DODGE):
-		_try_animation(AnimationMapping.WALK)
+		await _try_animation(AnimationMapping.WALK)
 	
 	var movement_speed = custom_movement_speed if custom_movement_speed > 0 else battle_manager.movement_speed
 	movement_speed *= battle_manager.speed_multiplier * 1.5  # Faster movement for dodge

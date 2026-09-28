@@ -22,7 +22,11 @@ Enemy Scene (.tscn)
            │    ├── attack_name: String (e.g. "Heavy Slam")
            │    ├── animation_name: String (e.g. "attack", "kick")
            │    ├── damage_multiplier: float (e.g. 1.5)
-           │    ├── hit_frame_ratio: float (-1.0 to use battler default)
+           │    ├── can_dodge: bool (allow dodge defense)
+           │    ├── can_parry: bool (allow parry defense)
+           │    ├── requires_jump: bool (require jump defense)
+           │    ├── defense_window_duration: float (defense timing)
+           │    ├── perfect_parry_window: float (perfect parry timing)
            │    ├── move_announcement_type: String ("attack", "heal", "buff")
            │    └── weight: float (AI selection weighting)
            └── Battle Rewards & Drops (exp_reward, cash_reward, item_drops)
@@ -84,10 +88,16 @@ Enemies choose their actions using their `attacks` list rather than card decks. 
 | `attack_name` | String | Displayed on the screen via HUD banner (e.g., `"Poison Sting"`). |
 | `animation_name` | String | Animation state in `AnimationTree` or clip name in `AnimationPlayer` (e.g., `"attack"`, `"kick"`). |
 | `damage_multiplier`| float | Damage scale factor applied to base attack damage (`1.0` = standard, `1.5` = heavy). |
-| `hit_frame_ratio` | float | Exact contact frame timing (`0.0` - `1.0`). `-1.0` uses the default battler contact frame (`0.55`). |
+| `can_dodge` | bool | Whether the target can dodge this attack. |
+| `can_parry` | bool | Whether the target can parry this attack. |
+| `requires_jump` | bool | Whether the target must jump to avoid this attack. |
+| `defense_window_duration` | float | Defense window duration in seconds (use `-1.0` for global default). |
+| `perfect_parry_window` | float | Perfect parry window duration in seconds (use `-1.0` for global default). |
 | `move_announcement_type` | String | Visual styling for the announcement banner: `"attack"` (red/hostile), `"heal"`, or `"buff"`. |
 | `weight` | float | AI selection probability weight (higher values = chosen more frequently). |
 | `description` | String | Optional editor notes describing the attack. |
+
+> **Note:** Hit timing is now controlled by AnimationPlayer method tracks (see `ANIMATION_CALLBACK_SETUP.md`). The `hit_frame_ratio` field has been removed.
 
 > **Note:** If an enemy has no entries in `attacks`, the AI falls back safely to the battler's default basic attack animation.
 

@@ -247,10 +247,6 @@ func _setup_shader():
 		card_shader_material.set_shader_parameter("x_rot", 0.0)
 		card_shader_material.set_shader_parameter("inset", 0.0)
 		card_3d_container.material = card_shader_material
-		print("Shader material set up for card: ", card_data.name if card_data else "unknown")
-	else:
-		print("Failed to set up shader - shader or card_3d_container invalid")
-
 
 
 func _set_type_based_background():

@@ -5,9 +5,7 @@
 
 [resource]
 script = ExtResource("1")
-actor_animation = "ranged_cast_1"
-animation_priority = 5
-fallback_animation = "ranged_cast_1"
+animation_name = "ranged_cast_1"
 target_type = 2
 target_selection_mode = 0
 target_filter = ""

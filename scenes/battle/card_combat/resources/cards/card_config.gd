@@ -70,14 +70,17 @@ enum Element {
 	DARK                # Dark element
 }
 
-# Animation Configuration
-@export var actor_animation: String = ""              ## Animation name for the actor playing the card
-@export var animation_priority: int = 0               ## Priority for animation selection
-@export var animation_blend_time: float = 0.2          ## Transition time for animation blending
-@export var animation_speed: float = 1.0              ## Playback speed multiplier
-@export var animation_events: Array[Resource] = [] ## Callback points during animation
-@export var fallback_animation: String = ""           ## Fallback animation if primary not found
-@export var animation_layer: String = "full_body"     ## Animation layer for blending
+# Animation Configuration (Simple - just the animation name)
+@export var animation_name: String = "melee_combo_1"  ## Animation to play for the actor (single-strike mode)
+
+# Multi-Strike Configuration (Inline arrays for convenience)
+@export var is_multi_strike: bool = false              ## Whether this card uses multi-strike sequence
+@export var strike_animations: Array[String] = []     ## Animation names for each strike
+@export var strike_multipliers: Array[float] = []      ## Damage multipliers for each strike
+@export var strike_delays: Array[float] = []           ## Delays between strikes (seconds)
+@export var strike_chain_leads: Array[float] = []      ## Optional per-strike chain lead: seconds trimmed from THIS strike's clip so the next strike starts early. Indexed by the current strike - the last entry is unused. Empty = use CardBattleConfig.multi_strike_chain_lead
+@export var strike_qte_difficulties: Array[float] = [] ## QTE difficulty for each strike
+@export var strike_qte_windows: Array[float] = []      ## QTE window duration for each strike
 
 # Targeting Configuration
 @export var target_type: TargetScope = TargetScope.SINGLE_ENEMY
@@ -283,5 +286,17 @@ func validate() -> Array[String]:
 	
 	if qte_type == QTEType.BUTTON_MASH and qte_mash_count <= 0:
 		issues.append("Button mash QTE type but invalid mash count")
+	
+	if is_multi_strike and strike_animations.is_empty():
+		issues.append("Multi-strike enabled but no strike animations specified")
+	
+	if is_multi_strike and not animation_name.is_empty():
+		issues.append("Multi-strike enabled but animation_name should be empty (use strike_animations instead)")
+	
+	if is_multi_strike and strike_animations.size() != strike_multipliers.size():
+		issues.append("Multi-strike: strike_animations and strike_multipliers arrays must have same size")
+	
+	if is_multi_strike and strike_animations.size() != strike_qte_windows.size():
+		issues.append("Multi-strike: strike_animations and strike_qte_windows arrays must have same size")
 	
 	return issues

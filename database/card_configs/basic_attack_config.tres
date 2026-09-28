@@ -1,17 +1,13 @@
 [gd_resource type="Resource" script_class="CardConfig" format=3 uid="uid://dtckg3jdk81j7"]
 
 [ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
-[ext_resource type="Resource" path="res://database/card_effects/basic_attack_damage.tres" id="2"]
+[ext_resource type="Resource" uid="uid://u1e7kn5o2xed" path="res://database/card_effects/basic_attack_damage.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
-actor_animation = "melee_combo_1"
-animation_priority = 5
-fallback_animation = "attack"
 primary_effect = ExtResource("2")
-projectile_lifetime = 2.0
 qte_type_string = "timing"
-qte_difficulty = 0.4
+qte_window_duration = 0.5
 qte_success_multiplier = 1.2
 qte_failure_multiplier = 0.8
 qte_mash_count = 0

@@ -7,8 +7,9 @@
 [ext_resource type="Resource" uid="uid://ba1bu5kyx2n8s" path="res://database/cards/heals/minor_heal.tres" id="3"]
 [ext_resource type="Resource" uid="uid://cuv6ss2lo6cyn" path="res://database/cards/status/electrocute.tres" id="5_pn46r"]
 [ext_resource type="Resource" path="res://database/cards/support/single_shield.tres" id="7_kl4a8"]
+[ext_resource type="Resource" path="res://database/cards/attacks/flurry_attack.tres" id="7_pn46r"]
 
 [resource]
 script = ExtResource("1")
 deck_name = "Player Starter Deck"
-cards = Array[ExtResource("1_m0m8l")]([ExtResource("2_l7j37"), ExtResource("3"), ExtResource("7_kl4a8"), ExtResource("7_kl4a8"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("5_pn46r")])
+cards = Array[ExtResource("1_m0m8l")]([ExtResource("2_l7j37"), ExtResource("3"), ExtResource("7_kl4a8"), ExtResource("7_kl4a8"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("5_pn46r"), ExtResource("7_pn46r"), ExtResource("7_pn46r"), ExtResource("7_pn46r")])

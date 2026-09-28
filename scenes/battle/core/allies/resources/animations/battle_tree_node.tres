@@ -13,17 +13,27 @@ animation = &"sword_02/sword_combo_attack_01_var004"
 animation = &"sword_02/sword_attack_up_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_2"]
-animation = &"skill-animations/strong-attack"
+animation = &"sword_02/sword_execution_var003"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee1"]
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee2"]
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee3"]
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged1"]
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged2"]
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_4vh7f"]
 switch_mode = 2
@@ -38,6 +48,7 @@ switch_mode = 2
 advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_csrss"]
+switch_mode = 2
 advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_jex2m"]
@@ -45,19 +56,20 @@ switch_mode = 2
 advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachine" id="combat_actions_sm"]
+states/End/position = Vector2(784, 174.4)
 states/Start/position = Vector2(16, 174.4)
 states/melee_combo_1/node = SubResource("anim_melee_combo_1")
-states/melee_combo_1/position = Vector2(300.32, 3.2000008)
+states/melee_combo_1/position = Vector2(300.3768, 3.2000008)
 states/melee_combo_2/node = SubResource("anim_melee_combo_2")
-states/melee_combo_2/position = Vector2(300, 100)
+states/melee_combo_2/position = Vector2(300.2482, 100)
 states/melee_combo_3/node = SubResource("anim_melee_combo_3")
-states/melee_combo_3/position = Vector2(300, 180)
+states/melee_combo_3/position = Vector2(301.26062, 180)
 states/ranged_cast_1/node = SubResource("anim_ranged_cast_1")
-states/ranged_cast_1/position = Vector2(300, 280)
+states/ranged_cast_1/position = Vector2(300.45416, 274.4)
 states/ranged_cast_2/node = SubResource("anim_ranged_cast_2")
-states/ranged_cast_2/position = Vector2(300, 360)
+states/ranged_cast_2/position = Vector2(299.87582, 360)
 transitions = ["Start", "melee_combo_1", SubResource("ca_start_to_melee1"), "Start", "melee_combo_2", SubResource("ca_start_to_melee2"), "Start", "melee_combo_3", SubResource("ca_start_to_melee3"), "Start", "ranged_cast_1", SubResource("ca_start_to_ranged1"), "Start", "ranged_cast_2", SubResource("ca_start_to_ranged2"), "melee_combo_1", "End", SubResource("AnimationNodeStateMachineTransition_4vh7f"), "melee_combo_2", "End", SubResource("AnimationNodeStateMachineTransition_m5yw2"), "melee_combo_3", "End", SubResource("AnimationNodeStateMachineTransition_thekq"), "ranged_cast_1", "End", SubResource("AnimationNodeStateMachineTransition_csrss"), "ranged_cast_2", "End", SubResource("AnimationNodeStateMachineTransition_jex2m")]
-graph_offset = Vector2(-89, 107.20982)
+graph_offset = Vector2(-307, 143.81148)
 
 [sub_resource type="AnimationNodeAnimation" id="anim_death"]
 animation = &"sword_02/sword_hit_death_var001"
@@ -66,19 +78,19 @@ animation = &"sword_02/sword_hit_death_var001"
 animation = &"sword_02/sword_dodge_combat_backward_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_hit"]
-animation = &"sword_02/sword_hit_backward_var001"
+animation = &"sword_02/sword_hit_forward_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_idle"]
 animation = &"sword_02/sword_idle_combat_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_jump"]
-animation = &"sword_02/sword_jump_start_var001"
+animation = &"sword_02/sword_jump_combat_start_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_jump_land"]
-animation = &"sword_02/sword_jump_stop_var001"
+animation = &"sword_02/sword_jump_combat_start_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_parry"]
-animation = &"sword_02/sword_block_hit_var001"
+animation = &"sword_02/sword_block_start_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_walk"]
 animation = &"sword_02/sword_dodge_combat_forward_var001"
@@ -158,24 +170,24 @@ advance_condition = &"is_dead"
 states/End/position = Vector2(1300, 200)
 states/Start/position = Vector2(38, 200)
 states/combat_actions/node = SubResource("combat_actions_sm")
-states/combat_actions/position = Vector2(621.6, 199.8592)
+states/combat_actions/position = Vector2(618.74426, 200.13184)
 states/death/node = SubResource("anim_death")
-states/death/position = Vector2(37.344, 49.504)
+states/death/position = Vector2(37.426594, 49.578342)
 states/dodge/node = SubResource("anim_dodge")
-states/dodge/position = Vector2(619.43036, 49.68)
+states/dodge/position = Vector2(618.8815, 49.765247)
 states/hit/node = SubResource("anim_hit")
-states/hit/position = Vector2(240, 50)
+states/hit/position = Vector2(240, 49.347202)
 states/idle1/node = SubResource("anim_idle")
 states/idle1/position = Vector2(240, 200)
 states/jump/node = SubResource("anim_jump")
 states/jump/position = Vector2(423.2, 347.82397)
 states/jump_land/node = SubResource("anim_jump_land")
-states/jump_land/position = Vector2(622.368, 348.48315)
+states/jump_land/position = Vector2(617.5989, 347.9558)
 states/parry/node = SubResource("anim_parry")
-states/parry/position = Vector2(38.572815, 349.68)
+states/parry/position = Vector2(36.34611, 343.83453)
 states/walk/node = SubResource("anim_walk")
-states/walk/position = Vector2(240, 350)
+states/walk/position = Vector2(240, 347.04572)
 states/walk_back/node = SubResource("anim_walk_back")
-states/walk_back/position = Vector2(240.288, 470.8)
+states/walk_back/position = Vector2(239.8976, 470.8)
 transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "combat_actions", "idle1", SubResource("combat_to_idle"), "idle1", "dodge", SubResource("idle_to_dodge"), "dodge", "idle1", SubResource("dodge_to_idle"), "idle1", "parry", SubResource("idle_to_parry"), "parry", "idle1", SubResource("parry_to_idle"), "idle1", "jump", SubResource("idle_to_jump"), "jump", "jump_land", SubResource("jump_to_jump_land"), "jump_land", "idle1", SubResource("jump_land_to_idle"), "idle1", "hit", SubResource("idle_to_hit"), "hit", "idle1", SubResource("hit_to_idle"), "idle1", "death", SubResource("idle_to_death")]
-graph_offset = Vector2(-173.40161, 80.4765)
+graph_offset = Vector2(-196.40161, -8.523499)

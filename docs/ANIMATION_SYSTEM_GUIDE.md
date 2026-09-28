@@ -100,31 +100,41 @@ tree) — the state machine is not the place to paper over bad content.
 
 ---
 
-## 4. Dynamic Duration & Hit-Frame Synchronization
+## 4. Animation Callback-Based Hit Timing
 
-Because `AnimationTree` does not reliably emit `AnimationPlayer.animation_finished` when transitioning inside nested trees, the game uses **dynamic clip inspection** and **timer-based event scheduling**.
+The system now uses **AnimationPlayer method track callbacks** to trigger hit timing directly from the animation timeline, replacing the old timer-based approach.
 
-### Step 1: Clip Length Resolution (`_get_animation_duration`)
-When an animation state begins, `_resolve_state_animation_name()` inspects the `AnimationNodeAnimation` node inside the state machine to identify the actual clip name (e.g. `"Locomotion-Library/attack1"`), then fetches its exact length from the `AnimationPlayer`:
-
-```gdscript
-var clip_length = anim_player.get_animation(resolved_name).length
-_current_attack_duration = max(0.25, clip_length)
-```
-
-### Step 2: The `hit_moment` Signal
-To ensure damage numbers and reactive defense windows (dodge/parry) line up precisely with the physical impact of the swing/punch (rather than firing when the animation starts or finishes), the system schedules a `hit_moment` signal:
+### Animation Callback Methods
+Three callback methods are implemented in `battler.gd` and called by AnimationPlayer method tracks:
 
 ```gdscript
-# Default: contact occurs at 55% of the total animation duration
-var hit_delay = duration * hit_frame_ratio # e.g. 1.2s * 0.55 = 0.66s
+func _on_attack_start():
+    attack_start.emit()
+    # Called at animation start frame
 
-_hit_moment_timer = get_tree().create_timer(hit_delay)
-_hit_moment_timer.timeout.connect(func():
+func _on_attack_hit():
     hit_moment.emit(self)
     anim_damage.emit()
-)
+    # Called at hit moment frame - triggers damage and defense windows
+
+func _on_attack_end():
+    attack_end.emit()
+    # Called at animation end frame
 ```
+
+### Method Track Setup
+Method tracks are added to attack animations in Godot editor:
+- `_on_attack_start()` at frame 0
+- `_on_attack_hit()` at the hit frame (authored per animation)
+- `_on_attack_end()` at the last frame
+
+See [`ANIMATION_CALLBACK_SETUP.md`](file:///c:/Users/XTAHA/Godot/Projects/3D-TurnBasedCombat/docs/ANIMATION_CALLBACK_SETUP.md) for detailed setup instructions.
+
+### Benefits
+- **Animation-driven timing**: Hit frame is authored directly in animation timeline
+- **Per-animation precision**: Each animation can have its own hit timing
+- **No ratio calculations**: No need for `hit_frame_ratio` multiplication
+- **Defense alignment**: Defense windows automatically aligned to actual hit frame
 
 ---
 
@@ -133,7 +143,7 @@ _hit_moment_timer.timeout.connect(func():
 When playing a card via `CardBattleManager.execute_card_with_config()`, character animations use **canonical slot names** that map directly to AnimationTree states:
 
 ```
-CardConfig (actor_animation: "ranged_cast_1")
+CardConfig (animation_name: "ranged_cast_1")
        │
        ▼
 Battler.get_resolved_animation("ranged_cast_1")
@@ -146,7 +156,10 @@ Resolved Name: "ranged_cast_1" (canonical slot, always valid)
 Battler._try_animation("ranged_cast_1")
        │
        ▼
-CardConfig.animation_events (staggered callbacks during animation playback)
+Wait for hit_moment signal from animation callback
+       │
+       ▼
+Apply damage immediately at hit moment
 ```
 
 > **Canonical slots** (`melee_combo_1..3`, `ranged_cast_1..2`) are the single source of
@@ -154,8 +167,25 @@ CardConfig.animation_events (staggered callbacks during animation playback)
 > Legacy generic names (`"attack"`, `"heal"`, `"magic_cast"`, …) are **not** valid and will
 > fail `_try_animation()` validation with a clear error.
 
-### Staggered Animation Callbacks (`process_animation_events`)
-Cards can attach `AnimationEvent` resources scheduled at fractional progress points (e.g. 0.3 for particle summon, 0.6 for hit impact). `CardBattleManager.process_animation_events()` monitors normalized animation progress `(animation_time / animation_duration)` and triggers events dynamically.
+### Card Damage Timing
+CardBattleManager uses `execute_animation_phase_with_hit_timing()` which:
+1. Plays the card's animation
+2. Waits for the `hit_moment` signal from the animation callback
+3. Applies damage immediately when the signal is received
+4. Waits for the animation to complete via `attack_end` signal
+
+### Multi-Strike Card Animation Timing
+Multi-strike cards (configured with `is_multi_strike = true`) execute a sequence of strikes:
+1. Actor moves to target once before the first strike
+2. For each strike in the sequence:
+   - Plays the strike's animation
+   - Waits for `hit_moment` signal from that strike's animation callback
+   - Applies damage with strike-specific multiplier
+   - Waits for `attack_end` signal from that strike's animation
+   - Applies strike delay before next strike (if configured)
+3. Actor returns to original position once after the final strike
+
+Each strike uses the same callback system as single-strike cards, ensuring consistent timing and damage application. The `attack_end` signal is critical for proper strike sequencing.
 
 ### Enemy Attack Animation Routing (`EnemyAttackConfig`)
 Enemies trigger attacks through their configured skills rather than card configs:
@@ -164,10 +194,20 @@ EnemyStats.attacks -> EnemyAttackConfig
        │
        ├─ animation_name: Canonical slot name (default "melee_combo_1")
        ├─ damage_multiplier: Scales outgoing physical damage
-       ├─ hit_frame_ratio: Custom contact frame ratio (overriding Battler.hit_frame_ratio)
+       ├─ can_dodge: Whether this attack can be dodged
+       ├─ can_parry: Whether this attack can be parried
+       ├─ requires_jump: Whether this attack must be jumped over
+       ├─ defense_window_duration: Defense window timing for this attack
+       ├─ perfect_parry_window: Perfect parry window timing
        └─ move_announcement_type: Triggers HUD banner before execution
 ```
-In `battler.gd`, `attack_anim(target, attack_config)` dynamically adapts to the config's `animation_name` and `hit_frame_ratio` during the strike phase.
+In `battler.gd`, `attack_anim(target, attack_config)`:
+1. Moves to target (if melee)
+2. Plays the configured animation
+3. Waits for `hit_moment` signal from animation callback
+4. Applies damage at hit moment
+5. Triggers real-time defense window for player allies
+6. Waits for `attack_end` signal before returning to position
 
 ---
 
@@ -272,3 +312,25 @@ Camera movement is synchronized with turn actions via `battlecamera.gd`:
 | `health_changed(cur, max)` | `Battler` | Fired on damage/heal to drive smooth health bar tweens and damage flashes. |
 | `ap_changed(cur, max)` | `Battler` | Fired when battler AP is spent or regenerated; drives HUD AP bar updates. |
 | `reactive_defense_result(type)` | `QTEManager` | Emits `"perfect_parry"`, `"parry"`, `"dodge"`, or `"none"` to trigger counter-animations. |
+
+## 10. Animation Callback System
+
+The animation callback system provides explicit timing control through AnimationPlayer method tracks:
+
+### Callback Methods
+- `_on_attack_start()` - Called at animation start frame
+- `_on_attack_hit()` - Called at hit moment frame
+- `_on_attack_end()` - Called at animation end frame
+
+### New Signals
+- `attack_start` - Emitted when animation starts (called by AnimationPlayer method track)
+- `attack_end` - Emitted when animation ends (called by AnimationPlayer method track)
+
+### Usage
+- **Card attacks**: CardBattleManager waits for `hit_moment` signal before applying damage
+- **Enemy attacks**: battler.gd waits for `hit_moment` signal before applying damage
+- **Defense timing**: Real-time defense windows are triggered by `hit_moment` signal
+- **Animation completion**: Code waits for `attack_end` signal before proceeding
+
+### Setup
+See [`ANIMATION_CALLBACK_SETUP.md`](file:///c:/Users/XTAHA/Godot/Projects/3D-TurnBasedCombat/docs/ANIMATION_CALLBACK_SETUP.md) for instructions on adding method tracks to animations.

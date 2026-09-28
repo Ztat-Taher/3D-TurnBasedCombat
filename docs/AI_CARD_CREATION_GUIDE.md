@@ -63,17 +63,71 @@ script = ExtResource("1")
 ### Animation Configuration
 
 **Required Fields:**
-- `actor_animation`: Animation name (string)
+- `animation_name`: Animation name (string) - for single-strike cards
   - Use **canonical slot names only** — these work on every standardised character:
     - Offensive: `"melee_combo_1"`, `"melee_combo_2"`, `"melee_combo_3"`, `"ranged_cast_1"`, `"ranged_cast_2"`
     - Locomotion: `"walk"` · Defensive: `"dodge"`, `"parry"`, `"jump"`, `"jump_land"`, `"hit"`, `"death"`
   - Non-melee skills/casts (heal, buff, debuff, spell attacks) all use the canonical cast slots `"ranged_cast_1"` / `"ranged_cast_2"`
   - Legacy names like `"attack"`, `"heal"`, `"magic_cast"`, `"cast"`, `"defend"`, `"heavy_attack"` do **not** exist on the standardised AnimationTree and will fail validation
-- `animation_priority`: Integer (0-10, higher = more important)
-- `animation_blend_time`: Float (0.0-1.0 seconds)
-- `animation_speed`: Float (0.5-2.0 multiplier)
-- `fallback_animation`: Canonical slot name used if `actor_animation` is empty
-- `animation_layer`: "full_body", "upper_body", or "additive"
+
+**Animation Timing:**
+- Timing is controlled by AnimationPlayer method tracks in the animation itself
+- The system uses callbacks (`_on_attack_start`, `_on_attack_hit`, `_on_attack_end`) triggered by method tracks
+- Damage is applied when the `hit_moment` signal is emitted by the `_on_attack_hit()` callback
+- See [`ANIMATION_CALLBACK_SETUP.md`](file:///c:/Users/XTAHA/Godot/Projects/3D-TurnBasedCombat/docs/ANIMATION_CALLBACK_SETUP.md) for details on setting up animation callbacks
+
+### Multi-Strike Configuration
+
+**Overview:** Multi-strike cards execute a sequence of multiple attacks with individual animations, QTEs, and damage multipliers. This is ideal for combo moves, flurry attacks, and rapid-fire abilities.
+
+**Required Fields:**
+- `is_multi_strike`: Boolean (set to `true` for multi-strike cards)
+- `animation_name`: Empty string (must be empty when using multi-strike)
+- `strike_animations`: Array[String] - Animation names for each strike
+- `strike_multipliers`: Array[float] - Damage multipliers for each strike
+- `strike_qte_windows`: Array[float] - QTE window duration for each strike
+
+**Optional Fields:**
+- `strike_delays`: Array[float] - Delays between strikes in seconds (0.0 for no delay)
+- `strike_chain_leads`: Array[float] - Optional per-strike chain lead: seconds trimmed from THIS strike's clip so the next strike starts early. Indexed by the current strike - the last entry is unused. Empty = use CardBattleConfig.multi_strike_chain_lead
+- `strike_qte_difficulties`: Array[float] - QTE difficulty for each strike (0.0-1.0)
+
+**Configuration Rules:**
+- All arrays must have the same size (one entry per strike)
+- `animation_name` must be empty when `is_multi_strike` is true
+- Each strike uses its own QTE with individual timing and difficulty
+- Damage is applied per strike with individual multipliers
+- Movement to target happens once before the first strike
+- Return movement happens once after the final strike
+
+**Example Multi-Strike Card Configuration:**
+```gdscript
+is_multi_strike = true
+animation_name = ""
+strike_animations = Array[String](["melee_combo_1", "melee_combo_2", "melee_combo_3"])
+strike_multipliers = Array[float]([1.0, 1.2, 1.5])
+strike_delays = Array[float]([0.0, 0.1, 0.1])
+strike_qte_difficulties = Array[float]([0.4, 0.5, 0.6])
+strike_qte_windows = Array[float]([0.4, 0.4, 0.4])
+```
+
+**Multi-Strike Execution Flow:**
+1. Actor moves to target (once)
+2. For each strike in sequence:
+   - Apply strike delay if configured
+   - Start QTE for this strike (if qte_window > 0)
+   - Play strike animation
+   - Wait for hit moment callback
+   - Apply damage with strike-specific multiplier
+   - Wait for animation end
+3. Actor returns to original position (once)
+
+**QTE Timing in Multi-Strike:**
+- Each strike has its own QTE window
+- QTEs are sequential - one per strike
+- QTE timing uses the same `BEFORE_ATTACK` pattern as single-strike cards
+- Each QTE result affects only its corresponding strike's damage
+- QTE multipliers are cumulative across all strikes for total damage
 
 ### Animation Mapping System
 
@@ -153,11 +207,6 @@ These can be used as templates or directly assigned to character Battler nodes.
 - Keep generic names consistent across cards
 - Document the generic animation names used in your card system
 - Test cards with different character types to ensure mappings work correctly
-
-**Animation Events (Optional):**
-- `animation_events`: Array of AnimationEvent resources
-  - Each event specifies trigger time (0.0-1.0 of animation)
-  - Event types: EFFECT_TRIGGER, SOUND_PLAY, VFX_SPAWN, CAMERA_EFFECT, etc.
 
 ### Targeting Configuration
 
@@ -431,9 +480,11 @@ script = ExtResource("1")
 - 3 = SEQUENCE (sequence input QTE - specific button order)
 
 **QTE Timing Enum:**
-- 0 = BEFORE_ATTACK (QTE before attack animation)
-- 1 = ON_HIT_FRAME (QTE on hit frame)
-- 2 = AFTER_ATTACK (QTE after attack animation)
+- 0 = BEFORE_ATTACK (QTE starts before animation, ends at hit moment)
+- 1 = ON_HIT_FRAME (QTE on hit frame - not currently used)
+- 2 = AFTER_ATTACK (QTE after attack animation - not currently used)
+
+**Note:** The system currently uses `BEFORE_ATTACK` timing. QTEs start before the animation and end exactly at the hit moment. The window duration is configured via `qte_window_duration` in the card config.
 
 **QTE Type-Specific Fields:**
 - For SEQUENCE type: `qte_sequence`: Array[String] (button sequence)
