@@ -52,8 +52,32 @@ static func create_default() -> RunMap:
 	start_node.display_name = "Start"
 	start_node.node_config = combat_config
 	start_node.level_path = ""
-	start_node.next_node_ids.assign(["river_path", "ancient_bridge", "foggy_road"])
+	start_node.next_node_ids.assign(["rest_stop", "ancient_bridge", "recruit_stop"])
 	start_node.map_position = Vector2(0.5, 0.92)
+
+	# Rest & Recruit are stops ON the two flanking routes out of the start node
+	# (not side spurs): start -> rest -> river_path on the left, start ->
+	# recruit -> foggy_road on the right, with ancient_bridge as the direct
+	# centre route. Each opens its own UI scene (like a Combat node opens its
+	# battle scene) via level_changed.
+	var rest_config := load("res://scripts/game_state/map/node_config_rest.tres") as NodeConfig
+	var recruit_config := load("res://scripts/game_state/map/node_config_recruit.tres") as NodeConfig
+
+	var rest_stop := RunMapNode.new()
+	rest_stop.id = "rest_stop"
+	rest_stop.display_name = "Rest"
+	rest_stop.node_config = rest_config
+	rest_stop.level_path = "res://scenes/menus/map_menu/rest_screen.tscn"
+	rest_stop.next_node_ids.assign(["river_path"])
+	rest_stop.map_position = Vector2(0.34, 0.84)
+
+	var recruit_stop := RunMapNode.new()
+	recruit_stop.id = "recruit_stop"
+	recruit_stop.display_name = "Recruit"
+	recruit_stop.node_config = recruit_config
+	recruit_stop.level_path = "res://scenes/menus/map_menu/recruit_screen.tscn"
+	recruit_stop.next_node_ids.assign(["foggy_road"])
+	recruit_stop.map_position = Vector2(0.66, 0.84)
 	
 	# Bottom layer - diverse branching
 	var river_path := RunMapNode.new()
@@ -183,5 +207,5 @@ static func create_default() -> RunMap:
 	
 	# Set starting node and add all nodes
 	map.starting_node_ids.assign(["start"])
-	map.nodes = [start_node, river_path, ancient_bridge, foggy_road, marsh_lands, twisted_forest, stone_gate, mountain_pass, crystal_cave, sunken_ruins, windy_cliff, summit_path, hidden_valley, summit_alt, final_gate, boss]
+	map.nodes = [start_node, river_path, ancient_bridge, foggy_road, rest_stop, recruit_stop, marsh_lands, twisted_forest, stone_gate, mountain_pass, crystal_cave, sunken_ruins, windy_cliff, summit_path, hidden_valley, summit_alt, final_gate, boss]
 	return map

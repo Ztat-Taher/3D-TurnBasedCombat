@@ -501,8 +501,9 @@ func initialize_battle():
 
 
 func count_allies():
-	# For now, Should be one.
-	battle_settings.ally_party = 1
+	# The party size is however many ally battlers actually took the field
+	# (drives escape difficulty penalties below).
+	battle_settings.ally_party = maxi(1, players.size())
 
 # See _ready() -> SignalBus.select_target.connect() ... Emitted from Battler
 func target_selected(target: Battler) -> void:
@@ -595,6 +596,15 @@ func start_next_turn():
 	current_turn_timeout_timer = 0.0
 	is_turn_transitioning = false
 
+	# A reactive counter can defeat the acting enemy before its original attack
+	# coroutine reaches end_turn(). Battler.take_damage() removes that enemy from
+	# turn_order immediately, so current_turn may temporarily equal the old
+	# array size. Normalize the index before accessing it; this also protects
+	# against any other asynchronous removal that changes the queue mid-turn.
+	if turn_order.is_empty():
+		end_battle()
+		return
+	current_turn = current_turn % turn_order.size()
 	current_character = turn_order[current_turn]
 	current_battler = current_character
 	

@@ -16,6 +16,7 @@ var _map_plane : MeshInstance3D
 var _map_viewport : SubViewport
 var _map_ui : Control
 var _pawn : MeshInstance3D
+var _world_viewport : SubViewport
 
 ## 2D UI references (inside viewport)
 var _path_drawer : MapPathDrawer
@@ -38,6 +39,16 @@ var _stop_node_scene : PackedScene = load("res://scenes/menus/map_menu/stop_node
 var _pawn_scene : PackedScene = load("res://scenes/menus/map_menu/pawns/pawn_player.tscn")
 var _initial_load : bool = true
 
+## Decorative follower pawns - one per extra party member (visual only).
+var _party_pawns : Array[MeshInstance3D] = []
+
+## Formation offsets (XZ, world units) for follower pawns relative to the leader.
+const PARTY_OFFSETS : Array[Vector2] = [
+	Vector2(0.14, -0.14),
+	Vector2(-0.14, -0.14),
+	Vector2(0.0, -0.30),
+]
+
 func _ready() -> void:
 	if run_map == null:
 		run_map = RunMap.create_default()
@@ -47,12 +58,14 @@ func _ready() -> void:
 		GameState.reset()
 		print("Game state cleared for debug")
 	
-	# Get references
-	_camera = get_node("Camera3D")
-	_map_plane = get_node("MapPlane")
-	_map_viewport = get_node("MapUIViewport")
-	_map_ui = get_node("MapUIViewport/MapUI")
-	_pawn = get_node("PlayerPawn")
+	# Get references (3D world is wrapped in ViewportContainer for PSX post-processing)
+	var world_path := "ViewportContainer/WorldViewport"
+	_camera = get_node(world_path + "/Camera3D")
+	_map_plane = get_node(world_path + "/MapPlane")
+	_map_viewport = get_node(world_path + "/MapUIViewport")
+	_map_ui = get_node(world_path + "/MapUIViewport/MapUI")
+	_pawn = get_node(world_path + "/PlayerPawn")
+	_world_viewport = get_node(world_path)
 	
 	# Print coordinate reference points
 	_print_coordinate_reference()
@@ -132,7 +145,7 @@ func _setup_map_plane() -> void:
 	material.albedo_texture = viewport_texture
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.flags_unshaded = true
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # crisp, pixelated map
 	
 	_map_plane.material_override = material
 
@@ -209,6 +222,9 @@ func _rebuild_map() -> void:
 	if _initial_load and _current_node_id and _pawn:
 		_position_pawn_3d(_current_node_id)
 		_initial_load = false
+	
+	# Keep the follower pawn group in sync with the party size (visual only).
+	_refresh_party_pawns()
 
 func _refresh_2d_layout() -> void:
 	var viewport_size = Vector2(_map_viewport.size)
@@ -261,6 +277,46 @@ func _position_pawn_3d(node_id : String) -> void:
 	print("Positioning pawn at: ", final_pos)
 	_pawn.position = final_pos
 
+## Rebuild the follower pawn group so its size matches the party roster.
+## Only recreates pawns when the party size actually changed (visual only).
+func _refresh_party_pawns() -> void:
+	if _pawn == null or _pawn_scene == null:
+		return
+	
+	var count := maxi(1, GameState.get_party().size())
+	var expected_followers := count - 1
+	
+	if _party_pawns.size() != expected_followers:
+		for existing in _party_pawns:
+			if is_instance_valid(existing):
+				existing.queue_free()
+		_party_pawns.clear()
+		
+		for i in range(expected_followers):
+			var follower := _pawn_scene.instantiate() as MeshInstance3D
+			if follower == null:
+				continue
+			follower.name = "PartyPawn_%d" % (i + 1)
+			_pawn.get_parent().add_child(follower)
+			follower.transform = _pawn.transform
+			_party_pawns.append(follower)
+	
+	_update_party_pawn_positions()
+
+## Lock follower pawns to the leader's position so they hop along with it.
+func _update_party_pawn_positions() -> void:
+	if _pawn == null:
+		return
+	for i in _party_pawns.size():
+		var follower := _party_pawns[i]
+		if not is_instance_valid(follower):
+			continue
+		var offset := PARTY_OFFSETS[mini(i, PARTY_OFFSETS.size() - 1)]
+		if i >= PARTY_OFFSETS.size():
+			# Extra members beyond the standard formation share an offset with jitter.
+			offset += Vector2(0.06 * float(i - PARTY_OFFSETS.size() + 1), 0.0)
+		follower.position = _pawn.position + Vector3(offset.x, 0.0, offset.y)
+
 func _on_node_selected(node_id : String, node_level_path : String) -> void:
 	var map_node := run_map.get_node_by_id(node_id)
 	if map_node == null:
@@ -289,7 +345,7 @@ func _on_node_selected(node_id : String, node_level_path : String) -> void:
 	_current_node_id = node_id
 	
 	_rebuild_map()
-	
+
 	if not node_level_path.is_empty():
 		level_changed.emit(node_level_path)
 
@@ -303,6 +359,9 @@ func _on_pawn_movement_finished() -> void:
 	pass
 
 func _process(delta: float) -> void:
+	# Keep follower pawns locked to the leader (they mirror its arc while hopping).
+	_update_party_pawn_positions()
+	
 	if not camera_follow_enabled or not _pawn or not _camera:
 		return
 	
@@ -327,9 +386,10 @@ func _input(event: InputEvent) -> void:
 		_forward_mouse_to_viewport(event)
 
 func _forward_mouse_to_viewport(event: InputEvent) -> void:
-	# Raycast from camera to plane
-	var ray_origin = _camera.project_ray_origin(event.position)
-	var ray_direction = _camera.project_ray_normal(event.position)
+	# Raycast from camera to plane (convert to low-res WorldViewport space first)
+	var world_pos := _window_to_world_coords(event.position)
+	var ray_origin = _camera.project_ray_origin(world_pos)
+	var ray_direction = _camera.project_ray_normal(world_pos)
 	var plane = Plane(Vector3.UP, _map_plane.position.y)
 	var intersection = plane.intersects_ray(ray_origin, ray_direction)
 	
@@ -352,6 +412,18 @@ func _forward_mouse_to_viewport(event: InputEvent) -> void:
 			var viewport_event = event.duplicate()
 			viewport_event.position = viewport_pos
 			_map_viewport.push_input(viewport_event)
+
+## Converts window coordinates to the low-res WorldViewport space.
+## The SubViewportContainer renders at 1/stretch_shrink resolution, so
+## camera raycasts need mouse positions scaled into that viewport first.
+func _window_to_world_coords(window_pos: Vector2) -> Vector2:
+	if _world_viewport == null:
+		return window_pos
+	var win_size := Vector2(get_viewport().get_visible_rect().size)
+	var world_size := Vector2(_world_viewport.get_visible_rect().size)
+	if win_size.x <= 0.0 or win_size.y <= 0.0:
+		return window_pos
+	return window_pos * (world_size / win_size)
 
 func _trigger_button_at_position(viewport_pos: Vector2) -> void:
 	print("Trying to trigger button at viewport position: ", viewport_pos)

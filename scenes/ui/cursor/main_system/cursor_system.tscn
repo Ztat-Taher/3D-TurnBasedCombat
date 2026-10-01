@@ -14,7 +14,7 @@
 _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.5, 0.5), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
 point_count = 3
 
-[node name="CursorSystem" type="CanvasLayer" unique_id=824409362]
+[node name="CursorSystem" type="CanvasLayer" unique_id=824409362 groups=["cursor_manager"]]
 process_mode = 3
 layer = 100
 script = ExtResource("1_cursor_manager")

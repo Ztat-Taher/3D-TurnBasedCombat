@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="EnemyStats" format=3 uid="uid://b0n3m4r4ud3r5"]
 
-[ext_resource type="Script" uid="uid://dxpqx3hh3hron" path="res://scripts/systems/battle/battlers/stats/EnemyStats.gd" id="1_stats"]
+[ext_resource type="Script" path="res://scripts/systems/battle/battlers/stats/EnemyStats.gd" id="1_stats"]
 [ext_resource type="Script" uid="uid://286lbfhgjnsn" path="res://scripts/systems/battle/battlers/stats/EnemyAttackConfig.gd" id="2_atk"]
 [ext_resource type="Script" uid="uid://xut8pvgqpe8u" path="res://database/items/enemy_drop.gd" id="3_drop"]
 [ext_resource type="Resource" uid="uid://orange" path="res://database/items/orange.tres" id="4_orange"]

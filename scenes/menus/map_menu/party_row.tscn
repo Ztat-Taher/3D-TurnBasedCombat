@@ -1,0 +1,21 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/map/party_row.gd" id="1_script"]
+
+[node name="PartyRow" type="HBoxContainer"]
+script = ExtResource("1_script")
+
+[node name="NameLabel" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Ally"
+
+[node name="HpLabel" type="Label" parent="."]
+layout_mode = 2
+text = "Full"
+
+[node name="HealButton" type="Button" parent="."]
+layout_mode = 2
+text = "Heal"
+
+[connection signal="pressed" from="HealButton" to="." method="_on_heal_button_pressed"]

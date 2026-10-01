@@ -26,6 +26,12 @@ extends Resource
 @export var agility_multiplier: int = 1 ## Agility gain per level
 @export var ap_multiplier: int = 0 ## AP gain per level (default 0)
 
+@export_group("Cards")
+## Card deck this ally fights with.
+## Also the default deck for the ally type when the run party has no per-ally
+## deck assigned (see GameState / AllyPartyMember).
+@export var deck: DeckResource
+
 @export_group("Other Stats")
 @export var element: int = GlobalBattleSettings.Elements.Physical ## Character element
 

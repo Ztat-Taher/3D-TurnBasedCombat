@@ -21,6 +21,9 @@ signal level_changed(next_level_path : String)
 @export var troop_override : Troops = null
 
 func _enter_tree() -> void:
+	# Sync the run party onto the battlefield (spawns / levels / HP) before the
+	# battle manager gathers its players.
+	PartyBattleSync.prepare_party(self)
 	# Runs before the battle's _ready(), so the override applies before enemies spawn.
 	if troop_override == null: return
 	var battle := get_node_or_null("Battle") as BattleManager
@@ -33,8 +36,12 @@ func _ready() -> void:
 		push_error("BattleLevel: no BattleManager found as a child named 'Battle' in %s" % scene_file_path)
 		return
 	battle.battle_ended.connect(_on_battle_ended)
+	# Once battlers exist, restore the HP the party carried into this node.
+	PartyBattleSync.apply_saved_health(self)
 
 func _on_battle_ended(end_condition : BattleManager.BattleEndCondition) -> void:
+	# Write live battler HP/level/exp back onto the run party.
+	PartyBattleSync.store_party_state(self)
 	match end_condition:
 		BattleManager.BattleEndCondition.WIN:
 			# Empty path: the LevelManager picks the next level from the SceneLister.

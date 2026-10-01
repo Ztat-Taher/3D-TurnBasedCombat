@@ -9,6 +9,7 @@ signal card_drag_ended(card_button: CardButton, dropped_in_play_zone: bool)
 var card_data: CardData
 var is_hovered: bool = false
 var is_selected: bool = false
+var is_highlighted: bool = false
 var is_dragging: bool = false
 var is_returning: bool = false
 var is_out_of_hand: bool = false
@@ -322,9 +323,6 @@ func _setup_description_popup():
 	else:
 		add_child(description_popup)
 	
-	# Set high z-index within the card's children to ensure it's on top
-	description_popup.z_index = 100
-	
 	# Get status effects from card
 	var status_effects = _get_card_status_effects()
 	
@@ -342,7 +340,13 @@ func _pop_in():
 	pass
 
 func _get_cursor_manager() -> CursorManager:
-	return get_tree().get_first_node_in_group("BattleHud").cursor_system if get_tree().get_first_node_in_group("BattleHud") else null
+	var battle_hud := get_tree().get_first_node_in_group("BattleHud")
+	if battle_hud:
+		var hud_cursor := battle_hud.get_node_or_null("cursor_system")
+		if hud_cursor is CursorManager:
+			return hud_cursor
+	var manager := get_tree().get_first_node_in_group("cursor_manager")
+	return manager as CursorManager if manager is CursorManager else null
 
 func _on_mouse_entered():
 	if is_dragging:
@@ -350,10 +354,6 @@ func _on_mouse_entered():
 	is_hovered = true
 	z_index = 100
 	_animate_hover(true)
-	
-	# Update popup z-index to be significantly higher than any card
-	if description_popup:
-		description_popup.z_index = 1000
 	
 	var cm = _get_cursor_manager()
 	if cm:
@@ -363,12 +363,12 @@ func _on_mouse_exited():
 	if is_dragging:
 		return
 	is_hovered = false
-	z_index = base_z_index
+	if not is_highlighted:
+		z_index = base_z_index
 	_animate_hover(false)
 	
 	# Update popup z-index to match base card
-	if description_popup:
-		description_popup.z_index = z_index + 1
+	_hide_description_popup()
 	
 	var cm = _get_cursor_manager()
 	if cm:
@@ -390,16 +390,21 @@ func _animate_hover(hover: bool):
 	hover_tween.set_ease(Tween.EaseType.EASE_OUT)
 	hover_tween.set_trans(Tween.TransitionType.TRANS_CUBIC)
 	
-	hover_tween.tween_property(self, "z_index", 100 if hover else base_z_index, 0.15)
+	hover_tween.tween_property(self, "z_index", 100 if hover or is_highlighted else base_z_index, 0.15)
 	if card_3d_container:
-		hover_tween.tween_property(card_3d_container, "position", Vector2(0.0, -45.0 + base_y_offset) if hover else Vector2(0.0, base_y_offset), 0.15)
-		hover_tween.tween_property(card_3d_container, "scale", Vector2(1.2, 1.2) if hover else Vector2.ONE, 0.15)
+		var raised := hover or is_highlighted
+		hover_tween.tween_property(card_3d_container, "position", Vector2(0.0, -45.0 + base_y_offset) if raised else Vector2(0.0, base_y_offset), 0.15)
+		hover_tween.tween_property(card_3d_container, "scale", Vector2(1.2, 1.2) if raised else Vector2.ONE, 0.15)
 		hover_tween.tween_property(card_3d_container, "rotation_degrees", 0.0 if hover else base_rotation, 0.15)
-	
-	# Update popup z-index with tween to use a very high value
-	if description_popup:
-		var target_z = 1000 if hover else base_z_index + 1
-		hover_tween.tween_property(description_popup, "z_index", target_z, 0.15)
+
+func _hide_description_popup() -> void:
+	if not description_popup:
+		return
+	if description_popup.has_method("set_hovering"):
+		description_popup.set_hovering(false)
+	description_popup.visible = false
+	description_popup.modulate.a = 0.0
+	hover_timer = 0.0
 
 func _process(delta: float) -> void:
 	var mouse_pos = get_viewport().get_mouse_position()
@@ -419,12 +424,13 @@ func _process(delta: float) -> void:
 		hover_timer = 0.0
 		if description_popup and description_popup.has_method("set_hovering"):
 			description_popup.set_hovering(false)
+		if description_popup:
+			description_popup.visible = false
 	
 	# Update popup position and z-index if visible and card is moving
 	if description_popup and description_popup.visible:
 		if description_popup.has_method("update_position"):
 			description_popup.update_position()
-		description_popup.z_index = z_index
 	
 	if is_dragging:
 		# Dragging logic
@@ -439,7 +445,7 @@ func _process(delta: float) -> void:
 			card_3d_container.scale = Vector2(1.25, 1.25)
 		
 		is_out_of_hand = not _is_inside_hand_zone()
-	elif is_hovered:
+	if is_hovered:
 		# Hover state with pseudo 3D effect
 		if card_shader_material:
 			var card_center := global_position + (size * 0.5)
@@ -470,9 +476,30 @@ func _process(delta: float) -> void:
 				card_shader_material.set_shader_parameter("x_rot", 0.0)
 		
 		if card_3d_container and not is_draw_animating:
-			card_3d_container.scale = lerp(card_3d_container.scale, Vector2.ONE, 0.25)
-			card_3d_container.position = Vector2(0.0, base_y_offset)
-			card_3d_container.rotation_degrees = base_rotation
+			if is_highlighted:
+				card_3d_container.scale = Vector2(1.2, 1.2)
+				card_3d_container.position = Vector2(0.0, -45.0 + base_y_offset)
+				card_3d_container.rotation_degrees = 0.0
+			else:
+				card_3d_container.scale = lerp(card_3d_container.scale, Vector2.ONE, 0.25)
+				card_3d_container.position = Vector2(0.0, base_y_offset)
+				card_3d_container.rotation_degrees = base_rotation
+
+func set_highlighted(highlighted: bool) -> void:
+	if is_highlighted == highlighted:
+		return
+	is_highlighted = highlighted
+	z_index = 100 if highlighted else base_z_index
+	if not card_3d_container:
+		return
+	if highlighted:
+		card_3d_container.scale = Vector2(1.2, 1.2)
+		card_3d_container.position = Vector2(0.0, -45.0 + base_y_offset)
+		card_3d_container.rotation_degrees = 0.0
+	else:
+		card_3d_container.scale = Vector2.ONE
+		card_3d_container.position = Vector2(0.0, base_y_offset)
+		card_3d_container.rotation_degrees = base_rotation
 
 func _on_gui_input(event: InputEvent):
 	## Connected to CardFace.gui_input in card_button.tscn. The root Control

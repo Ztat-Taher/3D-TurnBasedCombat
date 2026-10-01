@@ -3,6 +3,28 @@
 [ext_resource type="Script" uid="uid://dsb0dpqbyeoee" path="res://scenes/menus/map_menu/map_menu_3d.gd" id="1_map_menu_3d"]
 [ext_resource type="PackedScene" uid="uid://d2nt213thaby7" path="res://scenes/menus/map_menu/pawns/pawn_player.tscn" id="2_p1035"]
 [ext_resource type="Texture2D" uid="uid://f44jyxit6ht3" path="res://assets/images/map/map_background.png" id="2_rayjf"]
+[ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="3_psx"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_psxmap"]
+shader = ExtResource("3_psx")
+shader_parameter/enabled = true
+shader_parameter/dithering = true
+shader_parameter/colors = 12
+shader_parameter/dither_size = 1
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_map"]
+sky_top_color = Color(0.447336, 0.519571, 0.620102, 1)
+sky_cover_modulate = Color(0.801182, 0.452923, 0.347646, 1)
+
+[sub_resource type="Sky" id="Sky_map"]
+sky_material = SubResource("ProceduralSkyMaterial_map")
+
+[sub_resource type="Environment" id="Environment_map"]
+background_mode = 2
+sky = SubResource("Sky_map")
+fog_enabled = true
+fog_light_energy = 1.34
+volumetric_fog_density = 0.02
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_rayjf"]
 size = Vector2(3.62, 2)
@@ -10,29 +32,49 @@ size = Vector2(3.62, 2)
 [node name="MapMenu3D" type="Node3D" unique_id=1714182536]
 script = ExtResource("1_map_menu_3d")
 
-[node name="Camera3D" type="Camera3D" parent="." unique_id=1057489359]
-transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 1, 1.25)
+[node name="ViewportContainer" type="SubViewportContainer" parent="." unique_id=357567546]
+material = SubResource("ShaderMaterial_psxmap")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+stretch_shrink = 2
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1451366115]
+[node name="WorldViewport" type="SubViewport" parent="ViewportContainer" unique_id=925571558]
+handle_input_locally = false
+size = Vector2i(640, 360)
+render_target_update_mode = 4
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="ViewportContainer/WorldViewport" unique_id=1462291086]
+environment = SubResource("Environment_map")
+
+[node name="Camera3D" type="Camera3D" parent="ViewportContainer/WorldViewport" unique_id=1057489359]
+transform = Transform3D(1, 0, 0, 0, 0.25881907, 0.9659258, 0, -0.9659258, 0.25881907, 0, 1.5, 0.5)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="ViewportContainer/WorldViewport" unique_id=1451366115]
 transform = Transform3D(1, 0, 0, 0, 0.64278764, 0.76604444, 0, -0.76604444, 0.64278764, 0, 1.75, 1.75)
 shadow_enabled = true
 sky_mode = 1
 
-[node name="MapPlane" type="MeshInstance3D" parent="." unique_id=1256966515]
+[node name="MapPlane" type="MeshInstance3D" parent="ViewportContainer/WorldViewport" unique_id=1256966515]
 mesh = SubResource("PlaneMesh_rayjf")
 
-[node name="PlayerPawn" parent="." unique_id=149876272 instance=ExtResource("2_p1035")]
+[node name="PlayerPawn" parent="ViewportContainer/WorldViewport" unique_id=149876272 instance=ExtResource("2_p1035")]
 hop_height = 0.25
-hop_duration = 0.8
+hop_duration = 0.35
 
-[node name="MapUIViewport" type="SubViewport" parent="." unique_id=1291046295]
+[node name="MapUIViewport" type="SubViewport" parent="ViewportContainer/WorldViewport" unique_id=1291046295]
 transparent_bg = true
 handle_input_locally = false
 anisotropic_filtering_level = 0
 canvas_item_default_texture_filter = 0
 size = Vector2i(1230, 680)
+render_target_update_mode = 4
 
-[node name="MapUI" type="Control" parent="MapUIViewport" unique_id=1098054941]
+[node name="MapUI" type="Control" parent="ViewportContainer/WorldViewport/MapUIViewport" unique_id=1098054941]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -40,7 +82,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Background" type="TextureRect" parent="MapUIViewport/MapUI" unique_id=952907324]
+[node name="Background" type="TextureRect" parent="ViewportContainer/WorldViewport/MapUIViewport/MapUI" unique_id=952907324]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0

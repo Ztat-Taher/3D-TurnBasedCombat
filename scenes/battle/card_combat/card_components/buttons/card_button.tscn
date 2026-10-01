@@ -8,7 +8,6 @@
 [ext_resource type="Texture2D" uid="uid://cr244eente0qr" path="res://assets/images/cards/template/card_template_main.png" id="6_f5rll"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_7g8l3"]
-load_path = "res://.godot/imported/20251124emptyFrameC1-Sheet.png-84ea66a0154b2e3bd910d94b0039feda.ctex"
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_3xdqv"]
 atlas = SubResource("CompressedTexture2D_7g8l3")
@@ -197,6 +196,8 @@ layout_mode = 2
 mouse_filter = 2
 
 [node name="PopUpContainer" type="VBoxContainer" parent="." unique_id=247804383]
+z_index = 1000
+z_as_relative = false
 custom_minimum_size = Vector2(250, 0)
 layout_mode = 1
 anchors_preset = 4

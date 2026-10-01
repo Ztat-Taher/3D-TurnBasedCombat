@@ -20,7 +20,7 @@ signal end_turn_pressed
 @onready var battle_text_display: RichTextLabel = $Control/BattleTextDisplay/Text
 @onready var item_select: Control = $Control/Items
 @onready var card_ui: Control = $Control/CardUI
-@onready var party_status_panel: HBoxContainer = $Control/PartyStatusPanel
+@onready var party_status_panel: VBoxContainer = $Control/PartyStatusPanel
 @onready var boss_bar = $Control/BossBar
 @onready var enemy_overhead_bars_container: Control = $Control/EnemyOverheadBarsContainer
 @onready var move_banner: Control = $Control/MoveBanner

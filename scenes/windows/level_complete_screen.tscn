@@ -1,17 +1,17 @@
-[gd_scene format=3 uid="uid://25mmdo67c2tb"]
+[gd_scene format=3 uid="uid://ciphbotutuf1s"]
 
-[ext_resource type="Script" uid="uid://bwsouglh6ntxc" path="res://scenes/windows/level_complete_screen.gd" id="1_gr6pd"]
+[ext_resource type="Script" uid="uid://bwsouglh6ntxc" path="res://scenes/windows/level_complete_screen.gd" id="1_script"]
 
-[node name="LevelCompleteScreen" type="Control" unique_id=607401344]
+[node name="LevelCompleteScreen" type="Control" unique_id=1579614079]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_gr6pd")
+script = ExtResource("1_script")
 
-[node name="Background" type="ColorRect" parent="." unique_id=977100052]
+[node name="Background" type="ColorRect" parent="." unique_id=672474630]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -19,66 +19,69 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.6)
 
-[node name="Center" type="CenterContainer" parent="." unique_id=424459371]
+[node name="RewardLayout" type="VBoxContainer" parent="." unique_id=1706508302]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 110.0
+offset_top = 24.0
+offset_right = -110.0
+offset_bottom = -24.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 4
 
-[node name="Panel" type="PanelContainer" parent="Center" unique_id=1589499663]
-custom_minimum_size = Vector2(480, 0)
+[node name="RewardHeader" type="VBoxContainer" parent="RewardLayout" unique_id=1161279872]
 layout_mode = 2
+theme_override_constants/separation = 2
 
-[node name="Content" type="MarginContainer" parent="Center/Panel" unique_id=1993943369]
-layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
-
-[node name="VBox" type="VBoxContainer" parent="Center/Panel/Content" unique_id=960956694]
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="TitleLabel" type="Label" parent="Center/Panel/Content/VBox" unique_id=2013279557]
+[node name="TitleLabel" type="Label" parent="RewardLayout/RewardHeader" unique_id=1457631320]
 layout_mode = 2
 theme_override_font_sizes/font_size = 32
-text = "Level Complete!"
+text = "Choose a Card"
 horizontal_alignment = 1
 
-[node name="DescriptionLabel" type="Label" parent="Center/Panel/Content/VBox" unique_id=1751333020]
+[node name="DescriptionLabel" type="Label" parent="RewardLayout/RewardHeader" unique_id=588179430]
 layout_mode = 2
-text = "Victory! Choose your next step on the map."
+text = "Each ally chooses one card to add to their deck."
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="Rewards" type="VBoxContainer" parent="Center/Panel/Content/VBox" unique_id=2057378509]
+[node name="RewardStage" type="MarginContainer" parent="RewardLayout" unique_id=1238449972]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="MembersContainer" type="VBoxContainer" parent="RewardLayout/RewardStage" unique_id=2078202439]
 unique_name_in_owner = true
-visible = false
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="BottomBar" type="PanelContainer" parent="RewardLayout" unique_id=1258807495]
 layout_mode = 2
 
-[node name="Buttons" type="HBoxContainer" parent="Center/Panel/Content/VBox" unique_id=468345428]
+[node name="Buttons" type="HBoxContainer" parent="RewardLayout/BottomBar" unique_id=365553404]
 layout_mode = 2
 theme_override_constants/separation = 16
 alignment = 1
 
-[node name="ContinueButton" type="Button" parent="Center/Panel/Content/VBox/Buttons" unique_id=91995127]
+[node name="ContinueButton" type="Button" parent="RewardLayout/BottomBar/Buttons" unique_id=820613217]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-size_flags_horizontal = 3
 text = "Continue"
 
-[node name="MainMenuButton" type="Button" parent="Center/Panel/Content/VBox/Buttons" unique_id=681186541]
+[node name="MainMenuButton" type="Button" parent="RewardLayout/BottomBar/Buttons" unique_id=1840475332]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-size_flags_horizontal = 3
 text = "Main Menu"
 
-[node name="ExitButton" type="Button" parent="Center/Panel/Content/VBox/Buttons" unique_id=1590786623]
+[node name="ExitButton" type="Button" parent="RewardLayout/BottomBar/Buttons" unique_id=1399332529]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 text = "Exit"
+
+[connection signal="pressed" from="RewardLayout/BottomBar/Buttons/ContinueButton" to="." method="_on_continue_button_pressed"]
+[connection signal="pressed" from="RewardLayout/BottomBar/Buttons/MainMenuButton" to="." method="_on_main_menu_button_pressed"]
+[connection signal="pressed" from="RewardLayout/BottomBar/Buttons/ExitButton" to="." method="_on_exit_button_pressed"]

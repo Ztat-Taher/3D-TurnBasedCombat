@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1")
-value = 10
+value = 100
 stack_count = 0
 crit_multiplier = 1.5

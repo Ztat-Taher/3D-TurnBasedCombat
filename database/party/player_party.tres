@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PartyData" load_steps=5 format=3 uid="uid://player_party_template"]
+
+[ext_resource type="Script" path="res://scripts/game_state/party/party_data.gd" id="1_party"]
+[ext_resource type="Script" path="res://scripts/game_state/party/ally_party_member.gd" id="2_ally"]
+[ext_resource type="Resource" path="res://scripts/systems/battle/battlers/stats/PlayerData.tres" id="3_stats"]
+
+[sub_resource type="Resource" id="1_ally_1"]
+script = ExtResource("2_ally")
+stats = ExtResource("3_stats")
+id = "ally_1"
+display_name = "Player"
+ally_scene_path = "res://scenes/battle/core/allies/models/y_bot-ally.tscn"
+deck_path = "res://database/decks/player_deck.tres"
+portrait_path = "res://Placeholder.svg"
+level = 1
+exp_total = 0
+max_health = 0
+current_health = -1
+
+[resource]
+script = ExtResource("1_party")
+allies = Array[ExtResource("2_ally")]([SubResource("1_ally_1")])

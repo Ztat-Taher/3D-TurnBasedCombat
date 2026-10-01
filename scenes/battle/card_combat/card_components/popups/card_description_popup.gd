@@ -156,6 +156,14 @@ func hide_popup() -> void:
 
 func set_hovering(hovering: bool) -> void:
 	is_hovering_card = hovering
+	if not hovering:
+		current_hover_time = 0.0
+		for popup in active_status_popups:
+			if is_instance_valid(popup):
+				popup.visible = false
+				popup.modulate.a = 0.0
+		modulate.a = 0.0
+		visible = false
 
 func _exit_tree():
 	# Clean up status popups when popup is destroyed
