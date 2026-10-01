@@ -44,6 +44,7 @@ var _current_health_internal: int
 var _old_health: int = 0  # Track previous health for healing detection
 var _cached_effect_center: Vector3 = Vector3.ZERO  # Cached effect center position
 var _effect_center_cached: bool = false  # Whether the cache is valid
+var _is_initialized: bool = false  # Prevent healing effect during initialization
 
 var current_health: int:
 	get:
@@ -54,8 +55,8 @@ var current_health: int:
 			_current_health_internal = value
 			health_changed.emit(_current_health_internal, max_health)
 			
-			# Play healing effect if health increased
-			if value > old_value:
+			# Play healing effect if health increased (but not during initialization)
+			if value > old_value and _is_initialized:
 				_play_healing_effect()
 var is_defending: bool = false
 var current_target = null
@@ -287,11 +288,13 @@ func _ready():
 		attack = enemy_stats.attack
 		defense = enemy_stats.defense
 		agility = enemy_stats.agility
+		_is_initialized = true
 	elif stats:
 		# Basic stats for ally
 		character_name = stats.character_name
 		# Apply level-focused progression (calculates stats based on level)
 		apply_level_progression()
+		_is_initialized = true
 	else:
 		push_error("Neither BattlerStats nor EnemyStats resource set for %s!" % name)
 	
@@ -1341,11 +1344,18 @@ func _play_healing_effect() -> void:
 		if anim_player:
 			anim_player.play("open")
 	
-	# Auto-cleanup after effect finishes
-	get_tree().create_timer(1.2).timeout.connect(func():
-		if is_instance_valid(healing_instance):
-			remove_aura_effect(healing_instance)
-	)
+	# Auto-cleanup after effect finishes using the finished signal
+	if healing_instance.has_signal("finished"):
+		healing_instance.finished.connect(func():
+			if is_instance_valid(healing_instance):
+				remove_aura_effect(healing_instance)
+		)
+	else:
+			# Fallback timer if no finished signal
+			get_tree().create_timer(1.2).timeout.connect(func():
+				if is_instance_valid(healing_instance):
+					remove_aura_effect(healing_instance)
+			)
 
 func process_states() -> void:
 	var states_to_remove = []
@@ -1490,6 +1500,7 @@ func apply_level_progression() -> void:
 	# Set current health to max if first time initialization
 	if current_health == 0:
 		current_health = max_health
+		_is_initialized = true
 	
 	# Set current AP to max if first time initialization
 	if current_ap == 0 or current_ap > max_ap:

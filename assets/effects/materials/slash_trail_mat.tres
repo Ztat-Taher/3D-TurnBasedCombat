@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://d28phoi8n0e6o"]
+
+[ext_resource type="Shader" uid="uid://dsjux5m7b2q8x" path="res://assets/effects/slash/slash_trail.gdshader" id="1_slash"]
+[ext_resource type="Texture2D" uid="uid://cus4exauc82y6" path="res://assets/effects/textures/T_Random_45.png" id="2_8kdhl"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_slash")
+shader_parameter/base_color = Color(1, 1, 1, 1)
+shader_parameter/edge_color = Color(0.8, 0.9, 1, 1)
+shader_parameter/emission_energy = 3.0000001425
+shader_parameter/noise_texture = ExtResource("2_8kdhl")
+shader_parameter/pan_speed = Vector2(0, 0)
+shader_parameter/distortion_strength = 0.15
+shader_parameter/trail_length_fade_power = 1.00000004424012
+shader_parameter/edge_fade_power = 2.5

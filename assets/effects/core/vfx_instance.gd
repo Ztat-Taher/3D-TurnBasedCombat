@@ -143,6 +143,8 @@ func _stop_particles() -> void:
 
 func _collect_particles(node: Node, result: Array[GPUParticles3D]) -> void:
 	for c in node.get_children():
+		if c.name.begins_with("Impact"):
+			continue
 		if c is GPUParticles3D:
 			result.append(c)
 		_collect_particles(c, result)

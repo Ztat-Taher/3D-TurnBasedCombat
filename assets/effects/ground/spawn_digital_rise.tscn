@@ -126,6 +126,8 @@ size = Vector3(0.06, 0.16, 0.025)
 
 [node name="SpawnDigitalRise" type="Node3D" unique_id=945310400]
 script = ExtResource("1_scr")
+autoplay = true
+one_shot = true
 
 [node name="Squares" type="GPUParticles3D" parent="." unique_id=2147022500]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)

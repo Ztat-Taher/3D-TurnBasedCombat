@@ -698,10 +698,18 @@ func _play_spawn_effect(battler: Battler) -> void:
 	get_tree().current_scene.add_child(spawn_instance)
 	spawn_instance.global_position = battler.global_position
 	
-	# Auto-cleanup after effect finishes
-	await get_tree().create_timer(2.0).timeout
-	if is_instance_valid(spawn_instance):
-		spawn_instance.queue_free()
+	# The VFXInstance has autoplay and one_shot enabled, so it handles its own timing
+	# Wait for the effect to finish, then cleanup
+	if spawn_instance.has_signal("finished"):
+		spawn_instance.finished.connect(func():
+			if is_instance_valid(spawn_instance):
+				spawn_instance.queue_free()
+		)
+	else:
+			# Fallback timer if no finished signal
+			await get_tree().create_timer(2.0).timeout
+			if is_instance_valid(spawn_instance):
+				spawn_instance.queue_free()
 
 ## Play healing effect for a battler
 func _play_healing_effect(battler: Battler) -> void:
@@ -717,16 +725,28 @@ func _play_healing_effect(battler: Battler) -> void:
 		if anim_player:
 			anim_player.play("open")
 	
-	# Auto-cleanup after effect finishes
-	await get_tree().create_timer(1.0).timeout
-	if is_instance_valid(healing_instance):
-		if healing_instance.has_node("AnimationPlayer"):
-			var anim_player = healing_instance.get_node("AnimationPlayer")
-			if anim_player:
-				anim_player.play("close")
-		await get_tree().create_timer(0.2).timeout
+	# Auto-cleanup after effect finishes using the finished signal
+	if healing_instance.has_signal("finished"):
+		healing_instance.finished.connect(func():
+			if is_instance_valid(healing_instance):
+				if healing_instance.has_node("AnimationPlayer"):
+					var anim_player = healing_instance.get_node("AnimationPlayer")
+					if anim_player:
+						anim_player.play("close")
+						await anim_player.animation_finished
+				healing_instance.queue_free()
+		)
+	else:
+			# Fallback timer if no finished signal
+		await get_tree().create_timer(1.0).timeout
 		if is_instance_valid(healing_instance):
-			healing_instance.queue_free()
+			if healing_instance.has_node("AnimationPlayer"):
+				var anim_player = healing_instance.get_node("AnimationPlayer")
+				if anim_player:
+					anim_player.play("close")
+			await get_tree().create_timer(0.2).timeout
+			if is_instance_valid(healing_instance):
+				healing_instance.queue_free()
 
 ## Populates [member valid_targets] based on the queued item's target type and highlights the default.
 ## For multi-target items, skips manual selection and targets all valid targets immediately.
