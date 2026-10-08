@@ -1,4 +1,4 @@
-[gd_resource type="VisualShader" format=3 uid="uid://cw6xsw81hgvvg"]
+[gd_resource type="VisualShader" format=3 uid="uid://61f04p6gk060"]
 
 [sub_resource type="VisualShaderNodeTexture2DParameter" id="VisualShaderNodeTexture2DParameter_db0yx"]
 parameter_name = "Main_Texture"

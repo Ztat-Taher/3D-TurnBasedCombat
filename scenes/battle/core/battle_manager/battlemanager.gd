@@ -18,8 +18,6 @@ enum BattleEndCondition { WIN, CUTSCENE, DEFEAT, ESCAPE }
 
 ## Emitted once the battle reaches an end condition (WIN, DEFEAT, ESCAPE, CUTSCENE).
 ## Level wrappers connect to this to continue the run flow (next battle / run over / replay).
-## If nothing is connected (e.g. playing a battle scene standalone),
-## WIN and ESCAPE fall back to loading [member game_map].
 signal battle_ended(end_condition: BattleEndCondition)
 
 ## Set once a battle is finished so out-of-band kills (e.g. parry counters)
@@ -53,10 +51,6 @@ var current_target_type: String = "enemy"  # "enemy" or "ally"
 @onready var battle_settings = GlobalBattleSettings
 
 var current_battler
-# Defualt animation should check for weapon's later down the road, And adapt to using them with unique animations.
-@export var default_animation = "Locomotion-Library/idle2" # Unused, But i reccomend gettomg the stats and animation from the database.
-# Added by repo owner, Fame. To test compatibility with returning after a battle.
-@export var game_map = "res://replace/regular_map/backtogame.tscn"
 @onready var hud: BattleHud = $BattleHUD
 
 # Toggles For Battles
@@ -64,13 +58,6 @@ var current_battler
 @export var item_toggle: bool = true
 @export var run_toggle: bool = true
 @export var mouse_input_toggle: bool = true
-
-# Movement Animation System
-@export_group("Movement Animation System", "movement")
-@export var enable_movement_to_target: bool = true
-@export var movement_distance_threshold: float = 2.0
-@export var movement_speed: float = 4.0
-@export var walking_forward_animation: String = "run"
 
 # Battle Speed Control
 @export_group("Battle Speed Control", "speed")
@@ -83,7 +70,6 @@ var is_speed_active: bool = false
 # Turn Safety & Timeout
 @export_group("Turn Safety", "turn")
 @export var turn_timeout_seconds: float = 10.0  ## Max time a turn can take before force-advancing. Prevents soft locks.
-@export var movement_timeout_seconds: float = 5.0  ## Max time a battler can be stuck advancing before auto-return.
 var current_turn_timeout_timer: float = 0.0
 
 # Formation positioning with proper spacing
@@ -212,10 +198,6 @@ func spawn_troop(troop: Troops, parent_node: Node3D = self) -> void:
 		enemies.append(enemy)
 		turn_order.append(enemy)
 		
-		# Connect damage signal
-		if not enemy.anim_damage.is_connected(_on_anim_damage):
-			enemy.anim_damage.connect(_on_anim_damage)
-		
 		# Set battle idle state
 		enemy.battle_idle()
 		hud.on_start_combat(enemy)
@@ -274,10 +256,6 @@ func spawn_reinforcements(troop: Troops, parent_node: Node3D = self) -> void:
 		# Apply troop-wide damage reduction if applicable
 		if troop.damage_reduction != 1.0:
 			enemy.damage_multiplier = troop.damage_reduction
-		
-		# Connect damage signal
-		if not enemy.anim_damage.is_connected(_on_anim_damage):
-			enemy.anim_damage.connect(_on_anim_damage)
 		
 		# Set battle idle state
 		enemy.battle_idle()
@@ -405,8 +383,6 @@ func _input(event: InputEvent) -> void:
 			exit_targeting_mode()
 		elif queued_item:
 			_use_action_on_target()
-		else:
-			printerr("MANAGER: No item or card queued!")
 
 func initialize_battle():
 	# Get all nodes and convert to Battler arrays
@@ -439,8 +415,6 @@ func initialize_battle():
 	for player in players:
 		hud.on_add_character(player)
 		player.battle_idle()
-		if not player.anim_damage.is_connected(_on_anim_damage):
-			player.anim_damage.connect(_on_anim_damage)
 		
 		# Play spawn effect for allies
 		_play_spawn_effect(player)
@@ -451,8 +425,6 @@ func initialize_battle():
 	for enemy in enemies:
 		hud.on_start_combat(enemy)
 		enemy.battle_idle()
-		if not enemy.anim_damage.is_connected(_on_anim_damage):
-			enemy.anim_damage.connect(_on_anim_damage)
 	
 	# Initialize card integration now that battle is set up
 	initialize_cards_for_players()
@@ -494,8 +466,6 @@ func initialize_battle():
 		for enemy in enemies:
 			hud.on_start_combat(enemy)
 			enemy.battle_idle()
-			if not enemy.anim_damage.is_connected(_on_anim_damage):
-				enemy.anim_damage.connect(_on_anim_damage)
 	
 	start_next_turn()
 
@@ -593,7 +563,6 @@ func start_next_turn():
 		await get_tree().create_timer(1.5 / speed_multiplier).timeout
 
 	# Reset turn-based flags
-	current_turn_timeout_timer = 0.0
 	is_turn_transitioning = false
 
 	# A reactive counter can defeat the acting enemy before its original attack
@@ -623,9 +592,7 @@ func start_next_turn():
 	if current_character.active_states.has("Chilled"):
 		var chilled_state = current_character.active_states["Chilled"] as ChilledState
 		if chilled_state and chilled_state.skip_turn:
-			# Skip this battler's turn - shown in the battle log instead of the console
-			if hud and hud.battle_text_display:
-				hud.battle_text_display.show_text("%s is Chilled and skips their turn!" % current_character.character_name)
+			# Skip this battler's turn
 			end_turn()
 			return
 	
@@ -1122,11 +1089,6 @@ func _use_action_on_target() -> void:
 	SignalBus.allow_select_target.emit(false)
 	end_turn()
 
-func _on_anim_damage():
-	# This function will be replaced by the card combat system
-	# For now, keeping it for compatibility with existing animations
-	pass
-
 func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConfig = null) -> void:
 	# Safety check - if damage is 0, don't process
 	if damage <= 0:
@@ -1143,9 +1105,6 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 	# Roll for hit
 	var roll = randf_range(0.0, 100.0)
 	if roll > hit_chance:
-		# Display miss text
-		if hud and hud.battle_text_display:
-			hud.battle_text_display.show_miss(attacker, target, null)
 		return  # Miss - no damage applied
 	
 	damage = Formulas.physical_damage(attacker, target, damage)
@@ -1198,8 +1157,6 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 					var bleed_proc_damage = bleed_state.trigger_bleed_proc(target.max_health)
 					# Apply bleed proc damage immediately
 					await target.take_damage(bleed_proc_damage, null)
-					if hud and hud.battle_text_display:
-						hud.battle_text_display.show_text("%s bleeds for %d damage!" % [target.character_name, bleed_proc_damage])
 		
 		# Track damage for Taunt state
 		if target.active_states.has("Taunt"):
@@ -1232,18 +1189,10 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 		await target.take_damage(damage, attacker)
 		hud.update_health_bars()
 		update_hud()
-		
-		# Display damage text with BattleAflictions
-		if hud and hud.battle_text_display:
-			hud.battle_text_display.show_damage(attacker, target, null, damage, false, false)
 
 func heal_calculation(user, target, amount):
 	var healing = target.take_healing(amount)
 	hud.update_health_bars()
-	
-	# Display healing text with BattleAflictions
-	if hud and hud.battle_text_display:
-		hud.battle_text_display.show_healing(user, target, null, healing)
 
 func enemy_turn(character:Battler) -> void:
 	# SET THESE BEFORE AI CHOOSES ACTION
@@ -1284,6 +1233,8 @@ func end_turn():
 	if is_turn_transitioning:
 		return
 	is_turn_transitioning = true
+	battler_attacking = false  # RC-D: always clear — ai_manager sets this but never resets it
+
 	
 	if skip_turn:
 		skip_turn = false
@@ -1347,16 +1298,6 @@ func force_turn_advance() -> void:
 	battler_attacking = false
 	end_turn()
 
-## Start the turn timeout timer to prevent soft locks
-func _start_turn_timeout() -> void:
-	current_turn_timeout_timer = turn_timeout_seconds
-	
-	await get_tree().create_timer(turn_timeout_seconds / speed_multiplier).timeout
-	
-	# Check if turn has exceeded timeout
-	if current_character:
-		force_turn_advance()
-
 func player_turn(character):
 	count_allies()
 	hud.set_activebattler(character)
@@ -1405,9 +1346,6 @@ func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
 			# Show battle results for escape
 			show_battle_results()
 			
-			for player in players:
-				player.gain_experience(100)
-			
 			# Remove defeated enemies with tween (scale instead of modulate)
 			for enemy in enemies:
 				var tween = create_tween()
@@ -1426,10 +1364,6 @@ func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
 			# Show battle results screen
 			show_battle_results()
 			
-			# Award experience to players
-			for player in players:
-				player.gain_experience(100)
-			
 			# Remove defeated enemies with tween (scale instead of modulate)
 			for enemy in enemies:
 				var tween = create_tween()
@@ -1447,19 +1381,12 @@ func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
 			await _play_defeat_sequence()
 
 ## Shared exit point for every end condition. Emits [signal battle_ended] so a
-## level wrapper can continue the run (next battle / run over / replay). When
-## nothing is connected (e.g. playing a battle scene standalone), falls back to
-## the old behavior of loading [member game_map] after a WIN or ESCAPE.
+## level wrapper can continue the run (next battle / run over / replay).
 func _finish_battle(state: BattleEndCondition) -> void:
 	if not is_node_alive(): return
 	if battle_ended.get_connections().size() > 0:
 		battle_ended.emit(state)
 		return
-	match state:
-		BattleEndCondition.WIN, BattleEndCondition.ESCAPE:
-			get_tree().change_scene_to_file(game_map)
-		_:
-			pass
 
 ## Brief defeat moment: play the defeat sound, then hand control to the level flow.
 func _play_defeat_sequence() -> void:

@@ -1,7 +1,7 @@
 class_name StatusIconsContainer
 extends HBoxContainer
 ## Reusable container for displaying status effect icons with hover tooltips
-## Used by EnemyOverheadBar, PartyStatusCard, and other UI elements
+## Used by EnemyHealthBar, PartyStatusCard, and other UI elements
 ## Shows all active status effects when hovering over the container
 
 var status_icon_template: TextureRect = null

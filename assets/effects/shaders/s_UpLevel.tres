@@ -1,4 +1,4 @@
-[gd_resource type="VisualShader" format=3 uid="uid://cosgu7lv2c1y1"]
+[gd_resource type="VisualShader" format=3 uid="uid://cx4mgryy011np"]
 
 [sub_resource type="VisualShaderNodeFloatOp" id="VisualShaderNodeFloatOp_1bdmv"]
 operator = 2

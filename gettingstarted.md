@@ -10,6 +10,6 @@ First, let's assume you need to set up and install the repository first. You may
 Start up your game engine (Godot 4+) and manually add the project, You can possibly right-click and open the project's main folder depending on how you configured Godot. Then, Once the project is opened, The easiest way to test and use the template, Is with.
 
 ## Step 3
-Load up the file in: ```res://maps/battle_scenes/test.tscn```, After it's opened, You begin to see the project in its current working state. The following is up to you, I encourage you to take the time to submit pull requests and code reviews of what was used to make the battle system. You can as well as follows along with tasks waiting to be implemented in the project tab of the repository: [TaskBoard/ToDo](https://github.com/orgs/Cute-Fame-Studio/projects/2)
+Load up the file in: ```res://maps/battle_scenes/example_scene.tscn```, After it's opened, You begin to see the project in its current working state. The following is up to you, I encourage you to take the time to submit pull requests and code reviews of what was used to make the battle system. You can as well as follows along with tasks waiting to be implemented in the project tab of the repository: [TaskBoard/ToDo](https://github.com/orgs/Cute-Fame-Studio/projects/2)
 
 # Thank you for listening!

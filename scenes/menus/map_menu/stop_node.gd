@@ -72,6 +72,5 @@ func _on_focus_exited() -> void:
 	node_exited.emit(node_id)
 
 func _on_button_pressed() -> void:
-	print("StopNode pressed: ", node_id, " available: ", is_available, " locked: ", is_locked)
 	if is_available and not is_locked:
 		node_selected.emit(node_id, level_path)

@@ -56,7 +56,6 @@ func _ready() -> void:
 	# Clear game state if debug flag is set
 	if clear_game_state_on_load:
 		GameState.reset()
-		print("Game state cleared for debug")
 	
 	# Get references (3D world is wrapped in ViewportContainer for PSX post-processing)
 	var world_path := "ViewportContainer/WorldViewport"
@@ -66,9 +65,6 @@ func _ready() -> void:
 	_map_ui = get_node(world_path + "/MapUIViewport/MapUI")
 	_pawn = get_node(world_path + "/PlayerPawn")
 	_world_viewport = get_node(world_path)
-	
-	# Print coordinate reference points
-	_print_coordinate_reference()
 	
 	# Setup 2D UI layers inside viewport
 	_setup_2d_ui_layers()
@@ -85,28 +81,6 @@ func _ready() -> void:
 		_current_node_id = run_map.starting_node_ids[0]
 	
 	_rebuild_map()
-
-func _print_coordinate_reference() -> void:
-	print("=== MAP COORDINATE REFERENCE ===")
-	print("Map 3D dimensions: ", map_3d_width, " x ", map_3d_height)
-	print("Map 3D margin: ", map_margin_3d)
-	print()
-	
-	# Calculate the actual bounds
-	var min_x = -(map_3d_width - map_margin_3d * 2.0) / 2.0
-	var max_x = (map_3d_width - map_margin_3d * 2.0) / 2.0
-	var min_z = -(map_3d_height - map_margin_3d * 2.0) / 2.0
-	var max_z = (map_3d_height - map_margin_3d * 2.0) / 2.0
-	
-	print("World coordinate bounds:")
-	print("  Top-Left:    (", min_x, ", 0, ", min_z, ") -> Normalized: (0.0, 0.0)")
-	print("  Top-Right:   (", max_x, ", 0, ", min_z, ") -> Normalized: (1.0, 0.0)")
-	print("  Bottom-Left: (", min_x, ", 0, ", max_z, ") -> Normalized: (0.0, 1.0)")
-	print("  Bottom-Right:(", max_x, ", 0, ", max_z, ") -> Normalized: (1.0, 1.0)")
-	print("  Center:      (0, 0, 0) -> Normalized: (0.5, 0.5)")
-	print()
-	print("Move pawn to these 5 points and report back the actual world positions!")
-	print("=====================================")
 
 func _setup_2d_ui_layers() -> void:
 	# Create PathLayer for dashed lines
@@ -182,9 +156,6 @@ func _rebuild_map() -> void:
 		if current_node:
 			available = current_node.next_node_ids.duplicate()
 	
-	print("Current node: ", _current_node_id)
-	print("Available nodes: ", available)
-	
 	# Create node icons (render all nodes except starting node)
 	for node in run_map.nodes:
 		var map_node := node as RunMapNode
@@ -213,7 +184,6 @@ func _rebuild_map() -> void:
 	# Update path drawer
 	if _path_drawer:
 		_path_drawer.set_completed_nodes(completed)
-		print("Completed nodes: ", completed)
 	
 	# Position nodes in 2D UI
 	_refresh_2d_layout()
@@ -274,7 +244,6 @@ func _position_pawn_3d(node_id : String) -> void:
 		return
 	
 	var final_pos = _get_node_world_pos(map_node)
-	print("Positioning pawn at: ", final_pos)
 	_pawn.position = final_pos
 
 ## Rebuild the follower pawn group so its size matches the party roster.
@@ -426,17 +395,12 @@ func _window_to_world_coords(window_pos: Vector2) -> Vector2:
 	return window_pos * (world_size / win_size)
 
 func _trigger_button_at_position(viewport_pos: Vector2) -> void:
-	print("Trying to trigger button at viewport position: ", viewport_pos)
-	
 	# Check all stop nodes to see if the click is within their bounds
 	for node_id in _node_icons:
 		var stop_node : StopNode = _node_icons[node_id]
 		var node_rect = Rect2(stop_node.position, stop_node.size)
 		
 		if node_rect.has_point(viewport_pos):
-			print("Found button at position: ", node_id)
 			if stop_node.is_available and not stop_node.is_locked:
 				stop_node._on_button_pressed()
-			else:
-				print("Button not clickable - available: ", stop_node.is_available, " locked: ", stop_node.is_locked)
 			return

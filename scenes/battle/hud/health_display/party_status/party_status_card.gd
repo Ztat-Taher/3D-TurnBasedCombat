@@ -7,7 +7,7 @@ extends Control
 @onready var hp_damage_bar: TextureProgressBar = $BackgroundContainer/HPContainer/HPDamageBar
 @onready var hp_num_label: Label = $BackgroundContainer/HPContainer/HPBar/HPNumLabel
 @onready var ap_bar_container: HBoxContainer = $BackgroundContainer/APContainer/APBarContainer
-@onready var ap_num_label: Label = $BackgroundContainer/APContainer/APNumContainer/APNumBackground/APNumLabel
+@onready var level_num_label: Label = $BackgroundContainer/APContainer/LevelNumContainer/LevelNumBackground/LevelNumLabel
 @onready var portrait_background: TextureRect = $BackgroundContainer/PortraitBackground
 @onready var status_icons_container: StatusIconsContainer = $BackgroundContainer/StatusIconsContainer
 @onready var status_icon_template: TextureRect = $BackgroundContainer/StatusIconsContainer/StatusIconTemplate
@@ -54,6 +54,10 @@ func setup(ally: Battler) -> void:
 	
 	update_ap(current_ap, max_ap)
 	
+	# Update level display
+	var level = ally.current_level if "current_level" in ally else 1
+	update_level(level)
+	
 	# Connect to ally AP changes if signal exists
 	if ally.has_signal("ap_changed") and not ally.ap_changed.is_connected(update_ap):
 		ally.ap_changed.connect(update_ap)
@@ -65,6 +69,10 @@ func setup(ally: Battler) -> void:
 	# Connect to ally state changes if signal exists (for initial state application)
 	if ally.has_signal("state_applied") and not ally.state_applied.is_connected(_on_state_applied):
 		ally.state_applied.connect(_on_state_applied)
+	
+	# Connect to ally level up if signal exists
+	if ally.has_signal("level_up") and not ally.level_up.is_connected(_on_level_up):
+		ally.level_up.connect(_on_level_up)
 	
 	# Setup status icons container with the reusable component
 	if status_icons_container and status_icon_template:
@@ -124,9 +132,6 @@ func update_hp(current_health: int, max_health: int) -> void:
 			hp_num_label.text = "%d/%d" % [current_health, max_health]
 
 func update_ap(current_ap: int, max_ap: int) -> void:
-	if ap_num_label:
-		ap_num_label.text = str(current_ap)
-	
 	if ap_bar_container:
 		# Ensure we have the correct number of AP bar nodes
 		var current_child_count = ap_bar_container.get_child_count()
@@ -191,3 +196,10 @@ func _on_state_applied(state_name: String) -> void:
 	# Update shields when Protected state is applied
 	if state_name == "Protected":
 		update_shields()
+
+func update_level(level: int) -> void:
+	if level_num_label:
+		level_num_label.text = str(level)
+
+func _on_level_up(new_level: int) -> void:
+	update_level(new_level)

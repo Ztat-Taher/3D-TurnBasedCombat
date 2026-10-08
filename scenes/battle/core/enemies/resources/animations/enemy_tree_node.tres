@@ -16,19 +16,24 @@ animation = &"monster_01/monster_jump_attack_var001"
 animation = &"monster_02/zombie_attack_var001"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee1"]
-advance_mode = 0
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee2"]
-advance_mode = 0
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee3"]
-advance_mode = 0
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged1"]
-advance_mode = 0
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged2"]
-advance_mode = 0
+switch_mode = 2
+advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_jo775"]
 switch_mode = 2
@@ -63,7 +68,7 @@ states/ranged_cast_1/position = Vector2(300, 280)
 states/ranged_cast_2/node = SubResource("anim_ranged_cast_2")
 states/ranged_cast_2/position = Vector2(300, 360)
 transitions = ["Start", "melee_combo_1", SubResource("ca_start_to_melee1"), "Start", "melee_combo_2", SubResource("ca_start_to_melee2"), "Start", "melee_combo_3", SubResource("ca_start_to_melee3"), "Start", "ranged_cast_1", SubResource("ca_start_to_ranged1"), "Start", "ranged_cast_2", SubResource("ca_start_to_ranged2"), "melee_combo_1", "End", SubResource("AnimationNodeStateMachineTransition_jo775"), "melee_combo_2", "End", SubResource("AnimationNodeStateMachineTransition_giucu"), "melee_combo_3", "End", SubResource("AnimationNodeStateMachineTransition_hr4tk"), "ranged_cast_1", "End", SubResource("AnimationNodeStateMachineTransition_yyo5o"), "ranged_cast_2", "End", SubResource("AnimationNodeStateMachineTransition_yjvbk")]
-graph_offset = Vector2(-89, -2.8026428)
+graph_offset = Vector2(-89, 42.10706)
 
 [sub_resource type="AnimationNodeAnimation" id="anim_death"]
 animation = &"monster_01/monster_death_var001"
@@ -118,7 +123,7 @@ advance_condition = &"is_dead"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_07edp"]
 switch_mode = 2
-advance_mode = 2
+advance_mode = 0
 
 [resource]
 states/End/position = Vector2(1300, 200)

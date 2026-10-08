@@ -5,8 +5,8 @@ class_name ProgressBarJuice
 ## Adds dual-layer trailing, damage/healing feedback, critical health effects, and text juice to progress bars
 
 # References
-@export var main_bar: TextureProgressBar = null
-@export var trailing_bar: TextureProgressBar = null  # Damage bar
+@export var main_bar = null
+@export var trailing_bar = null  # Damage bar
 @export var associated_label: Label = null
 
 # Dual-layer Settings
@@ -85,10 +85,10 @@ func _auto_setup_from_parent() -> void:
 	if not parent:
 		return
 	
-	# Look for TextureProgressBar children
-	var progress_bars: Array[TextureProgressBar] = []
+	# Look for ProgressBar children (includes TextureProgressBar)
+	var progress_bars = []
 	for child in parent.get_children():
-		if child is TextureProgressBar:
+		if child is ProgressBar:
 			progress_bars.append(child)
 	
 	# If we have progress bars, set them up. Refs that were explicitly
@@ -110,7 +110,7 @@ func _auto_setup_from_parent() -> void:
 	if main_bar:
 		setup(main_bar, trailing_bar, associated_label)
 
-func setup(bar: TextureProgressBar, damage_bar: TextureProgressBar = null, label: Label = null) -> void:
+func setup(bar, damage_bar = null, label = null) -> void:
 	main_bar = bar
 	trailing_bar = damage_bar
 	associated_label = label

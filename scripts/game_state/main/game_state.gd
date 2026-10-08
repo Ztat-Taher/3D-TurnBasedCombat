@@ -220,13 +220,10 @@ static func sync_from_battlers(battlers : Array = []) -> void:
 		# damage and progression persist across map nodes.
 		member.max_health = b.max_health
 		member.current_health = maxi(b.current_health, 0)
-		if b.stats != null:
-			member.level = b.stats.level
-			if b.stats.deck != null:
-				member.deck = b.stats.deck
-		var experience := b.get_node_or_null("Experience") as Experience
-		if experience:
-			member.exp_total = experience.exp_total
+		member.level = b.current_level
+		member.exp_total = b.current_exp
+		if b.stats != null and b.stats.deck != null:
+			member.deck = b.stats.deck
 	GlobalState.save()
 
 

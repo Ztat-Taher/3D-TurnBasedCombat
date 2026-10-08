@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://c57p8obm33ioi"]
 
 [ext_resource type="Script" uid="uid://cq3o50hp8k2t0" path="res://scenes/battle/hud/action_system/action_buttons/action_buttons.gd" id="1_action_buttons_script"]
-[ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_ui_theme"]
+[ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://resources/themes/theme_test.tres" id="2_ui_theme"]
 [ext_resource type="Texture2D" uid="uid://yp7lgpib21q3" path="res://assets/images/ui/action_buttons/attack.png" id="3_attack_tex"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://scripts/juice/buttons/button_juice.gd" id="5_21sk8"]
 [ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://scenes/battle/hud/action_system/input/input_prompt.gd" id="5_input_prompt"]

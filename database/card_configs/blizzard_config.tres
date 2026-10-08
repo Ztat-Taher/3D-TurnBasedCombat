@@ -1,56 +1,25 @@
-[gd_resource type="Resource" script_class="CardConfig" format=3 load_steps=3]
+[gd_resource type="Resource" script_class="CardConfig" format=3 uid="uid://cdastwfrprjf4"]
 
-[ext_resource type="Script" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
+[ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
 [ext_resource type="Resource" path="res://database/state_configs/chilled_state_config.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
 animation_name = "ranged_cast_1"
 target_type = 2
-target_selection_mode = 0
-target_filter = ""
-requires_los = false
-primary_effect = null
-secondary_effects = []
 effect_timing = 0
-effect_conditions = []
-vfx_on_actor = null
-vfx_on_target = null
-vfx_on_projectile = null
-camera_effects = null
-screen_effects = null
-projectile_enabled = false
-projectile_scene = ""
-projectile_speed = 10.0
 projectile_lifetime = 2.0
-projectile_arc = 0.0
-projectile_spawn_point = "actor"
-cast_sound = null
-hit_sound = null
-impact_sound = null
-loop_sound = null
-voice_line = ""
-qte_type_string = "none"
 qte_difficulty = 0.0
-qte_timing_string = "before_attack"
 qte_window_duration = 0.0
 qte_success_multiplier = 1.0
-qte_failure_multiplier = 1.0
-qte_sequence = []
 qte_mash_count = 0
 qte_mash_window = 0.0
 base_damage = 8
 damage_scaling = {
 "attack": 0.4
 }
-damage_type = 0
-heal_amount = 0
-shield_amount = 0
-stat_modifiers = {}
 applies_states = Array[Resource]([ExtResource("2")])
-applies_self_states = []
 state_chance = 0.6
-state_duration = 1
 card_rarity = 1
 card_element = 2
 card_tags = Array[String](["status", "ice", "aoe"])

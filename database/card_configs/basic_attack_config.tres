@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("1")
+animation_name = "melee_combo_1"
 primary_effect = ExtResource("2")
 qte_type_string = "timing"
 qte_window_duration = 0.5

@@ -105,17 +105,3 @@ static func level_up(battler: Battler) -> void:
 static func get_exp_for_next_level(current_level: int, base_exp_requirement: int = 100) -> int:
 	# Each level requires more exp: level * base_exp_requirement * 1.1^(level-1)
 	return int(base_exp_requirement * current_level * pow(1.1, current_level - 1))
-
-## Check if battler has enough exp to level up
-static func check_level_up(battler: Battler) -> bool:
-	if not battler or not battler.stats or not battler.exp_node:
-		return false
-	
-	var exp_needed = get_exp_for_next_level(battler.stats.level)
-	
-	if battler.exp_node.exp_total >= exp_needed:
-		battler.exp_node.exp_total -= exp_needed
-		level_up(battler)
-		return true
-	
-	return false

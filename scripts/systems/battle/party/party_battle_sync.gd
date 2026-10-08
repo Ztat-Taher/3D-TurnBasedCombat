@@ -54,7 +54,7 @@ static func prepare_party(level_root : Node) -> void:
 		configure_ally(allies[i], roster[i])
 
 
-## Applies the HP the party carried into this node (and refreshes AP).
+## Applies the HP, XP, and level the party carried into this node (and refreshes AP).
 ## Call once the battlers exist (i.e. after the battle's _ready()).
 static func apply_saved_health(level_root : Node = null) -> void:
 	var roster := GameState.get_party()
@@ -66,10 +66,19 @@ static func apply_saved_health(level_root : Node = null) -> void:
 		var member := roster[i]
 		if not is_instance_valid(battler) or member == null:
 			continue
+		
+		# Restore HP
 		var target := battler.max_health
 		if member.current_health >= 0:
 			target = clampi(member.current_health, MIN_BATTLE_HP, battler.max_health)
 		battler.current_health = target
+		
+		# Restore XP and level from party member
+		battler.current_level = member.level
+		battler.current_exp = member.exp_total
+		battler.calculate_exp_for_next_level()
+		battler.apply_level_progression()
+		
 		battler.reset_ap()
 
 

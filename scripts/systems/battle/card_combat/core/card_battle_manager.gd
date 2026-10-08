@@ -234,19 +234,17 @@ func execute_card_with_config(card: CardData, target: Battler) -> void:
 	
 	# Phase 0: Movement Phase (for non-AOE enemy targeting)
 	var movement_time := 0.0
+	var should_return_to_position = false
 	if not is_aoe and card_cfg.target_type == CardConfig.TargetScope.SINGLE_ENEMY and target:
-		print("[CardBattleManager] Starting movement to target: %s" % target.character_name)
 		# Store original position before movement so we can return later
 		var original_pos_before_move = current_player_battler.global_position
+		should_return_to_position = true  # Store decision before target might die
 		if current_player_battler.advance_to_target(target):
 			current_player_battler._try_animation("walk")
 			var movement_start = Time.get_ticks_msec() / 1000.0
 			while current_player_battler.is_advancing:
 				await get_tree().create_timer(0.016).timeout
 			movement_time = (Time.get_ticks_msec() / 1000.0) - movement_start
-			print("[CardBattleManager] Movement took %.3fs" % movement_time)
-		else:
-			print("[CardBattleManager] advance_to_target returned false (already at target?)")
 	
 	# Phase 0.5: Check if multi-strike or single-strike
 	if card_cfg.is_multi_strike:
@@ -271,13 +269,19 @@ func execute_card_with_config(card: CardData, target: Battler) -> void:
 	# damage_applied_at_hit; multi-strike cards set skip_primary_effect. Either way the
 	# primary damage is never applied twice here. Secondary effects / states still resolve.
 	await execute_effect_phase(card_cfg, context)
+
+	# Stop if target died during effect phase
+	var effect_target = context.get("target")
+	if effect_target and effect_target.has_method("is_defeated") and effect_target.is_defeated():
+		return
 	
 	# Phase 5: VFX Phase
 	if card_cfg.vfx_on_actor or card_cfg.vfx_on_target or card_cfg.vfx_on_projectile:
 		execute_vfx_phase(card_cfg, context)
 	
 	# Phase 6: Return Movement (for non-AOE enemy targeting)
-	if not is_aoe and card_cfg.target_type == CardConfig.TargetScope.SINGLE_ENEMY and target:
+	# Use stored decision instead of checking target (target may have died)
+	if should_return_to_position:
 		if current_player_battler.has_method("return_to_original_position"):
 			current_player_battler.return_to_original_position()
 			while current_player_battler.is_advancing:
@@ -312,40 +316,39 @@ func execute_animation_phase_with_hit_timing(card_cfg: CardConfig, context: Dict
 		if actor.has_method("get_resolved_animation"):
 			animation_name = actor.get_resolved_animation(animation_name)
 		
-		print("Playing animation with hit timing: ", animation_name, " for actor: ", actor.character_name)
-		
 		# Start the animation
 		if actor.has_method("_try_animation"):
-			var success = actor._try_animation(animation_name)
-			print("Animation success: ", success)
+			actor._try_animation(animation_name)
 		
 		# Wait for hit moment signal to apply damage
 		if actor.has_signal("hit_moment"):
 			var hit_time = Time.get_ticks_msec() / 1000.0
 			await actor.hit_moment
 			var time_until_hit = (Time.get_ticks_msec() / 1000.0) - hit_time
-			print("[CardBattleManager] HIT MOMENT RECEIVED - Time until hit: %.3fs" % time_until_hit)
-			
+
 			# Calculate QTE duration if QTE was started early
 			if card_cfg.should_trigger_qte() and qte_start_time > 0:
 				var qte_duration = (Time.get_ticks_msec() / 1000.0) - qte_start_time
-				print("[CardBattleManager] QTE DURATION: %.3fs (configured: %.3fs)" % [qte_duration, card_cfg.qte_window_duration])
-			
+
 			# Capture QTE result at hit moment
 			if card_cfg.should_trigger_qte() and qte_manager:
 				var qte_result = qte_manager.last_qte_result
 				context["qte_success"] = qte_result
 				context["qte_success_set"] = true
-				print("[CardBattleManager] QTE result at hit moment: %s" % qte_result)
-			
+
 			await execute_effect_phase(card_cfg, context, true)
 			context["damage_applied_at_hit"] = true
-		
+
+			# Stop animation if target died
+			var hit_target = context.get("target")
+			if hit_target and hit_target.has_method("is_defeated") and hit_target.is_defeated():
+				return
+
 		# Wait for remaining animation duration
 		var anim_duration: float = 0.0
 		if actor.has_method("_get_animation_duration"):
 			anim_duration = actor._get_animation_duration(animation_name)
-		
+
 		if anim_duration > 0.0:
 			await get_tree().create_timer(anim_duration).timeout
 
@@ -359,8 +362,6 @@ func _run_qte_async(card_cfg: CardConfig, context: Dictionary, delay: float = 0.
 	# Wait for delay before starting QTE
 	if delay > 0:
 		await get_tree().create_timer(delay).timeout
-	
-	print("[CardBattleManager] Starting QTE for card: %s" % context["card_data"].name)
 	
 	# Use the configured QTE type from CardConfig
 	match card_cfg.qte_type:
@@ -383,7 +384,6 @@ func _execute_timing_qte_async(card_cfg: CardConfig, context: Dictionary) -> voi
 	
 	# Check if QTE is actually enabled for this card
 	if card_cfg.qte_type == CardConfig.QTEType.NONE:
-		print("[CardBattleManager] QTE disabled for card: %s" % context["card_data"].name)
 		return
 	
 	var _difficulty = card_cfg.qte_difficulty
@@ -397,7 +397,6 @@ func _execute_timing_qte_async(card_cfg: CardConfig, context: Dictionary) -> voi
 	var qte_result = qte_manager.last_qte_result
 	context["qte_success"] = qte_result
 	context["qte_success_set"] = true
-	print("[CardBattleManager] QTE completed with result: %s" % qte_result)
 
 ## Execute button mash QTE (synchronous - waits for completion)
 func _execute_button_mash_qte_async(card_cfg: CardConfig, context: Dictionary) -> void:
@@ -505,7 +504,6 @@ func execute_effect_phase(card_cfg: CardConfig, context: Dictionary, from_animat
 	
 	# Skip if damage was already applied at hit moment
 	if context.get("damage_applied_at_hit", false):
-		print("[CardBattleManager] Damage already applied at hit moment, skipping effect phase")
 		return
 	
 	# Check all conditions before executing effects
@@ -610,13 +608,9 @@ func execute_single_strike_sequence(card_cfg: CardConfig, context: Dictionary) -
 		# If QTE window is longer than hit moment time, we need to delay animation start
 		if qte_window > hit_moment_time:
 			anim_delay = qte_window - hit_moment_time
-			print("[CardBattleManager] QTE Timing - QTE window: %.3fs, Hit moment: %.3fs, Animation delay: %.3fs" % [qte_window, hit_moment_time, anim_delay])
-		else:
-			print("[CardBattleManager] QTE Timing - QTE window: %.3fs, Hit moment: %.3fs, No delay needed" % [qte_window, hit_moment_time])
 		
 		# Start QTE immediately
 		qte_start_time = Time.get_ticks_msec() / 1000.0
-		print("[CardBattleManager] QTE STARTED early - Card: %s, Window: %.3fs" % [context["card_data"].name, qte_window])
 		
 		var qte_mgr = context["qte_manager"]
 		if qte_mgr:
@@ -625,7 +619,6 @@ func execute_single_strike_sequence(card_cfg: CardConfig, context: Dictionary) -
 		# Delay animation start if needed
 		if anim_delay > 0:
 			await get_tree().create_timer(anim_delay).timeout
-			print("[CardBattleManager] Animation delayed by %.3fs to sync with QTE" % anim_delay)
 	
 	# Phase 1: Animation Phase with hit timing
 	await execute_animation_phase_with_hit_timing(card_cfg, context, qte_start_time)
@@ -634,36 +627,40 @@ func execute_single_strike_sequence(card_cfg: CardConfig, context: Dictionary) -
 func execute_multi_strike_sequence(card_cfg: CardConfig, context: Dictionary) -> void:
 	var actor = context["actor"]
 	var strike_count = card_cfg.strike_animations.size()
-	
+
 	if strike_count == 0:
 		push_error("Multi-strike enabled but strike_animations is empty")
 		return
-	
-	print("[CardBattleManager] Starting multi-strike sequence with %d strikes" % strike_count)
-	
+
 	var total_qte_success = true
 	var cumulative_qte_multiplier = 1.0
-	
+
 	var sequence_start := Time.get_ticks_msec() / 1000.0
+
+	# Prevent combat_to_idle AUTO transition during multi-strike to avoid idle insertion
+	if actor and actor.has_method("set_animation_condition"):
+		print("[CardBattleManager] Setting allow_combat_to_idle = false before multi-strike")
+		actor.set_animation_condition("allow_combat_to_idle", false)
 	
 	for strike_index in range(strike_count):
 		# Abort the combo if the target was destroyed mid-sequence (defeated, faded
 		# out and freed by an earlier strike).
 		if not is_instance_valid(context.get("target")):
-			print("[CardBattleManager] Multi-strike aborted before strike %d - target no longer valid" % (strike_index + 1))
 			break
 		
 		var animation_name = card_cfg.strike_animations[strike_index]
 		var damage_multiplier = card_cfg.strike_multipliers[strike_index] if strike_index < card_cfg.strike_multipliers.size() else 1.0
-		var strike_delay = card_cfg.strike_delays[strike_index] if strike_index < card_cfg.strike_delays.size() else 0.0
 		var qte_difficulty = card_cfg.strike_qte_difficulties[strike_index] if strike_index < card_cfg.strike_qte_difficulties.size() else 0.5
 		var qte_window = card_cfg.strike_qte_windows[strike_index] if strike_index < card_cfg.strike_qte_windows.size() else 0.4
 		var has_next_strike = strike_index < strike_count - 1
-		var chain_lead = get_strike_chain_lead(card_cfg, strike_index) if has_next_strike else 0.0
 		
-		print("[CardBattleManager] Executing strike %d/%d: %s" % [strike_index + 1, strike_count, animation_name])
+		# Read unified timing and split it into delay (positive gap before this strike) 
+		# and chain_lead (negative overlap before the next strike).
+		var strike_timing = get_strike_timing(card_cfg, strike_index)
+		var strike_delay = maxf(0.0, strike_timing)
+		var chain_lead = maxf(0.0, -strike_timing) if has_next_strike else 0.0
 		
-		# Apply strike delay if configured
+		# Apply strike delay if configured (only applies to gaps, not overlaps)
 		if strike_delay > 0:
 			await get_tree().create_timer(strike_delay).timeout
 		
@@ -694,23 +691,26 @@ func execute_multi_strike_sequence(card_cfg: CardConfig, context: Dictionary) ->
 	# card's primary effect so it cannot land a phantom final hit. Secondary effects
 	# and states are still applied by execute_effect_phase().
 	context["skip_primary_effect"] = true
-	
+
 	# Store cumulative results in main context
 	context["qte_success"] = total_qte_success
 	context["qte_success_set"] = true
 	context["qte_multiplier"] = cumulative_qte_multiplier
-	print("[CardBattleManager] Multi-strike complete - Total QTE success: %s, Cumulative multiplier: %.2f" % [total_qte_success, cumulative_qte_multiplier])
-	print("[CardBattleManager] Multi-strike sequence total time: %.3fs" % ((Time.get_ticks_msec() / 1000.0) - sequence_start))
 
-## Chain lead (seconds trimmed from a strike's clip so the next strike starts early).
-## Per-strike values come from CardConfig.strike_chain_leads; the global default is
-## CardBattleConfig.multi_strike_chain_lead. 0.0 = wait for the full clip.
-func get_strike_chain_lead(card_cfg: CardConfig, strike_index: int) -> float:
-	if strike_index >= 0 and strike_index < card_cfg.strike_chain_leads.size():
-		return max(0.0, card_cfg.strike_chain_leads[strike_index])
-	if card_battle_config:
-		return max(0.0, card_battle_config.multi_strike_chain_lead)
-	return 0.0
+	# Re-enable combat_to_idle AUTO transition after multi-strike completes
+	if actor and actor.has_method("set_animation_condition"):
+		print("[CardBattleManager] Setting allow_combat_to_idle = true after multi-strike")
+		actor.set_animation_condition("allow_combat_to_idle", true)
+
+## Unified per-strike timing offset (seconds).
+## Per-strike values come from CardConfig.strike_timing; the global default is
+## CardBattleConfig.default_strike_timing.
+func get_strike_timing(card_cfg: CardConfig, strike_index: int) -> float:
+	if strike_index >= 0 and strike_index < card_cfg.strike_timing.size():
+		return card_cfg.strike_timing[strike_index]
+	if card_battle_config and "default_strike_timing" in card_battle_config:
+		return card_battle_config.default_strike_timing
+	return -0.2 # Safe fallback if not found
 
 ## Execute a single strike using inline configuration
 func execute_single_strike_inline(context: Dictionary) -> void:
@@ -736,13 +736,9 @@ func execute_single_strike_inline(context: Dictionary) -> void:
 		
 		if qte_window > hit_moment_time:
 			anim_delay = qte_window - hit_moment_time
-			print("[CardBattleManager] Strike %d QTE Timing - Window: %.3fs, Hit moment: %.3fs, Delay: %.3fs" % [context["strike_index"], qte_window, hit_moment_time, anim_delay])
-		else:
-			print("[CardBattleManager] Strike %d QTE Timing - Window: %.3fs, Hit moment: %.3fs, No delay needed" % [context["strike_index"], qte_window, hit_moment_time])
 		
 		# Start QTE immediately
 		qte_start_time = Time.get_ticks_msec() / 1000.0
-		print("[CardBattleManager] Strike %d QTE STARTED - Window: %.3fs" % [context["strike_index"], qte_window])
 		
 		var qte_mgr = context["qte_manager"]
 		if qte_mgr:
@@ -753,7 +749,6 @@ func execute_single_strike_inline(context: Dictionary) -> void:
 			await get_tree().create_timer(anim_delay).timeout
 	
 	# Play animation with hit timing
-	print("[CardBattleManager] Strike %d animation: %s" % [context["strike_index"], animation_name])
 	var animation_start_time := Time.get_ticks_msec() / 1000.0
 	if actor.has_method("_try_animation"):
 		actor._try_animation(animation_name)
@@ -763,42 +758,39 @@ func execute_single_strike_inline(context: Dictionary) -> void:
 		var hit_time = Time.get_ticks_msec() / 1000.0
 		await actor.hit_moment
 		var time_until_hit = (Time.get_ticks_msec() / 1000.0) - hit_time
-		print("[CardBattleManager] Strike %d HIT MOMENT RECEIVED - Time until hit: %.3fs" % [context["strike_index"], time_until_hit])
 		
 		# Calculate QTE duration if QTE was started
 		if qte_window > 0 and qte_start_time > 0:
 			var qte_duration = (Time.get_ticks_msec() / 1000.0) - qte_start_time
-			print("[CardBattleManager] Strike %d QTE DURATION: %.3fs (configured: %.3fs)" % [context["strike_index"], qte_duration, qte_window])
 		
 		# Capture QTE result at hit moment
 		if qte_window > 0 and qte_manager:
 			var qte_result = qte_manager.last_qte_result
 			context["qte_success"] = qte_result
 			context["qte_success_set"] = true
-			print("[CardBattleManager] Strike %d QTE result at hit moment: %s" % [context["strike_index"], qte_result])
 		
 		# Apply damage for this strike with strike-specific multiplier
 		var strike_multiplier = 1.2 if context.get("qte_success", false) else 0.8
 		
-		# Apply damage immediately
-		await apply_strike_damage_inline(context, damage_multiplier, strike_multiplier)
+		# All strikes fire damage WITHOUT await so the target's hit-reaction plays in
+		# parallel. The clip_remainder timer below is the sole timing mechanism for all
+		# strikes — awaiting damage here (even on the last hit) blocked for the full
+		# hit-animation duration before allow_combat_to_idle could be set, causing the
+		# freeze before walk_back / idle. Defeat handling runs as a background coroutine.
+		apply_strike_damage_inline(context, damage_multiplier, strike_multiplier)
 		context["damage_applied_at_hit"] = true
 	
-	# Wait out the remainder of this strike's clip before the next strike starts.
-	# Timing is anchored to the frame the animation was triggered, so the target's
-	# hit reaction awaited above overlaps the clip tail instead of stacking on top of
-	# the combo timing. `chain_lead` shortens the wait so the next strike's travel is
-	# issued while this clip is still playing, which keeps the actor inside the
-	# combat_actions sub-machine (no drop back to idle between combo hits).
+	# Wait out the remainder of this strike's clip before the next strike (or the
+	# post-combat transition) begins. Timing is anchored to animation_start_time so
+	# the wait is always correct regardless of how long damage_calculation takes.
+	# `chain_lead` shortens the wait for mid-combo strikes so the next travel() is
+	# issued while this clip is still playing, keeping the actor inside combat_actions.
 	var clip_length = _get_strike_clip_length(actor, animation_name)
 	var clip_end_time = animation_start_time + clip_length
 	var clip_remaining = clip_end_time - (Time.get_ticks_msec() / 1000.0)
 	var wait_time = maxf(0.0, clip_remaining - chain_lead)
 	if wait_time > 0.0:
-		if chain_lead > 0.0:
-			print("[CardBattleManager] Strike %d - chaining next strike (%.3fs to clip end, %.3fs lead, waiting %.3fs)" % [context["strike_index"], clip_remaining, chain_lead, wait_time])
 		await get_tree().create_timer(wait_time).timeout
-	print("[CardBattleManager] Strike %d animation complete (clip %.3fs)" % [context["strike_index"], clip_length])
 
 ## Resolve the playback length (seconds) of a strike's animation clip.
 ## Falls back to a safe default so an unresolvable clip can never stall a combo.
@@ -818,8 +810,6 @@ func apply_strike_damage_inline(context: Dictionary, damage_multiplier: float, q
 	# Calculate damage with strike multiplier
 	var base_damage = card_cfg.base_damage
 	var strike_damage = int(base_damage * damage_multiplier * qte_multiplier)
-	
-	print("[CardBattleManager] Strike %d damage: %d (base: %d, strike mult: %.2f, QTE mult: %.2f)" % [context["strike_index"], strike_damage, base_damage, damage_multiplier, qte_multiplier])
 	
 	# Apply damage to target (guard against the target being freed mid-combo)
 	if battle_manager and is_instance_valid(target):

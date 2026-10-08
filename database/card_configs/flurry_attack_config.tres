@@ -5,13 +5,12 @@
 
 [resource]
 script = ExtResource("1")
-animation_name = ""
 is_multi_strike = true
 strike_animations = Array[String](["melee_combo_1", "melee_combo_2", "melee_combo_3"])
 strike_multipliers = Array[float]([1.0, 1.2, 1.5])
-strike_delays = Array[float]([0.0, 0.0, 0.0])
 strike_qte_difficulties = Array[float]([0.4, 0.5, 0.6])
 strike_qte_windows = Array[float]([0.4, 0.5, 0.6])
+strike_timing = Array[float]([-0.15, -0.15, 0.0])
 primary_effect = ExtResource("2")
 effect_timing = 0
 projectile_lifetime = 2.0

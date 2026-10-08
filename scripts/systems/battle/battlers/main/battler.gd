@@ -1,7 +1,6 @@
 class_name Battler
 extends CharacterBody3D
 
-signal anim_damage()
 signal hit_moment(attacker: Battler)
 signal attack_start()
 signal attack_end()
@@ -13,6 +12,8 @@ signal bleed_proc_triggered(damage: int)
 signal shield_broken()
 signal shield_changed(shield_count: int)
 signal burn_stack_changed(stack_count: int)
+signal level_up(new_level: int)
+signal exp_gained(amount: int, current_exp: int, exp_needed: int)
 enum TEAM {ALLY, ENEMY}
 
 @export_group("Stats Configuration")
@@ -40,9 +41,16 @@ var max_ap: int = 3
 var current_ap: int = 3
 var ap_regen_per_turn: int = 3
 
+# XP and Leveling System
+var current_level: int = 1
+var current_exp: int = 0
+var exp_to_next_level: int = 100
+
 var _current_health_internal: int
 var _old_health: int = 0  # Track previous health for healing detection
 var _cached_effect_center: Vector3 = Vector3.ZERO  # Cached effect center position
+var _cached_effect_top: Vector3 = Vector3.ZERO  # Cached effect top position
+var _cached_effect_bottom: Vector3 = Vector3.ZERO  # Cached effect bottom position
 var _effect_center_cached: bool = false  # Whether the cache is valid
 var _is_initialized: bool = false  # Prevent healing effect during initialization
 
@@ -67,14 +75,15 @@ var _is_despawning: bool = false
 var is_advancing: bool = false
 var advance_target_position: Vector3
 var original_position: Vector3
+var _counter_handled_return: bool = false
 
-# Per-battler movement settings (override global if set)
+# Per-battler movement settings
 @export_group("Movement Settings", "movement")
-## Distance at which this battler requires movement to target. -1.0 = use global setting
-@export var custom_movement_distance: float = -1.0
-## Speed of movement animation for this battler. -1.0 = use global setting  
-@export var custom_movement_speed: float = -1.0
-## Movement animation name for this battler. Empty = use global setting
+## Distance at which this battler requires movement to target
+@export var custom_movement_distance: float = 2.0
+## Speed of movement animation for this battler
+@export var custom_movement_speed: float = 4.0
+## Movement animation name for this battler
 @export var custom_movement_animation: String = ""
 ## Whether this battler requires movement before attacking
 @export var requires_walking: bool = true
@@ -88,13 +97,13 @@ var original_position: Vector3
 ## Maps generic animation names (from cards) to character-specific animations
 ## Example: Card uses "magic_cast", Wizard maps it to "wizard_spell_cast"
 @export var animation_mapping: AnimationMapping = null
-##
-## CUSTOM MOVEMENT SETTINGS EXPLAINED:
-## -1.0 values mean "use the global setting from BattleManager"
-## Set positive values to override global settings for this specific battler
-## Example: Set custom_movement_distance = 5.0 for a big monster that needs more space
-## Example: Set custom_movement_speed = 1.0 for a slow character
-## Example: Set custom_movement_animation = "my_movement_anim" for custom animation
+
+## Helper method to set animation tree conditions
+func set_animation_condition(condition_name: String, value: bool) -> void:
+	if anim_tree:
+		print("[Battler %s] Setting %s = %s" % [character_name, condition_name, value])
+		anim_tree.set("parameters/conditions/" + condition_name, value)
+		print("[Battler %s] After set, %s = %s" % [character_name, condition_name, anim_tree.get("parameters/conditions/" + condition_name)])
 
 
 
@@ -238,13 +247,11 @@ func _update_highlight() -> void:
 		add_overlay(OverlayType.HIGHLIGHT, shader_mat, 10, "highlight")
 
 @export_group("Special Dependencies")
-## Deprecated — kept only for backwards compatibility with older card/skill code.
-## Use AnimationMapping slots directly in new code.
-@onready var basic_attack_animation = AnimationMapping.MELEE_COMBO_1
 @onready var anim_tree: AnimationTree = $AnimationTree
 var state_machine: AnimationNodeStateMachinePlayback
-@onready var exp_node: Experience = get_node("Experience")
-@export var damage_indicator_subviewport:SubViewport = null
+@export var number_indicator: NumberIndicator3D = null
+@export var attack_indicator_scene: PackedScene = preload("res://scenes/battle/effects/attack_indicator/attack_indicator_3d.tscn")
+var attack_indicator: AttackIndicator3D = null
 
 @export_group("Counter Stun Settings", "stun")
 ## Duration (seconds) before recovering from being hit by a counter attack
@@ -270,11 +277,15 @@ func _ready():
 	SignalBus.clear_default_selection.connect(_clear_default_selection)
 	
 	state_machine = anim_tree.get("parameters/playback") as AnimationNodeStateMachinePlayback
-	
+
 	# Verify state_machine is valid
 	if not state_machine:
 		push_error("AnimationNodeStateMachinePlayback not found! Check AnimationTree setup.")
 		return
+
+	# Initialize animation conditions
+	if anim_tree:
+		anim_tree.set("parameters/conditions/allow_combat_to_idle", true)
 	
 	# Meshes are collected in _collect_meshes() at the start of _ready().
 	# Material overrides with duplicated surface materials are set there;
@@ -294,6 +305,9 @@ func _ready():
 		character_name = stats.character_name
 		# Apply level-focused progression (calculates stats based on level)
 		apply_level_progression()
+		# Initialize XP and level
+		current_level = stats.level if stats else 1
+		calculate_exp_for_next_level()
 		_is_initialized = true
 	else:
 		push_error("Neither BattlerStats nor EnemyStats resource set for %s!" % name)
@@ -303,6 +317,9 @@ func _ready():
 		add_to_group("enemies")
 	elif team == TEAM.ALLY:
 		add_to_group("players")
+	
+	# Initialize attack indicator for enemies
+	_initialize_attack_indicator()
 
 ## Animation callback methods called by AnimationPlayer method tracks
 ## These are the new reference point system replacing timer-based hit frames
@@ -310,18 +327,14 @@ func _ready():
 func _on_attack_start():
 	"""Called by AnimationPlayer method track at animation start frame"""
 	attack_start.emit()
-	print("[Battler] Attack start callback: %s" % character_name)
 
 func _on_attack_hit():
 	"""Called by AnimationPlayer method track at hit moment frame"""
 	hit_moment.emit(self)
-	anim_damage.emit()
-	print("[Battler] Attack hit callback: %s" % character_name)
 
 func _on_attack_end():
 	"""Called by AnimationPlayer method track at animation end frame"""
 	attack_end.emit()
-	print("[Battler] Attack end callback: %s" % character_name)
 
 func _input_event(_camera: Camera3D, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -428,7 +441,6 @@ func get_attack_damage(target) -> int:
 	var damage = attack + randi() % 5
 	return Formulas.physical_damage(self, target, damage)
 
-@onready var floating_damage_num:PackedScene = preload("res://scenes/battle/effects/damage/damage_number.tscn")
 func take_damage(amount: int, attacker: Battler = null) -> void:
 	# Check for Protected state (shield) - ignores hit entirely
 	if active_states.has("Protected"):
@@ -436,11 +448,9 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 		if protected_state and protected_state.has_shield():
 			# Consume one shield hit
 			protected_state.consume_shield()
-			# Show shield break visual (0 damage)
-			var shield_num: DamageNumber = floating_damage_num.instantiate()
-			shield_num.value = 0
-			if damage_indicator_subviewport:
-				damage_indicator_subviewport.add_child(shield_num)
+			# Show shield break visual
+			if number_indicator:
+				number_indicator.show_shield_break()
 			# Emit signal for UI update
 			shield_changed.emit(protected_state.get_remaining_shields())
 			# Remove state if no shields left
@@ -456,18 +466,20 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 	
 	# Check for weakness state BEFORE applying damage
 	var weakness_multiplier = 1.0
+	var is_weakness = false
 	if active_states.has("Weakness"):
 		weakness_multiplier = 1.5  # Takes 50% more damage
+		is_weakness = true
 	
 	damage_taken = int(float(damage_taken) * weakness_multiplier)
 	
 	# Add bleed accumulation when taking damage
 	add_bleed_accumulation(damage_taken)
 	
-	var damage_num: DamageNumber = floating_damage_num.instantiate()
-	damage_num.value = damage_taken
-	if damage_indicator_subviewport:
-		damage_indicator_subviewport.add_child(damage_num)
+	# Show damage number
+	if number_indicator:
+		number_indicator.show_damage(damage_taken, false, is_weakness)
+	
 	current_health -= damage_taken
 	if current_health < 0:
 		current_health = 0
@@ -492,6 +504,13 @@ func take_damage(amount: int, attacker: Battler = null) -> void:
 			return
 		_is_despawning = true
 		var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+		
+		# Award XP to the attacker who killed the enemy
+		if battle_manager and team == TEAM.ENEMY and enemy_stats and attacker:
+			var exp_reward = enemy_stats.exp_reward
+			if attacker.current_health > 0 and attacker.team == TEAM.ALLY:
+				attacker.add_experience(exp_reward)
+		
 		if battle_manager and battle_manager.has_method("register_enemy_defeat_reward"):
 			battle_manager.register_enemy_defeat_reward(self)
 		if battle_manager and battle_manager.remove_defeated_enemies and team == TEAM.ENEMY:
@@ -556,102 +575,172 @@ func battle_item(item: Item, target: Battler) -> void:
 		else:
 			inventory.collection.erase(item)
 
+## XP and Leveling System
+func add_experience(amount: int) -> void:
+	current_exp += amount
+	if number_indicator:
+		number_indicator.show_xp(amount)
+	exp_gained.emit(amount, current_exp, exp_to_next_level)
+	check_level_up()
+
+func check_level_up() -> void:
+	while current_exp >= exp_to_next_level:
+		current_exp -= exp_to_next_level
+		current_level += 1
+		calculate_exp_for_next_level()
+		apply_level_progression()
+		level_up.emit(current_level)
+		play_level_up_effect()
+
+func calculate_exp_for_next_level() -> void:
+	# Minecraft-style exponential formula
+	# Level 1→2: 100 XP
+	# Level 2→3: 110 XP (100 * 1.1)
+	# Level 3→4: 121 XP (110 * 1.1)
+	exp_to_next_level = int(100 * pow(1.1, current_level - 1))
+
+func play_level_up_effect() -> void:
+	var vfx = preload("res://assets/effects/ground/vfx_level_up.tscn").instantiate()
+	add_child(vfx)
+	vfx.global_position = global_position
+	# Auto-cleanup after effect plays
+	await get_tree().create_timer(3.0).timeout
+	if is_instance_valid(vfx):
+		vfx.queue_free()
+
+## Initialize attack indicator for enemies
+func _initialize_attack_indicator() -> void:
+	if team != TEAM.ENEMY:
+		return
+	
+	if not attack_indicator_scene:
+		return
+	
+	if attack_indicator:
+		return
+	
+	attack_indicator = attack_indicator_scene.instantiate() as AttackIndicator3D
+	if not attack_indicator:
+		push_error("Failed to instantiate attack indicator for %s" % name)
+		return
+	
+	# Position indicator at the top of the battler with an offset
+	var top_pos = get_effect_position(EffectPosition.TOP)
+	attack_indicator.position = Vector3(0, top_pos.y + 0.8, 0)
+	add_child(attack_indicator)
+
+## Determine indicator type from attack config
+func _get_indicator_type(attack_config: EnemyAttackConfig) -> AttackIndicator3D.AttackType:
+	if not attack_config:
+		return AttackIndicator3D.AttackType.DODGE_ONLY
+	
+	if attack_config.requires_jump:
+		return AttackIndicator3D.AttackType.JUMPABLE
+	
+	if attack_config.can_parry and not attack_config.can_dodge:
+		return AttackIndicator3D.AttackType.PARRIABLE_ONLY
+	
+	if not attack_config.can_parry and attack_config.can_dodge:
+		return AttackIndicator3D.AttackType.DODGE_ONLY
+	
+	# If both are allowed, default to dodge-only (gold circle)
+	return AttackIndicator3D.AttackType.DODGE_ONLY
+
 ## Performs an attack animation and damage application on target
 ## Optionally accepts an EnemyAttackConfig for custom animation/timing/multiplier
 func attack_anim(target, attack_config: EnemyAttackConfig = null) -> void:
-	# SAFETY: Prevent self-attacks
 	if target == self:
 		return
 	
 	current_target = target
+	_counter_handled_return = false
 	
-	print("[Battler] Enemy attack: attempting to advance to target %s" % target.character_name)
+	var rtdm: RealTimeDefenseManager = get_tree().get_first_node_in_group("real_time_defense_manager")
+	if rtdm and target.team == TEAM.ALLY:
+		rtdm.open_buffer(self, target, attack_config)
+	
+	# Show attack indicator for enemies attacking allies
+	if team == TEAM.ENEMY and target.team == TEAM.ALLY and attack_indicator:
+		var indicator_type = _get_indicator_type(attack_config)
+		attack_indicator.show_indicator(indicator_type)
+	
 	if advance_to_target(target):
 		_try_animation(AnimationMapping.WALK)
 		while is_advancing:
 			await get_tree().create_timer(0.016).timeout
-		print("[Battler] Enemy attack: advance complete")
-	else:
-		print("[Battler] Enemy attack: advance_to_target returned false")
 	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	var chosen_anim = AnimationMapping.MELEE_COMBO_1
 	if attack_config and not attack_config.animation_name.is_empty():
 		chosen_anim = attack_config.animation_name
 	
-	await _try_animation(chosen_anim)
+	var _attack_ended = false
+	var _on_attack_end = func(): _attack_ended = true
+	attack_end.connect(_on_attack_end, CONNECT_ONE_SHOT)
+
 	if not _try_animation(chosen_anim):
-		await _try_animation(AnimationMapping.MELEE_COMBO_1)
+		_try_animation(AnimationMapping.MELEE_COMBO_1)
 	
-	# Wait for hit_moment signal from animation track callback
-	# The _on_attack_hit() method is called by AnimationPlayer method track
 	await hit_moment
+	var exact_hit_time = Time.get_ticks_msec() / 1000.0
 	
-	# Calculate damage at exact contact frame (regardless of defense)
-	var base_atk = attack if attack > 0 else 15
-	var multiplier = attack_config.damage_multiplier if attack_config else 1.0
-	var atk_damage = int(base_atk * multiplier)
+	# Late forgiveness window: wait briefly so slightly late inputs are still captured
+	if rtdm and target.team == TEAM.ALLY:
+		await get_tree().create_timer(0.15).timeout
 	
-	# Apply damage at exact contact frame
-	if battle_manager and target:
-		await battle_manager.damage_calculation(self, target, atk_damage, attack_config)
+	var defense_result := "none"
+	if rtdm and target.team == TEAM.ALLY:
+		defense_result = rtdm.lock_and_evaluate(exact_hit_time)
 	
-	# Check for real-time defense input at hit frame (post-damage mitigation)
-	var defense_result = "none"
-	var real_time_defense_manager = get_tree().get_first_node_in_group("real_time_defense_manager")
-	if real_time_defense_manager and target.team == TEAM.ALLY:
-		# Start defense window for player allies and wait for result
-		defense_result = await real_time_defense_manager.start_defense_window(self, target, attack_config)
-		
-		# Apply damage mitigation after defense (reduce already-applied damage or heal if needed)
-		if defense_result != "none":
-			await _apply_defense_mitigation(target, atk_damage, defense_result)
+	var base_atk := attack if attack > 0 else 15
+	var multiplier := attack_config.damage_multiplier if attack_config else 1.0
+	var raw_damage := int(base_atk * multiplier)
+	var mitigated := _apply_defense_to_damage(raw_damage, defense_result)
 	
-	# Wait for attack animation to complete via callback
-	await attack_end
+	if battle_manager and target and mitigated > 0:
+		await battle_manager.damage_calculation(self, target, mitigated, attack_config)
+		if target.is_defeated():
+			if rtdm:
+				rtdm.close_buffer()
+			return
 	
-	# CRITICAL: Wait for damage callback and counters to complete before returning
+	if defense_result == "perfect_parry" and rtdm:
+		await rtdm.execute_perfect_parry_counter(target, self)
+	
+	if not _counter_handled_return and not _attack_ended:
+		var timeout_t = 0.0
+		while not _attack_ended and timeout_t < 1.5:
+			await get_tree().process_frame
+			timeout_t += get_process_delta_time()
+	
+	if rtdm:
+		rtdm.close_buffer()
+	
+	# Hide attack indicator after attack completes
+	if attack_indicator:
+		attack_indicator.hide_indicator()
+	
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().create_timer(0.1).timeout
 	
-	# If stunned by counter, wait before returning to position
 	if is_counter_stunned:
 		await get_tree().create_timer(counter_stun_duration).timeout
 		is_counter_stunned = false
 	
-	# NOW return to original position after damage/counter completed
-	if original_position != Vector3.ZERO:
-		print("[Battler] Enemy attack: returning to original position")
+	if not _counter_handled_return and original_position != Vector3.ZERO:
 		return_to_original_position()
-		# Wait for return movement to complete
 		while is_advancing:
 			await get_tree().create_timer(0.1).timeout
-		print("[Battler] Enemy attack: return complete")
-	else:
-		print("[Battler] Enemy attack: skipping return (original_position is ZERO)")
 	
-	# Return to idle state
-	battle_idle()
+	if not _counter_handled_return:
+		battle_idle()
 
-## Apply defense mitigation after damage has been applied
-func _apply_defense_mitigation(target: Battler, original_damage: int, defense_result: String) -> void:
+func _apply_defense_to_damage(damage: int, defense_result: String) -> int:
 	match defense_result:
-		"perfect_parry":
-			# Heal back the full damage that was just applied
-			if original_damage > 0:
-				target.take_healing(original_damage)
-		"parry":
-			# Heal back 50% of the damage
-			if original_damage > 0:
-				var heal_amount = int(original_damage * 0.5)
-				target.take_healing(heal_amount)
-		"dodge", "jump":
-			# Heal back full damage (complete avoidance)
-			if original_damage > 0:
-				target.take_healing(original_damage)
-		_:
-			pass  # No defense, damage stands
+		"perfect_parry": return 0
+		"dodge", "jump": return 0
+		_:               return damage
 
 func wait_attack():
 	if self.is_defending:
@@ -679,6 +768,7 @@ func battle_idle():
 		anim_tree.set("parameters/conditions/is_parrying", false)
 		anim_tree.set("parameters/conditions/is_jumping", false)
 		anim_tree.set("parameters/conditions/is_hit", false)
+		anim_tree.set("parameters/conditions/allow_combat_to_idle", true)
 
 ## Plays the standardised hit flinch. The "hit" root state plays once, then
 ## the code explicitly travels back to idle1 (hit_to_idle is manual advance_mode=0).
@@ -692,10 +782,11 @@ func play_hit_reaction() -> void:
 	# Reset any combat_actions sub-machine playback first so we actually land in
 	# idle1 instead of staying visually stuck in a previous attack/cast pose.
 	var root_sm := anim_tree.tree_root as AnimationNodeStateMachine
-	if root_sm.has_node("combat_actions"):
-		var ca_sm := anim_tree.get("parameters/combat_actions/playback") as AnimationNodeStateMachinePlayback
-		if ca_sm:
-			ca_sm.travel("Start")
+	# REMOVED: Resetting to Start here causes T-pose because Start has no animation!
+	# if root_sm.has_node("combat_actions"):
+	# 	var ca_sm := anim_tree.get("parameters/combat_actions/playback") as AnimationNodeStateMachinePlayback
+	# 	if ca_sm:
+	# 		ca_sm.travel("Start")
 	state_machine.travel("idle1")
 	await get_tree().create_timer(0.1).timeout
 	_try_animation(AnimationMapping.HIT)
@@ -714,15 +805,15 @@ func advance_to_target(target: Battler) -> bool:
 	if not battle_manager:
 		return false
 		
-	if not battle_manager.enable_movement_to_target or not requires_walking:
+	if not requires_walking:
 		return false
 	
 	# SAFETY: Prevent overlapping advances
 	if is_advancing:
 		return false
-		
-	var movement_distance = custom_movement_distance if custom_movement_distance > 0 else battle_manager.movement_distance_threshold
-	var movement_speed = custom_movement_speed if custom_movement_speed > 0 else battle_manager.movement_speed
+	
+	var movement_distance = custom_movement_distance
+	var movement_speed = custom_movement_speed
 	
 	# Apply speed multiplier from battle manager
 	movement_speed *= battle_manager.speed_multiplier
@@ -733,7 +824,6 @@ func advance_to_target(target: Battler) -> bool:
 	
 	# Reset original_position to current position before moving
 	original_position = global_position
-	print("[Battler] advance_to_target: Setting original_position to %s" % str(original_position))
 	
 	var direction = (target.global_position - global_position).normalized()
 	advance_target_position = target.global_position - direction * movement_distance
@@ -770,7 +860,8 @@ func _try_animation(anim_name: String) -> bool:
 
 	# Resolve via animation mapping (slot -> character-specific state name).
 	var resolved_name := get_resolved_animation(anim_name)
-	print("[Battler] _try_animation: requested='%s', resolved='%s', character='%s'" % [anim_name, resolved_name, character_name])
+
+	print("[Battler %s] _try_animation(%s) -> %s, current_root=%s, allow_combat_to_idle=%s" % [character_name, anim_name, resolved_name, state_machine.get_current_node() if state_machine else "null", anim_tree.get("parameters/conditions/allow_combat_to_idle") if anim_tree else "null"])
 
 	# Canonical offensive slots live inside the combat_actions sub-machine.
 	var combat_slots: Array = [
@@ -798,45 +889,45 @@ func _try_animation(anim_name: String) -> bool:
 			push_error("[Battler] Combat animation '%s' does not exist in combat_actions on '%s'" % [leaf_name, character_name])
 			return false
 
-		print("[Battler] Traveling to combat_actions -> %s" % leaf_name)
-		state_machine.travel("combat_actions")
-		
+		# Only travel to combat_actions if we're not already in it.
+		# This prevents resetting the sub-machine during multi-strike combos,
+		# which would cause idle to play between consecutive strikes.
+		var active_node = state_machine.get_current_node()
+		var was_outside = (active_node != "combat_actions")
+		if was_outside:
+			state_machine.travel("combat_actions")
+
 		var ca_sm := anim_tree.get("parameters/combat_actions/playback") as AnimationNodeStateMachinePlayback
 		if not ca_sm:
 			push_warning("[Battler] Missing combat_actions/playback on '%s'" % character_name)
 			return false
-		
-		print("[Battler] Current state in combat_actions: %s" % ca_sm.get_current_node())
-		ca_sm.travel(leaf_name)
-		print("[Battler] New state in combat_actions: %s" % ca_sm.get_current_node())
+
+		if was_outside:
+			ca_sm.start(leaf_name)
+		else:
+			ca_sm.travel(leaf_name)
+		print("[Battler %s] After CA travel to %s, CA current node: %s" % [character_name, leaf_name, ca_sm.get_current_node() if ca_sm else "null"])
 
 		# Resolve clip duration and schedule hit_moment at the correct frame.
 		var resolved_clip_name = _resolve_state_animation_name(leaf_name)
-		print("[Battler] Resolved clip name for '%s': '%s'" % [leaf_name, resolved_clip_name])
-		
-		# Check if animation clip actually exists in AnimationPlayer
-		var anim_player = get_node_or_null("AnimationPlayer")
-		if anim_player:
-			var clip_exists = anim_player.has_animation(resolved_clip_name)
-			print("[Battler] Animation clip '%s' exists: %s" % [resolved_clip_name, clip_exists])
-			if clip_exists:
-				var clip_length = anim_player.get_animation(resolved_clip_name).length
-				print("[Battler] Direct clip length: %s seconds" % clip_length)
 		
 		return true
 
-	# Root-level state — travel only when it actually exists on this tree.
-	# If the root playback is currently inside the combat_actions sub-machine,
-	# reset the sub-machine's playback first so it doesn't keep playing its last
-	# state underneath the new root state (which would show the wrong pose).
-	if root_sm.has_node("combat_actions"):
-		var ca_sm := anim_tree.get("parameters/combat_actions/playback") as AnimationNodeStateMachinePlayback
-		if ca_sm:
-			ca_sm.travel("Start")
+	# Root-level state — force-exit combat_actions sub-machine first if needed,
+	# then travel directly to the target root state.
+	var current_node := state_machine.get_current_node()
+	if current_node == "combat_actions":
+		# With switch_mode=Immediate on combat_to_idle, the outer SM will blend
+		# directly from the held last-combat-frame into the target state without
+		# needing to push the inner sub-machine to End first (which caused a T-pose).
+		print("[Battler %s] Exiting combat_actions (Immediate blend) before travelling to %s" % [character_name, resolved_name])
+
 	if not root_sm.has_node(resolved_name):
 		push_error("[Battler] Animation state '%s' does not exist on '%s'" % [resolved_name, character_name])
 		return false
+	print("[Battler %s] Final travel to %s" % [character_name, resolved_name])
 	state_machine.travel(resolved_name)
+	print("[Battler %s] After final travel, current_node: %s" % [character_name, state_machine.get_current_node()])
 	return true
 
 ## Looks up the length of an animation from AnimationPlayer by state name.
@@ -978,30 +1069,27 @@ func _start_movement_timeout() -> void:
 	
 	# Check if still advancing (means it got stuck)
 	if is_advancing:
-		print("[Battler] Movement timeout - forcing advance to stop")
 		set_advancing(false)
 		# Don't return to original position - this interrupts normal movement
 		# Just stop the advance and let the caller handle the next step
 
 func return_to_original_position():
 	if is_advancing or global_position.distance_to(original_position) < 0.05:
-		print("[Battler] return_to_original_position skipped - is_advancing: %s, distance: %.3f" % [is_advancing, global_position.distance_to(original_position)])
 		return
 		
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if not battle_manager:
 		return
-		
-	var movement_speed = custom_movement_speed if custom_movement_speed > 0 else battle_manager.movement_speed
+	
+	var movement_speed = custom_movement_speed
 	movement_speed *= battle_manager.speed_multiplier
 	
-	print("[Battler] Returning to original position from %s to %s" % [str(global_position), str(original_position)])
 	set_advancing(true)
 	_try_animation(AnimationMapping.WALK_BACK)
 	
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
-	tween.tween_property(self, "global_position", original_position, 
+	tween.tween_property(self, "global_position", original_position,
 		global_position.distance_to(original_position) / movement_speed)
 	tween.tween_callback(_on_return_complete)
 
@@ -1031,7 +1119,7 @@ func perform_dodge_dash() -> void:
 	if not _try_animation(AnimationMapping.DODGE):
 		await _try_animation(AnimationMapping.WALK)
 	
-	var movement_speed = custom_movement_speed if custom_movement_speed > 0 else battle_manager.movement_speed
+	var movement_speed = custom_movement_speed
 	movement_speed *= battle_manager.speed_multiplier * 1.5  # Faster movement for dodge
 	
 	var tween = create_tween()
@@ -1041,29 +1129,29 @@ func perform_dodge_dash() -> void:
 	tween.tween_callback(_on_dodge_dash_complete.bind(dodge_start_position))
 
 func _on_dodge_dash_complete(p_original_position: Vector3):
-	
+
 	# Small pause at the end of dodge
 	await get_tree().create_timer(0.15).timeout
-	
+
 	# Return to original position
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if not battle_manager:
 		set_advancing(false)
 		_try_animation("idle1")
 		return
-	
-	var movement_speed = custom_movement_speed if custom_movement_speed > 0 else battle_manager.movement_speed
+
+	var movement_speed = custom_movement_speed
 	movement_speed *= battle_manager.speed_multiplier
-	
+
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
-	tween.tween_property(self, "global_position", p_original_position, 
+	tween.tween_property(self, "global_position", p_original_position,
 		global_position.distance_to(p_original_position) / movement_speed)
 	tween.tween_callback(_on_return_complete)
 
 func _on_return_complete():
 	set_advancing(false)
-	_try_animation("idle1")
+	# NOTE: Do NOT travel to idle1 here - it fights whatever the caller triggers next
 
 ## Performs a jump-dodge evasion: plays jump -> jump_land -> idle1.
 ## jump and jump_land are defensive maneuvers used to avoid ground-sweeping attacks.
@@ -1071,20 +1159,20 @@ func _on_return_complete():
 func perform_jump_evade() -> void:
 	var has_jump := state_machine != null and anim_tree.tree_root is AnimationNodeStateMachine \
 		and (anim_tree.tree_root as AnimationNodeStateMachine).has_node(AnimationMapping.JUMP)
-	
+
 	if has_jump:
 		# Play the jump ascent animation.
 		_try_animation(AnimationMapping.JUMP)
 		var jump_dur: float = max(0.25, _get_animation_duration(AnimationMapping.JUMP))
 		await get_tree().create_timer(jump_dur).timeout
-		
+
 		# Transition to landing animation if it exists.
 		var root_sm := anim_tree.tree_root as AnimationNodeStateMachine
 		if root_sm.has_node(AnimationMapping.JUMP_LAND):
 			_try_animation(AnimationMapping.JUMP_LAND)
 			var land_dur: float = max(0.2, _get_animation_duration(AnimationMapping.JUMP_LAND))
 			await get_tree().create_timer(land_dur).timeout
-		
+
 		_try_animation("idle1")
 	else:
 		# Fallback: tween a simple vertical arc when character has no jump clip.
@@ -1101,33 +1189,12 @@ func perform_jump_evade() -> void:
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		await tween2.finished
 
-	
-func get_exp_stat():
-	return exp_node
-
 # # #
 # Animation Damage & Effects Application
 # # #
 ## Called when animation reaches the hit point (either via animation event track or timer) - applies damage and any attached states
 func apply_animation_effects():
 	hit_moment.emit(self)
-	anim_damage.emit()
-
-func call_attack():
-	# Deprecated - use apply_animation_effects() instead
-	apply_animation_effects()
-
-# In take_damage, add state application for counter:
-
-# Update the animation callback to use new name:
-func _on_anim_damage():
-	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	if not battle_manager:
-		return
-	
-	# This function will be replaced by the card combat system
-	# For now, keeping it for compatibility with existing animations
-	pass
 
 # # #
 # Save System
@@ -1136,8 +1203,8 @@ func on_save_game(save_data):
 	var new_data = BattlerData.new()
 	new_data.current_health = current_health  # Using consistent property name
 
-	new_data.current_exp = get_exp_stat().get_total_exp()
-	new_data.current_level = get_exp_stat().get_current_level()
+	new_data.current_exp = current_exp
+	new_data.current_level = current_level
 	
 	save_data["charNameOrID"] = new_data
 
@@ -1148,8 +1215,10 @@ func on_load_game(load_data):
 	
 	current_health = save_data.current_health  # Using consistent property name
 
-	get_exp_stat().exp_total = save_data.current_exp
-	get_exp_stat().char_level = save_data.current_level
+	current_exp = save_data.current_exp
+	current_level = save_data.current_level
+	calculate_exp_for_next_level()
+	apply_level_progression()
 
 var active_states: Dictionary = {}  # {state_name: State}
 
@@ -1263,15 +1332,30 @@ func break_shield() -> void:
 		remove_state("Protected")
 		shield_broken.emit()
 
-## Get the center position for visual effects (auras, particles, etc.)
-## Returns the vertical center of the battler's mesh in local coordinates
-## Combines AABBs of all MeshInstance3D children for accurate center calculation
+enum EffectPosition { CENTER, TOP, BOTTOM }
+
+## Get a position for visual effects (auras, particles, indicators, etc.)
+## Returns the specified vertical position of the battler's mesh in local coordinates
+## Combines AABBs of all MeshInstance3D children for accurate position calculation
 ## Uses caching to avoid recalculating on every call
-func get_effect_center_position() -> Vector3:
-	# Return cached value if available
-	if _effect_center_cached:
-		return _cached_effect_center
+## position_type: EffectPosition.CENTER, EffectPosition.TOP, or EffectPosition.BOTTOM
+func get_effect_position(position_type: EffectPosition = EffectPosition.CENTER) -> Vector3:
+	# Calculate and cache all positions if not already cached
+	if not _effect_center_cached:
+		_calculate_effect_positions()
 	
+	match position_type:
+		EffectPosition.CENTER:
+			return _cached_effect_center
+		EffectPosition.TOP:
+			return _cached_effect_top
+		EffectPosition.BOTTOM:
+			return _cached_effect_bottom
+		_:
+			return _cached_effect_center
+
+## Calculate and cache all effect positions
+func _calculate_effect_positions() -> void:
 	var combined_aabb = AABB()
 	var has_mesh = false
 	
@@ -1289,16 +1373,19 @@ func get_effect_center_position() -> Vector3:
 	# If no meshes found, use default height
 	if not has_mesh:
 		_cached_effect_center = Vector3(0, 0.75, 0)  # Default center for 1.5 height
+		_cached_effect_top = Vector3(0, 1.5, 0)
+		_cached_effect_bottom = Vector3(0, 0.0, 0)
 	else:
-		# Calculate center from combined AABB
+		# Calculate positions from combined AABB
 		_cached_effect_center = Vector3(0, combined_aabb.position.y + combined_aabb.size.y / 2.0, 0)
+		_cached_effect_top = Vector3(0, combined_aabb.position.y + combined_aabb.size.y, 0)
+		_cached_effect_bottom = Vector3(0, combined_aabb.position.y, 0)
 	
 	_effect_center_cached = true
-	return _cached_effect_center
 
-## Invalidate the cached effect center position
+## Invalidate the cached effect positions
 ## Call this when meshes are added/removed from the battler
-func invalidate_effect_center_cache() -> void:
+func invalidate_effect_cache() -> void:
 	_effect_center_cached = false
 
 ## Apply an aura effect to this battler at the height center
@@ -1309,7 +1396,7 @@ func apply_aura_effect(aura_scene: PackedScene) -> Node3D:
 		return null
 	
 	var aura_instance = aura_scene.instantiate()
-	var center_pos = get_effect_center_position()
+	var center_pos = get_effect_position(EffectPosition.CENTER)
 	
 	add_child(aura_instance)
 	aura_instance.position = center_pos
@@ -1369,10 +1456,8 @@ func process_states() -> void:
 			if burning_state and burning_state.stack_count > 0:
 				var burn_damage = burning_state.get_burn_damage()
 				if burn_damage > 0:
-					var damage_num: DamageNumber = floating_damage_num.instantiate()
-					damage_num.value = burn_damage
-					if damage_indicator_subviewport:
-						damage_indicator_subviewport.add_child(damage_num)
+					if number_indicator:
+						number_indicator.show_damage(burn_damage)
 					current_health -= burn_damage
 					if current_health < 0:
 						current_health = 0
@@ -1393,16 +1478,16 @@ func process_states() -> void:
 			
 			# Only show damage popup for positive damage (DOT)
 			if actual_damage > 0:
-				var damage_num: DamageNumber = floating_damage_num.instantiate()
-				damage_num.value = actual_damage
-				if damage_indicator_subviewport:
-					damage_indicator_subviewport.add_child(damage_num)
+				if number_indicator:
+					number_indicator.show_damage(actual_damage)
 				current_health -= actual_damage
 				if current_health < 0:
 					current_health = 0
 			else:
 				# Healing state (negative damage)
 				var healing = abs(actual_damage)
+				if number_indicator:
+					number_indicator.show_heal(healing)
 				current_health = min(current_health + healing, max_health)
 		
 		# Handle duration
@@ -1423,45 +1508,22 @@ func process_states() -> void:
 
 func set_advancing(value: bool):
 	is_advancing = value
+	print("[Battler %s] set_advancing(%s), allow_combat_to_idle = %s" % [character_name, value, anim_tree.get("parameters/conditions/allow_combat_to_idle") if anim_tree else "null"])
 	anim_tree.set("parameters/conditions/is_walking", value)
 
 func set_defending(value: bool):
 	is_defending = value
 
 func _fade_and_remove() -> void:
-	var tween = create_tween()
-	tween.set_parallel(true)
-	
-	# Fade transparency on all collected mesh instances that support it.
-	# This works for any model regardless of node names.
-	for mesh in _highlight_meshes:
-		if is_instance_valid(mesh) and mesh is GeometryInstance3D:
-			mesh.transparency = 0.0
-			tween.tween_property(mesh, "transparency", 1.0, 0.35)
-	
-	# Also scale down the whole battler as a reliable universal effect.
-	# Scaling to exactly Vector3.ZERO makes the transform basis singular, which
-	# causes 'invert: Condition "det == 0"' errors in skeleton pose updates.
-	tween.tween_property(self, "scale", Vector3.ONE * 0.01, 0.35)
-	
-	await tween.finished
-	
+	# Play death animation instead of scaling down
+	_try_animation(AnimationMapping.DEATH)
+	var death_duration = _get_animation_duration(AnimationMapping.DEATH)
+	if death_duration > 0.0:
+		await get_tree().create_timer(death_duration).timeout
+
 	# Safety check: ensure the node hasn't already been destroyed by a scene change
 	if is_instance_valid(self):
 		queue_free()
-
-## LEVEL-FOCUSED PROGRESSION
-## Add experience and check for level up
-func gain_experience(amount: int) -> void:
-	if not exp_node:
-		push_error("Battler %s has no Experience node" % character_name)
-		return
-	
-	exp_node.add_exp(amount)
-	
-	# Check if level up occurred
-	while LevelProgression.check_level_up(self):
-		pass
 
 ## Apply level-based stat scaling to this battler
 ## Called on _ready() and after level up
@@ -1487,7 +1549,7 @@ func apply_level_progression() -> void:
 	}
 	
 	# Get calculated stats at current level
-	var calculated = LevelProgression.get_stats_at_level(base_stats, stat_multipliers, stats.level)
+	var calculated = LevelProgression.get_stats_at_level(base_stats, stat_multipliers, current_level)
 	
 	# Apply to battler
 	max_health = calculated["max_health"]

@@ -35,10 +35,10 @@ extends Resource
 ## Base healing multiplier for heal cards
 @export_range(0.5, 2.0, 0.1) var heal_multiplier: float = 1.0
 
-@export_group("Multi-Strike Chaining")
-## Seconds trimmed from a multi-strike clip so the NEXT strike's animation travel is
-## issued while the current clip is still playing. Keeping this above 0.0 stops the
-## combat_actions sub-machine from falling back to its End state (and the actor from
-## dropping back into idle) between combo hits. 0.0 = always wait for the full clip.
-## Per-card overrides live in CardConfig.strike_chain_leads.
-@export_range(0.0, 1.0, 0.05) var multi_strike_chain_lead: float = 0.2
+@export_group("Multi-Strike Timing")
+## Global default strike timing offset (seconds).
+##   > 0  → delay: pause this many seconds AFTER clip ends before next strike.
+##   = 0  → seamless: next strike fires exactly at clip end.
+##   < 0  → lead: fire |value| seconds BEFORE clip ends (overlap).
+## Per-card overrides live in CardConfig.strike_timing.
+@export_range(-1.0, 1.0, 0.05) var default_strike_timing: float = -0.2

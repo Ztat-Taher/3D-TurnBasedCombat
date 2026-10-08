@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://bgdds3edejcqq"]
+
+[ext_resource type="Shader" uid="uid://c120lmrhaj8se" path="res://assets/shaders/attack_indicator.gdshader" id="1_shader"]
+[ext_resource type="Script" uid="uid://bfa2mt8s2mg0h" path="res://scripts/systems/battle/effects/attack_indicator/attack_indicator_3d.gd" id="2_script"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_1"]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/indicator_color = Color(1, 0.8, 0, 1)
+shader_parameter/indicator_type = 0
+shader_parameter/pulse_speed = 5.0
+shader_parameter/pulse_intensity = 0.2
+shader_parameter/line_thickness = 0.05000000167648
+shader_parameter/progress = 1.0
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_k2qqf"]
+size = Vector2(2, 2)
+
+[node name="AttackIndicator3D" type="Node3D" unique_id=239483298]
+script = ExtResource("2_script")
+
+[node name="Sprite3D" type="Sprite3D" parent="." unique_id=1816398047]
+material_override = SubResource("ShaderMaterial_1")
+pixel_size = 0.4
+billboard = 1
+texture = SubResource("PlaceholderTexture2D_k2qqf")

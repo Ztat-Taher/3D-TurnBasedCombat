@@ -125,15 +125,16 @@ static func tick_states(battler: Battler) -> void:
 			actual_damage = max(1, actual_damage)
 			
 			if actual_damage > 0:
-				var damage_num: DamageNumber = battler.floating_damage_num.instantiate()
-				damage_num.value = actual_damage
-				battler.damage_indicator_subviewport.add_child(damage_num)
+				if battler.number_indicator:
+					battler.number_indicator.show_damage(actual_damage)
 				battler.current_health -= actual_damage
 				if battler.current_health < 0:
 					battler.current_health = 0
 				battler.health_changed.emit(battler.current_health, battler.max_health)
 			else:
 				var healing = abs(actual_damage)
+				if battler.number_indicator:
+					battler.number_indicator.show_heal(healing)
 				battler.current_health = min(battler.current_health + healing, battler.max_health)
 				battler.health_changed.emit(battler.current_health, battler.max_health)
 		

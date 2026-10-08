@@ -71,37 +71,59 @@ enum Element {
 }
 
 # Animation Configuration (Simple - just the animation name)
-@export var animation_name: String = "melee_combo_1"  ## Animation to play for the actor (single-strike mode)
+@export_group("Animation")
+@export var animation_name: String = ""  ## Animation slot to play (single-strike cards). Must be empty when is_multi_strike = true.
 
-# Multi-Strike Configuration (Inline arrays for convenience)
-@export var is_multi_strike: bool = false              ## Whether this card uses multi-strike sequence
-@export var strike_animations: Array[String] = []     ## Animation names for each strike
-@export var strike_multipliers: Array[float] = []      ## Damage multipliers for each strike
-@export var strike_delays: Array[float] = []           ## Delays between strikes (seconds)
-@export var strike_chain_leads: Array[float] = []      ## Optional per-strike chain lead: seconds trimmed from THIS strike's clip so the next strike starts early. Indexed by the current strike - the last entry is unused. Empty = use CardBattleConfig.multi_strike_chain_lead
-@export var strike_qte_difficulties: Array[float] = [] ## QTE difficulty for each strike
-@export var strike_qte_windows: Array[float] = []      ## QTE window duration for each strike
+# ─────────────────────────────────────────────────────────────────────────────
+# Multi-Strike
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Multi-Strike")
+@export var is_multi_strike: bool = false              ## Enable the combo sequence. Disable animation_name when true.
+@export var strike_animations: Array[String] = []     ## Animation slot names in order, e.g. ["melee_combo_1", "melee_combo_2", "melee_combo_3"].
+@export var strike_multipliers: Array[float] = []     ## Per-strike damage multiplier on top of base_damage. [1.0, 1.2, 1.5] = escalating hits.
+@export var strike_qte_difficulties: Array[float] = [] ## Per-strike QTE difficulty (0.0 = easy, 1.0 = hard).
+@export var strike_qte_windows: Array[float] = []     ## Per-strike QTE window duration in seconds.
 
+## Unified per-strike timing offset (seconds).
+##   > 0  →  delay:  pause this many seconds AFTER the previous clip ends before firing.
+##   = 0  →  seamless: next strike fires exactly at clip end.
+##   < 0  →  lead:   fire |value| seconds BEFORE the clip ends (overlap / chain).
+## Last entry is unused (no strike follows the final hit).
+## Empty = use CardBattleConfig.default_strike_timing for every strike.
+@export var strike_timing: Array[float] = []
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Targeting Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Targeting")
 @export var target_type: TargetScope = TargetScope.SINGLE_ENEMY
 @export var target_selection_mode: SelectionMode = SelectionMode.MANUAL
 @export var target_filter: String = ""                ## Filter conditions for valid targets
 @export var requires_los: bool = false                ## Whether line of sight is required
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Effect Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Effects")
 @export var primary_effect: Resource                 ## Main effect configuration
 @export var secondary_effects: Array[Resource] = [] ## Additional effects
 @export var effect_timing: EffectTiming = EffectTiming.ON_HIT
 @export var effect_conditions: Array[Resource] = [] ## Conditions for effect execution
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Visual Effect Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Visual Effects")
 @export var vfx_on_actor: Resource                   ## Visual effects on the actor
 @export var vfx_on_target: Resource                  ## Visual effects on target(s)
 @export var vfx_on_projectile: Resource              ## Projectile visual effects
 @export var camera_effects: Resource        ## Camera shake, zoom, etc.
 @export var screen_effects: Resource        ## Screen flash, time slow, etc.
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Projectile Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Projectile")
 @export var projectile_enabled: bool = false           ## Whether card uses a projectile
 @export var projectile_scene: String = ""              ## Path to projectile scene
 @export var projectile_speed: float = 10.0            ## Travel speed of projectile
@@ -109,14 +131,20 @@ enum Element {
 @export var projectile_arc: float = 0.0                ## Arc height for projectile trajectory
 @export var projectile_spawn_point: String = "actor"  ## Where projectile spawns
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Audio Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Audio")
 @export var cast_sound: Resource                    ## Sound when card is cast
 @export var hit_sound: Resource                     ## Sound when effect hits target
 @export var impact_sound: Resource                 ## Sound on impact/damage
 @export var loop_sound: Resource                   ## Looping sound during channel/projectile
 @export var voice_line: String = ""                    ## Character voice line to play
 
+# ─────────────────────────────────────────────────────────────────────────────
 # QTE Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("QTE Settings")
 @export var qte_type_string: String = "none"           ## String storage for enum (workaround for .tres loading)
 var qte_type: QTEType = QTEType.NONE:
 	get:
@@ -137,7 +165,10 @@ var qte_timing: QTETiming = QTETiming.BEFORE_ATTACK:
 @export var qte_mash_count: int = 5                    ## Required button presses for mash QTEs
 @export var qte_mash_window: float = 3.0               ## Time window for mash QTEs
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Damage and Stats Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Damage & Stats")
 @export var base_damage: int = 0                       ## Base damage value
 @export var damage_scaling: Dictionary = {}            ## Stat scaling (attack, magic, etc.)
 @export var damage_type: DamageType = DamageType.PHYSICAL
@@ -145,13 +176,19 @@ var qte_timing: QTETiming = QTETiming.BEFORE_ATTACK:
 @export var shield_amount: int = 0                     ## Shield/defense amount
 @export var stat_modifiers: Dictionary = {}           ## Temporary stat changes
 
+# ─────────────────────────────────────────────────────────────────────────────
 # State and Debuff Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("States & Debuffs")
 @export var applies_states: Array[Resource] = []   ## States to apply to targets
 @export var applies_self_states: Array[Resource] = [] ## States to apply to self
 @export var state_chance: float = 1.0                  ## Chance to apply states (0.0-1.0)
 @export var state_duration: int = 1                    ## Duration in turns
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Card Metadata
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Metadata")
 @export var card_rarity: CardRarity = CardRarity.COMMON
 @export var card_element: Element = Element.NONE
 @export var card_tags: Array[String] = []              ## Tags for filtering and grouping

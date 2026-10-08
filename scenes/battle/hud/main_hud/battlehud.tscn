@@ -1,8 +1,7 @@
 [gd_scene format=3 uid="uid://cyjcaceen0235"]
 
 [ext_resource type="Script" uid="uid://835wmi7qej15" path="res://scenes/battle/hud/main_hud/battlehud.gd" id="1_0qukq"]
-[ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://replace/theme_test.tres" id="2_uiugx"]
-[ext_resource type="Script" uid="uid://gl487spddx3j" path="res://scenes/battle/hud/information_display/text/battle_text_display.gd" id="3_btt"]
+[ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://resources/themes/theme_test.tres" id="2_uiugx"]
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://scenes/battle/hud/information_display/text/battleresults.tscn" id="6_g4nh0"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://scripts/juice/buttons/button_juice.gd" id="7_p32nk"]
 [ext_resource type="Texture2D" uid="uid://b2nrjutwl7rx7" path="res://assets/images/ui/menu/button_normal.png" id="8_27igj"]
@@ -37,26 +36,13 @@ layout_mode = 1
 [node name="TurnQueueUI" parent="Control" unique_id=1146046375 instance=ExtResource("13_turn_queue_ui")]
 layout_mode = 0
 
-[node name="BattleTextDisplay" type="Control" parent="Control" unique_id=-389943844]
-anchors_preset = 0
-anchor_left = 0.5
-anchor_top = 0.3
-anchor_right = 0.5
-anchor_bottom = 0.3
-offset_left = -200.0
-offset_top = -50.0
-offset_right = 200.0
-offset_bottom = 50.0
-
-[node name="Text" type="RichTextLabel" parent="Control/BattleTextDisplay" unique_id=1590330011]
+[node name="EnemyHealthBarsContainer" type="Control" parent="Control" unique_id=2090000003]
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 10
 anchor_right = 1.0
-anchor_bottom = 1.0
+offset_bottom = 126.0
 grow_horizontal = 2
-grow_vertical = 2
-bbcode_enabled = true
-script = ExtResource("3_btt")
+pivot_offset = Vector2(640, 63)
 
 [node name="Items" type="Control" parent="Control" unique_id=2067696712]
 visible = false
@@ -216,15 +202,6 @@ blur_amount = 0.5
 [node name="BossBar" parent="Control" unique_id=1980246889 instance=ExtResource("8_bossbar")]
 visible = false
 layout_mode = 1
-
-[node name="EnemyOverheadBarsContainer" type="Control" parent="Control" unique_id=2090000001]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
 
 [node name="MoveBanner" type="Control" parent="Control" unique_id=2090000002]
 visible = false

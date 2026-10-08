@@ -205,8 +205,6 @@ func _connect_to_buttons() -> void:
 	# Connect to button signals
 	for button in buttons:
 		_connect_button_hover_signals(button)
-	
-	print("CursorManager: Connected to ", buttons.size(), " buttons for hover detection")
 
 func _connect_button_hover_signals(button: Control) -> void:
 	if button.has_signal("mouse_entered") and not button.mouse_entered.is_connected(_on_button_mouse_entered):

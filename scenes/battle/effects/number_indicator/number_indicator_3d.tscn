@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://number_indicator_3d_component"]
+
+[ext_resource type="Script" path="res://scripts/systems/battle/effects/number_indicator/number_indicator_3d.gd" id="1_number_indicator_3d"]
+
+[node name="NumberIndicator3D" type="Node3D"]
+script = ExtResource("1_number_indicator_3d")

@@ -17,12 +17,11 @@ signal end_turn_pressed
 @onready var run_button: TextureButton = $Control/ActionButtons.get_node("RunWrapper/Run")
 @onready var end_turn_button: TextureButton = $Control/ActionButtons.get_node("EndTurnWrapper/EndTurnButton")
 @onready var global_back_button: TextureButton = $Control/BackButton
-@onready var battle_text_display: RichTextLabel = $Control/BattleTextDisplay/Text
 @onready var item_select: Control = $Control/Items
 @onready var card_ui: Control = $Control/CardUI
 @onready var party_status_panel: VBoxContainer = $Control/PartyStatusPanel
 @onready var boss_bar = $Control/BossBar
-@onready var enemy_overhead_bars_container: Control = $Control/EnemyOverheadBarsContainer
+@onready var enemy_health_bars_container: Control = $Control/EnemyHealthBarsContainer
 @onready var move_banner: Control = $Control/MoveBanner
 @onready var move_banner_actor: Label = $Control/MoveBanner/Panel/VBox/ActorLabel
 @onready var move_banner_label: Label = $Control/MoveBanner/Panel/VBox/MoveLabel
@@ -42,11 +41,11 @@ func _resolve_cursor_system() -> CursorManager:
 
 var aoe_confirm_button: Button = null
 
-## Overhead health bar scene: native resolution Canvas UI with depth sorting & occlusion.
-const ENEMY_OVERHEAD_BAR_SCENE: PackedScene = preload("res://scenes/battle/hud/health_display/bars/enemy_overhead/EnemyOverheadBar.tscn")
+## Enemy health bar scene: static UI panel at top of screen
+const ENEMY_HEALTH_BAR_SCENE: PackedScene = preload("res://scenes/battle/hud/health_display/bars/enemy_overhead/EnemyHealthBar.tscn")
 
-# Maps enemy battler -> overhead bar node
-var enemy_overhead_bar_map: Dictionary = {}
+# Maps enemy battler -> health bar node
+var enemy_health_bar_map: Dictionary = {}
 
 
 var activeBattler: Node = null
@@ -65,13 +64,26 @@ var current_ui_state: UIState = UIState.BASE_STATE
 var previous_ui_state: UIState = UIState.BASE_STATE
 var _just_restored_from_card: bool = false
 
-# Resolve the active BattleCamera controller for projecting 3D battler
-# positions into HUD screen space (handles the low-res SubViewport scaling).
+## Returns the BattleCamera controller from the battle manager.
+## This is the single authoritative source for the active camera — BattleCamera
+## manages one Camera3D whose transform is animated between modes (OTS, overview, focus, etc).
 func _get_battle_camera() -> BattleCamera:
-	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	if battle_manager:
-		return battle_manager.battle_camera as BattleCamera
-	return null
+	var bm = get_tree().get_first_node_in_group("battle_manager")
+	if not bm or not ("battle_camera" in bm):
+		return null
+	return bm.battle_camera as BattleCamera
+
+## Projects a world-space position into HUD screen coordinates via BattleCamera.
+## Returns null if BattleCamera is unavailable or the position is behind the camera.
+## BattleCamera.world_to_screen() already handles SubViewport scale internally.
+func _project_to_hud(world_pos: Vector3) -> Variant:
+	var bc := _get_battle_camera()
+	if not bc:
+		return null
+	if bc.is_position_behind(world_pos):
+		return null
+	return bc.world_to_screen(world_pos)
+
 
 func set_ui_state(new_state: Variant) -> void:
 	# Convert integer to UIState enum if needed
@@ -247,7 +259,10 @@ func _on_cbm_card_played(_card = null, _target = null) -> void:
 	_just_restored_from_card = true
 
 func _process(_delta: float) -> void:
-	# Respect UI state system - hide action buttons during execution/targeting
+	# ── Health bars: ALWAYS update every frame regardless of battle state ──
+	_update_enemy_health_bar_positions()
+	
+	# ── Action buttons: guarded by battle state ──
 	if current_ui_state == UIState.CARD_EXECUTION_STATE or current_ui_state == UIState.TARGETING_STATE:
 		if action_buttons and action_buttons.visible:
 			action_buttons.hide()
@@ -265,28 +280,75 @@ func _process(_delta: float) -> void:
 		return
 	
 	if action_buttons and action_buttons.visible and activeBattler and is_instance_valid(activeBattler):
-		var battle_camera = _get_battle_camera()
-		if battle_camera:
-			# Project 3D position (chest/head height) to 2D screen coordinate
-			var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
-			# Only position if in front of camera
-			if not battle_camera.is_position_behind(world_pos):
-				var screen_pos = battle_camera.world_to_screen(world_pos)
-				# Position action buttons to the RIGHT of the character
-				var target_pos = screen_pos + Vector2(70.0, -50.0)
-				# Clamp to screen margins
-				var vp_size = get_viewport().get_visible_rect().size
-				target_pos.x = clamp(target_pos.x, 20.0, vp_size.x - action_buttons.size.x - 20.0)
-				target_pos.y = clamp(target_pos.y, 20.0, vp_size.y - action_buttons.size.y - 120.0)
-				
-				# Smooth follow or direct snap
-				action_buttons.position = action_buttons.position.lerp(target_pos, 0.25)
+		var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
+		var screen_pos = _project_to_hud(world_pos)
+		
+		if screen_pos != null:
+			var target_pos = screen_pos + Vector2(70.0, -50.0)
+			var vp_size = get_viewport().get_visible_rect().size
+			target_pos.x = clamp(target_pos.x, 20.0, vp_size.x - action_buttons.size.x - 20.0)
+			target_pos.y = clamp(target_pos.y, 20.0, vp_size.y - action_buttons.size.y - 120.0)
+			action_buttons.position = action_buttons.position.lerp(target_pos, 0.25)
+
+## Repositions every enemy health bar each frame based on the enemy's current 3D position.
+## Called unconditionally from _process — must never be guarded by battle-state early returns.
+func _update_enemy_health_bar_positions() -> void:
+	if not enemy_health_bars_container:
+		return
+	
+	var bc := _get_battle_camera()
+	if not bc:
+		return
+	
+	var cam := bc.get_camera()
+	if not cam:
+		return
+	
+	var camera_pos := cam.global_position
+	
+	# Collect enemy bars with their distances from the active camera
+	var bars_with_distances: Array = []
+	for enemy in enemy_health_bar_map:
+		if not is_instance_valid(enemy):
+			continue
+		var bar = enemy_health_bar_map[enemy]
+		if not is_instance_valid(bar):
+			continue
+		bars_with_distances.append({
+			"bar": bar,
+			"enemy": enemy,
+			"distance": camera_pos.distance_to(enemy.global_position)
+		})
+	
+	# Sort furthest-first so the closest enemy gets the highest z_index (drawn on top)
+	bars_with_distances.sort_custom(func(a, b): return a.distance > b.distance)
+	
+	for i in range(bars_with_distances.size()):
+		var bar = bars_with_distances[i].bar
+		var enemy = bars_with_distances[i].enemy
+		
+		bar.z_index = i
+		
+		# BattleCamera.world_to_screen() handles SubViewport scaling internally
+		var screen_pos = _project_to_hud(enemy.global_position)
+		if screen_pos == null:
+			continue
+		
+		var container_rect := enemy_health_bars_container.get_global_rect()
+		var bar_size: Vector2 = bar.size if bar.size.x > 0 else bar.custom_minimum_size
+		
+		# Center bar horizontally over the enemy's projected screen X
+		var target_x: float = screen_pos.x - container_rect.position.x - (bar_size.x / 2.0)
+		target_x = clamp(target_x, 0.0, container_rect.size.x - bar_size.x)
+		
+		bar.position = Vector2(target_x, 0.0)
+
 
 func on_start_combat(enemy_node: Node):
 	enemy = enemy_node
 	if not active_enemies.has(enemy_node):
 		active_enemies.append(enemy_node)
-		_spawn_enemy_overhead_bar(enemy_node)
+		_spawn_enemy_health_bar(enemy_node)
 		_check_boss_bar(enemy_node)
 		# Register enemy with cursor system
 		if cursor_system:
@@ -303,7 +365,7 @@ func on_add_character(character: Node):
 	else:
 		if not active_enemies.has(character):
 			active_enemies.append(character)
-		_spawn_enemy_overhead_bar(character)
+		_spawn_enemy_health_bar(character)
 		_check_boss_bar(character)
 
 func _rebuild_party_status_panel() -> void:
@@ -383,23 +445,31 @@ func set_activebattler(character: Node):
 func update_health_bars():
 	update_party_status()
 
-## Spawn an overhead health bar for a given enemy (if not already spawned).
-## The bar is added to enemy_overhead_bars_container in the native-resolution CanvasLayer
-## and projects the enemy's 3D position with line-of-sight occlusion & depth sorting.
-func _spawn_enemy_overhead_bar(enemy_node: Node) -> void:
+## Spawn a health bar for a given enemy (if not already spawned).
+## The bar is added to enemy_health_bars_container at the top of the screen.
+func _spawn_enemy_health_bar(enemy_node: Battler) -> void:
 	if not is_instance_valid(enemy_node):
 		return
-	if enemy_overhead_bar_map.has(enemy_node):
+	if enemy_health_bar_map.has(enemy_node):
 		return
-	if not enemy_overhead_bars_container:
+	if not enemy_health_bars_container:
 		return
-	var bar = ENEMY_OVERHEAD_BAR_SCENE.instantiate()
-	enemy_overhead_bars_container.add_child(bar)
-	bar.setup(enemy_node as Battler)
+	
+	var bar = ENEMY_HEALTH_BAR_SCENE.instantiate()
+	enemy_health_bars_container.add_child(bar)
+	bar.setup(enemy_node)
 	bar.bar_died.connect(func() -> void:
-		enemy_overhead_bar_map.erase(enemy_node)
+		_remove_enemy_health_bar(enemy_node)
 	)
-	enemy_overhead_bar_map[enemy_node] = bar
+	enemy_health_bar_map[enemy_node] = bar
+
+## Remove a health bar when enemy dies
+func _remove_enemy_health_bar(enemy_node: Battler) -> void:
+	if enemy_health_bar_map.has(enemy_node):
+		var bar = enemy_health_bar_map[enemy_node]
+		enemy_health_bar_map.erase(enemy_node)
+		if is_instance_valid(bar):
+			bar.queue_free()
 
 ## Check if enemy_node is a boss and show the boss bar if so.
 func _check_boss_bar(enemy_node: Node) -> void:
@@ -434,13 +504,11 @@ func show_action_buttons(character: Node):
 	
 	# Initial positioning near the battler
 	if activeBattler and is_instance_valid(activeBattler):
-		var battle_camera = _get_battle_camera()
-		if battle_camera:
-			var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
-			if not battle_camera.is_position_behind(world_pos):
-				var screen_pos = battle_camera.world_to_screen(world_pos)
-				var target_pos = screen_pos + Vector2(70.0, -50.0)
-				action_buttons.position = target_pos
+		var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
+		var screen_pos = _project_to_hud(world_pos)
+		if screen_pos != null:
+			var target_pos = screen_pos + Vector2(70.0, -50.0)
+			action_buttons.position = target_pos
 	
 	# Only set BASE_STATE if we didn't just restore from card execution
 	if not _just_restored_from_card:
@@ -482,13 +550,11 @@ func show_action_buttons(character: Node):
 	
 	# Initial positioning near the battler
 	if activeBattler and is_instance_valid(activeBattler):
-		var battle_camera = _get_battle_camera()
-		if battle_camera:
-			var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
-			if not battle_camera.is_position_behind(world_pos):
-				var screen_pos = battle_camera.world_to_screen(world_pos)
-				var target_pos = screen_pos + Vector2(70.0, -50.0)
-				action_buttons.position = target_pos
+		var world_pos = activeBattler.global_position + Vector3(0, 1.2, 0)
+		var screen_pos = _project_to_hud(world_pos)
+		if screen_pos != null:
+			var target_pos = screen_pos + Vector2(70.0, -50.0)
+			action_buttons.position = target_pos
 	
 	# Use the new ActionButtons animation system
 	action_buttons.animate_buttons_in()
