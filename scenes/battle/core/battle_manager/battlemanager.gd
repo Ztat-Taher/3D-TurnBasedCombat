@@ -1089,7 +1089,7 @@ func _use_action_on_target() -> void:
 	SignalBus.allow_select_target.emit(false)
 	end_turn()
 
-func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConfig = null) -> void:
+func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConfig = null, damage_type: String = "physical", element: String = "none") -> void:
 	# Safety check - if damage is 0, don't process
 	if damage <= 0:
 		return
@@ -1185,8 +1185,19 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 			else:
 				effect_manager.trigger_normal_hit()
 		
+		# Extract damage type and element from attack config or parameters
+		var final_damage_type = damage_type
+		var final_element = element
+		
+		# Fall back to attack config if parameters are default
+		if attack_config:
+			if final_damage_type == "physical" and not attack_config.damage_type.is_empty():
+				final_damage_type = attack_config.damage_type
+			if final_element == "none" and not attack_config.element.is_empty():
+				final_element = attack_config.element
+		
 		# AWAIT damage so counters complete before continuing
-		await target.take_damage(damage, attacker)
+		await target.take_damage(damage, attacker, final_damage_type, final_element)
 		hud.update_health_bars()
 		update_hud()
 
@@ -1477,7 +1488,7 @@ func confirm_aoe_execution():
 	else:
 		exit_targeting_mode()
 
-func _execute_aoe_card_async(card_battle_manager: CardBattleManager, card: CardData, targets: Array[Battler]):
+func _execute_aoe_card_async(card_battle_manager: CardBattleManager, card: CardConfig, targets: Array[Battler]):
 	# Set animating state
 	is_animating = true
 	
@@ -1492,13 +1503,13 @@ func _execute_aoe_card_async(card_battle_manager: CardBattleManager, card: CardD
 	
 	# Spend AP
 	if card_battle_manager.current_player_battler:
-		card_battle_manager.current_player_battler.spend_ap(card.cost)
+		card_battle_manager.current_player_battler.spend_ap(card.ap_cost)
 		if card_battle_manager.ap_system:
 			card_battle_manager.ap_system.current_ap = card_battle_manager.current_player_battler.current_ap
 			card_battle_manager.ap_system.max_ap = card_battle_manager.current_player_battler.max_ap
 		card_battle_manager.ap_changed.emit(card_battle_manager.current_player_battler.current_ap, card_battle_manager.current_player_battler.max_ap)
 	elif card_battle_manager.ap_system:
-		card_battle_manager.ap_system.spend_ap(card.cost)
+		card_battle_manager.ap_system.spend_ap(card.ap_cost)
 	
 	# Remove from hand
 	var deck = card_battle_manager._get_current_deck()
@@ -1518,7 +1529,7 @@ func _execute_aoe_card_async(card_battle_manager: CardBattleManager, card: CardD
 	if hud:
 		hud.show_action_buttons(current_character)
 
-func _execute_card_async(card_battle_manager: CardBattleManager, card: CardData, target: Battler):
+func _execute_card_async(card_battle_manager: CardBattleManager, card: CardConfig, target: Battler):
 	# Helper function to execute card asynchronously
 	await card_battle_manager.play_card(card, target)
 

@@ -10,7 +10,6 @@ item_tags = "coin,throwable,harmful,joke"
 base_power = 55
 critical_rate = 0
 effectiveness = 100
-element = 0
 target_type = 1
 skill_type = 1
 hp_delta = -55

@@ -1,32 +1,5 @@
 class_name Formulas
 
-# Element effectiveness matrix (Must use constant values, not enum references)
-const ELEMENT_MATRIX = {
-	0: { # Physical
-		0: 1.0,  # Physical vs Physical
-		1: 1.0,  # Physical vs Earth
-		2: 1.0,  # Physical vs Air
-		3: 1.0,  # Physical vs Fire
-		4: 1.0,  # Physical vs Water
-		5: 0.5   # Physical vs Magic
-	},
-	3: { # Fire
-		0: 1.0,  # Fire vs Physical
-		1: 2.0,  # Fire vs Earth
-		2: 1.0,  # Fire vs Air
-		4: 0.5,  # Fire vs Water
-		5: 1.0   # Fire vs Magic
-	},
-	4: { # Water
-		0: 1.0,  # Water vs Physical
-		1: 0.5,  # Water vs Earth
-		2: 1.0,  # Water vs Air
-		3: 2.0,  # Water vs Fire
-		5: 1.0   # Water vs Magic
-	}
-	# Add other elements as needed
-}
-
 static func physical_damage(attacker, target, damage) -> int:
 	var atk_val = attacker.stats.attack if (attacker and attacker.stats) else (attacker.attack if attacker else 10)
 	var def_val = target.stats.defense if (target and target.stats) else (target.defense if target else 0)
@@ -34,19 +7,7 @@ static func physical_damage(attacker, target, damage) -> int:
 	var defense = def_val
 	var total_damage = max(1, offense - int(defense * 0.5))
 	
-	var atk_elem = attacker.stats.element if (attacker and attacker.stats) else 0
-	var def_elem = target.stats.element if (target and target.stats) else 0
-	return int(total_damage * element_wheel(atk_elem, def_elem))
-
-static func element_wheel(attack_element, defend_element) -> float:
-	var multiplier = 1.0
-
-	if attack_element == defend_element + 1:
-		multiplier = 0.5
-	elif attack_element == defend_element - 1:
-		multiplier = 2.0
-		
-	return multiplier
+	return total_damage
 
 ## Calculates damage based on stats, skill, and designated global damage calculation type.[br]
 ## [br]

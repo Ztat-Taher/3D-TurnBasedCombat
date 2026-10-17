@@ -2,15 +2,15 @@
 
 [ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
 [ext_resource type="Resource" uid="uid://cfcgtctwxdn1f" path="res://database/state_configs/bleed_state_config.tres" id="2"]
+[ext_resource type="Resource" path="res://database/card_effects/bleed_strike_damage.tres" id="3"]
 
 [resource]
 script = ExtResource("1")
 animation_name = "ranged_cast_1"
-base_damage = 8
-damage_scaling = {
-"attack": 0.5
-}
+primary_effect = ExtResource("3")
 applies_states = Array[Resource]([ExtResource("2")])
 state_duration = -1
+card_name = "Bleed Strike"
 card_tags = Array[String](["status", "bleed", "single_target"])
 card_description = "Causes the target to accumulate bleed from damage taken. Triggers massive damage when full."
+ap_cost = 1

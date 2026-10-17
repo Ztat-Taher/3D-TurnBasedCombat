@@ -1,15 +1,14 @@
 [gd_resource type="Resource" script_class="DeckResource" format=3 uid="uid://d4e5f6g7h8jaj"]
 
 [ext_resource type="Script" uid="uid://mwh0vw6ftl1r" path="res://scenes/battle/card_combat/resources/cards/deck_resource.gd" id="1"]
-[ext_resource type="Script" uid="uid://bey7off4hhc5m" path="res://addons/card_combat/card_data.gd" id="1_m0m8l"]
-[ext_resource type="Resource" uid="uid://1b2c3d4e5f6g" path="res://database/cards/attacks/basic_attack.tres" id="2"]
-[ext_resource type="Resource" path="res://database/cards/status/bleed_strike.tres" id="2_l7j37"]
-[ext_resource type="Resource" uid="uid://ba1bu5kyx2n8s" path="res://database/cards/heals/minor_heal.tres" id="3"]
-[ext_resource type="Resource" uid="uid://cuv6ss2lo6cyn" path="res://database/cards/status/electrocute.tres" id="5_pn46r"]
-[ext_resource type="Resource" path="res://database/cards/support/single_shield.tres" id="7_kl4a8"]
-[ext_resource type="Resource" path="res://database/cards/attacks/flurry_attack.tres" id="7_pn46r"]
+[ext_resource type="Resource" uid="uid://dtckg3jdk81j7" path="res://database/card_configs/basic_attack_config.tres" id="2"]
+[ext_resource type="Resource" uid="uid://h1xh0y51w8uw" path="res://database/card_configs/bleed_strike_config.tres" id="3"]
+[ext_resource type="Resource" uid="uid://dtckg3jdk81j7" path="res://database/card_configs/minor_heal_config.tres" id="4"]
+[ext_resource type="Resource" uid="uid://bxl2j6xk3m9n" path="res://database/card_configs/electrocuted_card_config.tres" id="5"]
+[ext_resource type="Resource" uid="uid://x3m7n9p4q5r6" path="res://database/card_configs/single_shield_config.tres" id="6"]
+[ext_resource type="Resource" uid="uid://a4b8c2d3e4f5" path="res://database/card_configs/flurry_attack_config.tres" id="7"]
 
 [resource]
 script = ExtResource("1")
 deck_name = "Player Starter Deck"
-cards = Array[ExtResource("1_m0m8l")]([ExtResource("2_l7j37"), ExtResource("3"), ExtResource("7_kl4a8"), ExtResource("7_kl4a8"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("5_pn46r"), ExtResource("7_pn46r"), ExtResource("7_pn46r"), ExtResource("7_pn46r")])
+cards = Array[CardConfig]([ExtResource("3"), ExtResource("4"), ExtResource("6"), ExtResource("6"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("5"), ExtResource("7"), ExtResource("7"), ExtResource("7")])

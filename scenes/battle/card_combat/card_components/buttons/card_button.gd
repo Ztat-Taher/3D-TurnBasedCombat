@@ -2,11 +2,11 @@ extends Control
 class_name CardButton
 ## Button representing a card in the player's hand with Balatro-style shader effect
 
-signal card_played(card: CardData)
+signal card_played(card: CardConfig)
 signal card_drag_started(card_button: CardButton)
 signal card_drag_ended(card_button: CardButton, dropped_in_play_zone: bool)
 
-var card_data: CardData
+var card_config: CardConfig
 var is_hovered: bool = false
 var is_selected: bool = false
 var is_highlighted: bool = false
@@ -76,8 +76,8 @@ var _default_type_icon_texture: Texture2D
 var _default_attack_icon_texture: Texture2D
 var _default_effect_icon_texture: Texture2D
 
-func setup(card: CardData) -> void:
-	card_data = card
+func setup(card: CardConfig) -> void:
+	card_config = card
 	
 	# Defer setup if nodes aren't ready yet
 	if not card_name or not ap_cost:
@@ -94,12 +94,12 @@ func setup(card: CardData) -> void:
 	_default_attack_icon_texture = attack_icon.texture if attack_icon else null
 	_default_effect_icon_texture = effect_icon.texture if effect_icon else null
 	
-	# Set modular card components (use fallback if card data doesn't provide texture)
+	# Set modular card components (use fallback textures for now)
 	if card_name:
-		card_name.text = card.name
+		card_name.text = card_config.card_name
 	
 	if ap_cost:
-		ap_cost.text = str(card.cost)
+		ap_cost.text = str(card.ap_cost)
 	
 	if card_frame:
 		card_frame.texture = card.card_frame_texture if card.card_frame_texture else _default_card_frame_texture
@@ -132,16 +132,16 @@ func setup(card: CardData) -> void:
 		effect_icon.texture = card.effect_icon if card.effect_icon else _default_effect_icon_texture
 	
 	# Set up description popup if description exists
-	if card.description and not card.description.is_empty():
+	if card.card_description and not card.card_description.is_empty():
 		_setup_description_popup()
 
 func _get_card_status_effects() -> Array[State]:
 	## Get status effects that this card applies
 	var status_effects: Array[State] = []
 	
-	# Check if card has config with applies_states
-	if card_data.card_config and card_data.card_config.applies_states:
-		for state_config in card_data.card_config.applies_states:
+	# Check if card has applies_states
+	if card_config.applies_states:
+		for state_config in card_config.applies_states:
 			if state_config and state_config.has_method("get"):
 				var state_id = state_config.get("state_id")
 				if not state_id.is_empty():
@@ -252,10 +252,22 @@ func _setup_shader():
 
 func _set_type_based_background():
 	## Set background based on card type when no specific background is provided
-	if not card_data or not card_background:
+	if not card_config or not card_background:
 		return
 	
-	var card_type = card_data.card_type.to_lower()
+	# Use card_tags to determine type
+	var card_tags = card_config.card_tags
+	var card_type = "default"
+	
+	if "attack" in card_tags:
+		card_type = "attack"
+	elif "heal" in card_tags:
+		card_type = "heal"
+	elif "shield" in card_tags or "defense" in card_tags:
+		card_type = "defense"
+	elif "status" in card_tags:
+		card_type = "special"
+	
 	var type_background_path = ""
 	
 	# Map card types to background sprite paths
@@ -327,7 +339,7 @@ func _setup_description_popup():
 	var status_effects = _get_card_status_effects()
 	
 	if description_popup.has_method("setup"):
-		description_popup.setup(self, card_data.description, status_effects)
+		description_popup.setup(self, card_config.card_name, status_effects)
 	
 	description_popup.visible = false
 

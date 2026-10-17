@@ -23,7 +23,6 @@ enum TARGETS_TYPES {
 @export var base_power : int = 0
 @export var critical_rate : int = 0
 @export var effectiveness : int = 100
-@export var element : GlobalBattleSettings.Elements = GlobalBattleSettings.Elements.Physical
 @export var target_type : TARGETS_TYPES = TARGETS_TYPES.SINGLE_TARGETS
 @export var skill_type : GlobalBattleSettings.ItemTypes = GlobalBattleSettings.ItemTypes.HEALING
 

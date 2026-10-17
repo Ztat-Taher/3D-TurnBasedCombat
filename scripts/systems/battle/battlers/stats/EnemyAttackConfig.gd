@@ -8,6 +8,10 @@ extends Resource
 @export_range(0.1, 10.0, 0.1) var weight: float = 1.0
 @export var description: String = ""
 
+@export_group("Damage Configuration")
+@export var damage_type: String = "physical"  # physical, magical, true_damage
+@export var element: String = "none"  # fire, ice, lightning, earth, air, magic, none
+
 @export_group("Defense Rules")
 @export var can_dodge: bool = true
 @export var can_parry: bool = true

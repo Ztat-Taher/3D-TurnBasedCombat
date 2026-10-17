@@ -16,3 +16,5 @@ applies_states = Array[Resource]([ExtResource("2")])
 state_duration = -1
 card_tags = Array[String](["support", "shield", "single_target"])
 card_description = "Grants a protective shield to a single ally that ignores the next hit."
+card_name = "Single Shield"
+ap_cost = 1

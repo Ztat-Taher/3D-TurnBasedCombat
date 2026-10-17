@@ -7,7 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://t0x151045p81" path="res://assets/images/cursors/cursor_interact.png" id="5_n8rhr"]
 [ext_resource type="Texture2D" uid="uid://5bsildqw8mgc" path="res://assets/images/cursors/cursor_targeting.png" id="6_3puft"]
 [ext_resource type="Texture2D" uid="uid://biirsroouiiyp" path="res://assets/images/cursors/hand_small_closed.png" id="6_press"]
-[ext_resource type="Script" uid="uid://45gyrg158vij" path="res://addons/trail_2d/trail_2d.gd" id="7_trail_script"]
+[ext_resource type="Script" uid="uid://45gyrg158vij" path="res://scenes/ui/cursor/effects/trail_2d.gd" id="7_trail_script"]
 [ext_resource type="Script" uid="uid://c544b7m24uk1v" path="res://scenes/ui/cursor/effects/cursor_juice.gd" id="8_juice_script"]
 
 [sub_resource type="Curve" id="Curve_trail_width"]

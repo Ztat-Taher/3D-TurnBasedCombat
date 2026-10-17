@@ -13,11 +13,8 @@ qte_success_multiplier = 1.2
 qte_failure_multiplier = 0.8
 qte_mash_count = 0
 qte_mash_window = 0.0
-base_damage = 10
-damage_scaling = {
-"attack": 0.5
-}
 state_chance = 0.0
 state_duration = 0
+card_name = "Basic Attack"
 card_tags = Array[String](["attack", "basic", "physical"])
 card_description = "A basic attack that deals 10 physical damage to a single enemy."

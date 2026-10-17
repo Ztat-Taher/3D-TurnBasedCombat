@@ -32,8 +32,5 @@ extends Resource
 ## deck assigned (see GameState / AllyPartyMember).
 @export var deck: DeckResource
 
-@export_group("Other Stats")
-@export var element: int = GlobalBattleSettings.Elements.Physical ## Character element
-
 ## Voicelines and Audio
 @export var voicelines: Voicelines ## Character voicelines for combat events

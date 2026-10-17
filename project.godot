@@ -46,12 +46,13 @@ AIManager="*res://scripts/systems/battle/core/ai/ai_manager.gd"
 SignalBus="*res://assets/globals/signal_bus.gd"
 ItemHandler="*res://scripts/systems/inventory/items/item_handler.gd"
 MCPRuntime="*uid://fj17x84g2o5q"
-DebugMenu="*uid://cggqb75a8w8r"
+DebugMenu="*res://addons/debug_menu/debug_menu.tscn"
 AppConfig="*uid://cjke6crjg14a0"
 SceneLoader="*uid://cbwmrnp0af35y"
 ProjectMusicController="*uid://r5t485lr3p7t"
 ProjectUISoundController="*uid://cc37235kj4384"
 CursorSystem="*res://scenes/ui/cursor/main_system/cursor_system.tscn"
+GlobalHitEffectLibrary="*res://assets/globals/hit_effect_library/hit_effect_library_globals.gd"
 
 [display]
 
@@ -65,7 +66,7 @@ project/assembly_name="Turn-Based Combat"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/anthonyec.camera_preview/plugin.cfg", "res://addons/card_combat/plugin.cfg", "res://addons/debug_menu/plugin.cfg", "res://addons/maaacks_game_template/plugin.cfg", "res://addons/plugin_updater/plugin.cfg")
+enabled=PackedStringArray("res://addons/anthonyec.camera_preview/plugin.cfg", "res://addons/debug_menu/plugin.cfg", "res://addons/maaacks_game_template/plugin.cfg", "res://addons/plugin_updater/plugin.cfg")
 
 [file_customization]
 

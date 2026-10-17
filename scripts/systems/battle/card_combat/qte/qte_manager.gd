@@ -41,21 +41,15 @@ func load_qte_config() -> QTEConfig:
 # CARD ATTACK QTE
 # ============================================================================
 
-func start_card_qte(card: CardData) -> bool:
+func start_card_qte(card: CardConfig) -> bool:
 	if not qte_config or not qte_config.card_qte_enabled:
 		return false
 	
-	# Check CardConfig for QTE settings (primary system)
-	if card.has_card_config():
-		if not card.card_config.should_trigger_qte():
-			return false
-		var card_cfg_diff = card.card_config.qte_difficulty
-		return start_qte(QTEType.CARD_ATTACK, card_cfg_diff)
-	
-	# Fallback to metadata for legacy cards
-	var card_type = card.metadata.get("card_type", "attack")
-	if card_type != "attack":
-		return false  # Only attack cards get QTEs
+	# Check CardConfig for QTE settings
+	if not card.should_trigger_qte():
+		return false
+	var card_cfg_diff = card.qte_difficulty
+	return start_qte(QTEType.CARD_ATTACK, card_cfg_diff)
 	
 	var metadata_diff = card.metadata.get("qte_difficulty", qte_config.default_card_qte_difficulty)
 	return start_qte(QTEType.CARD_ATTACK, metadata_diff)

@@ -4,59 +4,40 @@ This guide provides AI agents with precise instructions for creating new cards i
 
 ## System Architecture Overview
 
-The card system has two parallel configuration methods:
-1. **Legacy Metadata System** (backward compatible)
-2. **New CardConfig System** (recommended, fully featured)
+The card system uses a **simplified two-resource architecture**:
+1. **CardConfig** - Card-level configuration (targeting, animation, QTE, states, display assets)
+2. **CardEffect** - Effect-level configuration (numeric values, scaling, damage type, element)
 
-AI agents should prefer the CardConfig system for new cards as it provides complete control over all card behaviors.
+**Note:** The addon card_combat system (CardData, CombatDeck, CombatSession) has been deprecated and is no longer used. The game now uses only CardConfig and CardEffect resources directly.
 
 ## Deck Management
 
-**Important:** There is no longer a central CardDatabase. Cards are managed as individual CardData resources that are passed directly to the deck system.
-
 **Deck Composition:**
-- Cards are loaded as CardData resources from the `database/cards/` directory
-- Decks are composed by passing an array of CardData resources to `CardIntegration.initialize_for_player()`
+- Cards are loaded as CardConfig resources from the `database/card_configs/` directory
+- Decks are composed by passing an array of CardConfig resources to `CardIntegration.initialize_for_player()`
 - No card ID lookup system exists - cards are referenced directly by their resource objects
+- Decks use SimplifiedDeck (lightweight deck management) instead of the addon's CombatDeck
 
 **When creating cards for a deck:**
-1. Create the CardData resource file
-2. Create all associated CardConfig and sub-resources
-3. Link resources in Godot Editor
-4. Load the CardData resource and pass it to the deck initialization system
+1. Create the CardConfig resource file
+2. Create associated CardEffect resources
+3. Link resources in the .tres files using ExtResource format
+4. Add CardConfig to DeckResource.cards array
+5. Load the DeckResource and pass it to the deck initialization system
 
 ## Card Creation Process
 
-### Step 1: Choose Creation Method
-
-**For AI Agents: Always use CardConfig system** unless specifically requested to use legacy metadata.
-
-### CardData Resource Configuration
-
-**Required Fields:**
-- `card_id`: Unique identifier (snake_case)
-- `name`: Display name
-- `cost`: AP cost (integer)
-- `attack`: Base damage value (integer)  
-- `health`: Base heal value (integer)
-- `play_kind`: 0 = EFFECT, 1 = UNIT, 2 = PERSISTENT
-- `card_config`: Reference to CardConfig resource (set in Godot Editor)
-- `metadata`: Dictionary (only if not using CardConfig)
-- `spell_effects`: Array of SpellEffect resources (legacy system)
-
-**Important:** Set `card_config` to `null` in the .tres file and add a comment indicating what should be set in the Godot Editor. This avoids circular reference issues during file loading.
-
-### Step 3: Create CardConfig Resource
+### Step 1: Create CardConfig Resource
 
 **File Location:** `database/card_configs/[card_name]_config.tres`
 
 **Required Script Reference:**
 ```
-[ext_resource type="Script" path="res://battle-manager/card_combat/resources/card_config.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
 script = ExtResource("1")
 ```
 
-**Important Note:** Resource references (like CardEffect, VFXConfig, etc.) should be set in the Godot Editor, not directly in the .tres file. Set the properties to `null` in the .tres file and add comments indicating what should be set in the editor. This avoids circular reference issues.
+**Note:** Resource references (like CardEffect, StateConfig, etc.) should be set in the .tres file using the proper ExtResource format to avoid circular reference issues.
 
 ## CardConfig Property Configuration
 
@@ -251,20 +232,28 @@ These can be used as templates or directly assigned to character Battler nodes.
 
 ### CardEffect Resource Configuration
 
-**File Location:** `database/card_effects/[effect_name]_effect.tres`
+**File Location:** `database/card_effects/[effect_name].tres`
 
 **Required Script:**
 ```
-[ext_resource type="Script" path="res://battle-manager/card_combat/resources/card_effect.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
 script = ExtResource("1")
 ```
 
 **Required Fields:**
 - `effect_type`: Integer from EffectType enum
-- `value`: Integer (base effect value)
+- `value`: Integer (base effect value - damage, heal, shield amount)
 - `targeting`: Integer from EffectTargeting enum
 - `scaling`: Dictionary (stat scaling, e.g., {"attack": 0.5})
 - `conditions`: Array of EffectCondition resources (empty if none)
+
+**Important:** CardEffect is the **source of truth** for numeric values:
+- `value` contains the base damage/heal/shield amount
+- `scaling` contains stat scaling configuration
+- `damage_type` (for damage effects) can be "physical", "magical", or "true_damage"
+- `element` (for hit effects) can be "none", "fire", "ice", "lightning", "bleed", etc.
+
+These fields are NOT in CardConfig - they must be set in CardEffect.
 
 **Effect Type Enum:**
 - 0 = DAMAGE (deal damage to target(s))
@@ -296,6 +285,14 @@ script = ExtResource("1")
 - `stack_count`: Integer (number of stacks for stacking effects)
 - `can_crit`: Boolean (whether effect can critical hit)
 - `crit_multiplier`: Float (critical hit multiplier)
+
+**Effect Timing Enum:**
+- 0 = IMMEDIATE (effect triggers immediately)
+- 1 = AFTER_ANIMATION (effect triggers after animation completes)
+- 2 = ON_HIT (effect triggers on hit frame)
+- 3 = ON_IMPACT (effect triggers on impact with target)
+- 4 = CHANNEL_START (effect triggers when channeling starts)
+- 5 = CHANNEL_END (effect triggers when channeling ends)
 
 ### Visual Effect Configuration
 
@@ -490,20 +487,24 @@ script = ExtResource("1")
 - For SEQUENCE type: `qte_sequence`: Array[String] (button sequence)
 - For BUTTON_MASH type: `qte_mash_count`: Integer (required button presses), `qte_mash_window`: Float (time window)
 
-### Damage and Stats Configuration
+### CardConfig Display Assets Configuration
 
 **Required Fields:**
-- `base_damage`: Integer (base damage value)
-- `damage_scaling`: Dictionary (stat scaling, e.g., {"attack": 0.5, "magic": 0.3})
-- `damage_type`: Integer from DamageType enum
-- `heal_amount`: Integer (base healing amount)
-- `shield_amount`: Integer (shield/defense amount)
-- `stat_modifiers`: Dictionary (temporary stat changes)
+- `card_name`: String - Display name of the card (shown in UI)
+- `ap_cost`: int - AP cost to play the card (typically 1-3)
+- `card_description`: String - Flavor text and description
 
-**Damage Type Enum:**
-- 0 = PHYSICAL (physical damage)
-- 1 = MAGICAL (magical damage)
-- 2 = TRUE_DAMAGE (true damage - ignores defense)
+**Optional Display Asset Fields:**
+- `background_sprite`: Texture2D - Type-based background texture
+- `main_image`: Texture2D - Character portrait or icon
+- `attack_icon`: Texture2D - Attack damage icon
+- `effect_icon`: Texture2D - Effect/special ability icon
+- `card_frame_texture`: Texture2D - Outer frame/border texture
+- `name_banner_texture`: Texture2D - Textured banner for card name
+- `cost_badge_texture`: Texture2D - Cost badge texture
+- `type_icon`: Texture2D - Card type indicator icon
+
+**Note:** Numeric values (damage, heal, shield) are set in CardEffect, not CardConfig.
 
 ### State and Debuff Configuration
 
@@ -556,7 +557,6 @@ script = ExtResource("1")
 
 **Required Fields:**
 - `card_rarity`: Integer from CardRarity enum
-- `card_element`: Integer from Element enum
 - `card_tags`: Array[String] (tags for filtering and grouping)
 - `card_description`: String (flavor text and description)
 
@@ -567,70 +567,64 @@ script = ExtResource("1")
 - 3 = EPIC (epic cards)
 - 4 = LEGENDARY (legendary cards)
 
-**Element Enum:**
-- 0 = NONE (no element)
-- 1 = FIRE (fire element)
-- 2 = ICE (ice element)
-- 3 = LIGHTNING (lightning element)
-- 4 = EARTH (earth element)
-- 5 = WIND (wind element)
-- 6 = LIGHT (light element)
-- 7 = DARK (dark element)
+**Note:** Element is now set in CardEffect (for hit effects), not in CardConfig.
 
 ## AI Agent Card Creation Process
 
 ### Phase 1: File Creation
-AI agents create all necessary .tres files with null resource references and editor comments.
+AI agents create all necessary .tres files with proper ExtResource references.
 
-### Phase 2: Godot Editor Configuration
-After file creation, resources must be linked in the Godot Editor:
-1. Open the project in Godot Editor
-2. Navigate to the created resource files
-3. Set resource references (CardConfig → CardEffect, VFXConfig, etc.)
-4. Validate configurations in the inspector
-5. Test the card in the battle system
+### Phase 2: Resource Linking
+Resources are linked directly in the .tres files using ExtResource format:
+1. Create CardConfig resource in `database/card_configs/`
+2. Create CardEffect resource(s) in `database/card_effects/`
+3. Link CardConfig.primary_effect to CardEffect using ExtResource
+4. Add CardConfig to DeckResource.cards array
+5. No CardData creation needed
 
 ### Example Request: "Create a lightning bolt card that deals 40 damage to a single enemy with a 0.5 difficulty timing QTE, stun chance of 30%, rare rarity, and lightning element"
 
 ### AI Agent Process:
 
-1. **Create CardData resource** (`database/cards/skills/lightning_bolt.tres`)
-   - Set basic properties (card_id, name, cost, attack, etc.)
-   - Set card_config to null with comment
-   - Leave metadata and spell_effects empty
-
-2. **Create CardConfig resource** (`database/card_configs/lightning_bolt_config.tres`)
+1. **Create CardConfig resource** (`database/card_configs/lightning_bolt_config.tres`)
+   - Set card_name to "Lightning Bolt"
+   - Set ap_cost to 1 (or appropriate value)
    - Configure targeting as SINGLE_ENEMY (1)
-   - Set base_damage to 40
    - Configure QTE as TIMING (1) with difficulty 0.5
-   - Set actor_animation to a generic name (e.g., "magic_cast" for a spell)
-   - Set primary_effect to null with comment
-   - Set vfx_on_target to null with comment
-   - Add lightning element and rarity
-   - Set applies_states to null with comment for stun state
+   - Set animation_name to "ranged_cast_1" (canonical cast slot)
+   - Set card_rarity to RARE (2)
+   - Set applies_states to reference stun state configuration
+   - Link primary_effect to CardEffect resource via ExtResource
 
-3. **Create CardEffect resource** (`database/card_effects/lightning_damage_effect.tres`)
+2. **Create CardEffect resource** (`database/card_effects/lightning_damage.tres`)
    - Set effect_type to DAMAGE (0)
    - Set value to 40
    - Set targeting to TARGET (1)
-   - Add magic scaling
+   - Set scaling to {"attack": 0.5} (or appropriate scaling)
+   - Set damage_type to "physical" (or "magical" if applicable)
+   - Set element to "lightning" (for hit effects)
 
-4. **Create VFXConfig resource** (`database/vfx_configs/lightning_vfx.tres`)
-   - Set vfx_scene path
-   - Configure spawn point and timing
-
-5. **Create StateConfig resource** (`database/state_configs/stun_state.tres`)
+3. **Create StateConfig resource** (if applying states) (`database/state_configs/stun_state.tres`)
    - Set state_id to "stun"
    - Configure duration and chance
 
-6. **Add editor comments** to all files indicating which resources should be linked in Godot Editor
-
-7. **Provide completion instructions** to the user for Godot Editor setup
+4. **Add to DeckResource** (`database/decks/player_deck.tres`)
+   - Add CardConfig ExtResource reference to cards array
 
 ### Example Cards Created
-The card database has been cleared for a fresh start with the new resource-driven system. Example cards will be created as needed when requested.
-
-**Note:** Previous example cards (Lightning Bolt, Fire Explosion, etc.) have been removed as part of the database reset. The system is now ready for new card creation using the updated resource architecture.
+The card database contains the following example cards:
+- `basic_attack_config.tres` - Basic single-target attack
+- `bleed_strike_config.tres` - Attack with bleed status effect
+- `blizzard_config.tres` - AOE ice damage
+- `burning_card_config.tres` - Fire damage with burn status
+- `electrocuted_card_config.tres` - Lightning damage with electrocuted status
+- `flurry_attack_config.tres` - Multi-strike attack
+- `group_heal_config.tres` - AOE heal
+- `group_shield_config.tres` - AOE shield
+- `ice_spear_config.tres` - Single-target ice damage
+- `ice_strike_config.tres` - Ice damage with chilled status
+- `minor_heal_config.tres` - Single-target heal
+- `single_shield_config.tres` - Single-target shield
 
 ### AI Agent Template Example
 
@@ -660,8 +654,8 @@ Create a card with the following specifications:
 AI agents must ensure:
 
 1. **File Structure:**
-   - CardData in `database/cards/[category]/[card_name].tres`
    - CardConfig in `database/card_configs/[card_name]_config.tres`
+   - CardEffect in `database/card_effects/[effect_name].tres`
    - Related resources in appropriate subdirectories
 
 2. **Resource References:**
@@ -680,9 +674,9 @@ AI agents must ensure:
    - Validation would pass (check each resource's validate() method)
 
 5. **Integration:**
-   - CardData properly references CardConfig
-   - CardConfig references all sub-resources correctly
+   - CardConfig references all sub-resources correctly via ExtResource
    - File paths are relative to project root (res://)
+   - No CardData needed - CardConfig is the top-level resource
 
 ## Example Card Creation Process
 
@@ -690,15 +684,25 @@ AI agents must ensure:
 
 ### AI Agent Process:
 
-1. **Create CardData resource** (`database/cards/skills/fireball_burst.tres`)
-2. **Create CardConfig resource** (`database/card_configs/fireball_burst_config.tres`)
-3. **Create CardEffect resource** (`database/card_effects/fireball_damage_effect.tres`)
-4. **Configure targeting as ALL_ENEMIES (2)**
-5. **Set base_damage to 50**
-6. **Configure QTE as TIMING (1) with difficulty 0.4**
-7. **Set appropriate animation and VFX**
-8. **Add fire element and rarity**
-9. **Validate all configurations**
+1. **Create CardConfig resource** (`database/card_configs/fireball_config.tres`)
+   - Set card_name to "Fireball"
+   - Set ap_cost to 2 (AOE cards typically cost more)
+   - Configure targeting as ALL_ENEMIES (2)
+   - Configure QTE as TIMING (1) with difficulty 0.4
+   - Set animation_name to "ranged_cast_1" (canonical cast slot)
+   - Set card_rarity to UNCOMMON (1)
+   - Link primary_effect to CardEffect resource via ExtResource
+
+2. **Create CardEffect resource** (`database/card_effects/fireball_damage.tres`)
+   - Set effect_type to DAMAGE (0)
+   - Set value to 50
+   - Set targeting to ALL_ENEMIES (2)
+   - Set scaling to {"attack": 0.5}
+   - Set damage_type to "physical"
+   - Set element to "fire" (for hit effects)
+
+3. **Add to DeckResource** (`database/decks/player_deck.tres`)
+   - Add CardConfig ExtResource reference to cards array
 
 ## Common Card Patterns
 
@@ -803,9 +807,9 @@ After creating a card, AI agents should:
 ### Common Issues:
 
 1. **Card not appearing in deck:**
-   - Check card_id matches deck configuration
-   - Verify CardData resource loads correctly
-   - Ensure CardConfig reference is valid
+   - Verify CardConfig resource loads correctly
+   - Ensure CardConfig is added to DeckResource.cards array
+   - Check ExtResource references are valid
 
 2. **Effects not triggering:**
    - Check effect timing configuration
@@ -867,12 +871,6 @@ Apply multiple states for complex debuffs:
 #### Directory Structure:
 ```
 database/
-├── cards/
-│   ├── attacks/
-│   ├── skills/
-│   ├── heals/
-│   ├── buffs/
-│   └── debuffs/
 ├── card_configs/
 ├── card_effects/
 ├── vfx_configs/
@@ -886,12 +884,11 @@ database/
 **Note:** Some directories (camera_effects, screen_effects, state_configs) are optional as these resources can be embedded directly in CardConfig rather than stored as separate files. Use separate files only when the same resource is shared across multiple cards.
 
 **Current Database State:**
-- `database/cards/` - Empty (needs creation)
-- `database/card_configs/` - Empty (needs creation)
+- `database/card_configs/` - Contains 12 card config resources
+- `database/card_effects/` - Contains 9 effect resources
 - `database/animation_mappings/` - Empty (create as needed for characters)
-- `database/card_effects/` - Empty (needs creation)
-- `database/vfx_configs/` - Empty (needs creation)
-- `database/audio_configs/` - Empty (needs creation)
+- `database/vfx_configs/` - Empty (create as needed)
+- `database/audio_configs/` - Empty (create as needed)
 - `database/items/` - Contains item resources (preserve)
 - `database/states/` - Contains state resources (preserve)
 - `database/troops/` - Contains troop resources (preserve)
@@ -899,9 +896,8 @@ database/
 AI agents should create directories as needed when adding new cards.
 
 ### Naming Conventions:
-- Card files: `[card_name].tres`
 - Config files: `[card_name]_config.tres`
-- Effect files: `[effect_name]_effect.tres`
+- Effect files: `[effect_name].tres`
 - VFX files: `[vfx_name]_vfx.tres`
 - Audio files: `[audio_name]_audio.tres`
 - State files: `[state_name]_state.tres`
@@ -990,9 +986,9 @@ The resource scripts in `battle-manager/card_combat/resources/` have been design
 - Resource classes cannot call Node methods directly - camera node must be passed as parameter
 
 **CardIntegration:**
-- No CardDatabase class - cards are passed as CardData arrays
-- Deck initialization: `initialize_for_player(player_battler, deck_resources: Array[CardData])`
-- Backward compatible with legacy metadata system for existing cards
+- No CardDatabase class - cards are passed as CardConfig arrays
+- Deck initialization: `initialize_for_player(player_battler, deck_resources: Array[CardConfig])`
+- Uses SimplifiedDeck for deck management (draw_pile, hand, graveyard)
 - Removed `deck_card_ids` array - no longer uses ID-based lookup
 
 **General Principles:**
@@ -1002,15 +998,20 @@ The resource scripts in `battle-manager/card_combat/resources/` have been design
 - Test Godot parser/compilation after resource script changes
 - Use Godot ternary syntax: `value_if_true if condition else value_if_false`
 
-### Recent Bug Fixes (for reference)
+### Recent System Changes (for reference)
 
-The following issues were resolved in the resource scripts:
+The following major changes were made to the card system:
 
-1. **AudioConfig Type Errors:** Fixed invalid casts between AudioStreamPlayer base class and 2D/3D subclasses by using separate branches and generic Node return type
-2. **AudioConfig Doppler Tracking:** Fixed invalid enum members by using numeric values (0/1) instead of DISABLED/ENABLED constants
-3. **CameraEffectConfig SceneTree Access:** Fixed "Function not found in base self" errors by calling `camera.get_tree()` instead of `get_tree()` in resource methods
-4. **CameraEffectConfig Delta Time:** Fixed by using fixed 1.0/60.0 per-frame increment instead of `get_process_delta_time()`
-5. **CardIntegration CardDatabase:** Removed references to non-existent CardDatabase class; changed to direct CardData array passing
+1. **CardData Removal:** Deprecated the addon CardData wrapper - cards now use CardConfig directly
+2. **CombatDeck Replacement:** Replaced addon CombatDeck with SimplifiedDeck (uses Array[CardConfig])
+3. **CardConfig Cleanup:** Removed redundant damage/stats fields (base_damage, damage_scaling, heal_amount, shield_amount, damage_type, card_element, stat_modifiers)
+4. **CardConfig Additions:** Added display fields (card_name, ap_cost, background_sprite, main_image, attack_icon, effect_icon, card_frame_texture, name_banner_texture, cost_badge_texture, type_icon)
+5. **CardEffect as Source of Truth:** Numeric values (value, scaling, damage_type, element) are now in CardEffect, not CardConfig
+6. **AudioConfig Type Errors:** Fixed invalid casts between AudioStreamPlayer base class and 2D/3D subclasses by using separate branches and generic Node return type
+7. **AudioConfig Doppler Tracking:** Fixed invalid enum members by using numeric values (0/1) instead of DISABLED/ENABLED constants
+8. **CameraEffectConfig SceneTree Access:** Fixed "Function not found in base self" errors by calling `camera.get_tree()` instead of `get_tree()` in resource methods
+9. **CameraEffectConfig Delta Time:** Fixed by using fixed 1.0/60.0 per-frame increment instead of `get_process_delta_time()`
+10. **CardIntegration CardDatabase:** Removed references to non-existent CardDatabase class; changed to direct CardConfig array passing
 
 When creating new resource scripts, follow these patterns to avoid similar issues.
 

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardEffect" format=3 load_steps=2]
+
+[ext_resource type="Script" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+effect_type = 0
+value = 12
+targeting = 1
+scaling = {
+"attack": 0.6
+}
+conditions = []
+is_percentage = false
+delay = 0.0
+duration = 0.0
+stack_count = 0
+can_crit = true
+crit_multiplier = 1.5
+damage_type = "physical"
+element = "ice"

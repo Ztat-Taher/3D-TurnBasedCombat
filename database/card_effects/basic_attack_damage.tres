@@ -4,6 +4,18 @@
 
 [resource]
 script = ExtResource("1")
-value = 100
+effect_type = 0
+value = 10
+targeting = 1
+scaling = {
+"attack": 0.5
+}
+conditions = []
+is_percentage = false
+delay = 0.0
+duration = 0.0
 stack_count = 0
+can_crit = true
 crit_multiplier = 1.5
+damage_type = "physical"
+element = "none"

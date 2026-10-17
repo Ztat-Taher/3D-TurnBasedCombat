@@ -9,7 +9,7 @@ class_name BattleAflictions
 static func format_damage_text(
 	attacker: Battler,
 	target: Battler,
-	card: CardData,
+	card: CardConfig,
 	damage: int,
 	is_critical: bool = false,
 	is_weakness: bool = false
@@ -22,7 +22,7 @@ static func format_damage_text(
 		text += "[b]%s[/b]" % attacker.character_name
 
 	if card:
-		text += " used [i]%s[/i]" % card.name
+		text += " used [i]%s[/i]" % card.card_name
 	else:
 		text += " attacked"
 
@@ -34,8 +34,8 @@ static func format_damage_text(
 
 	# Determine text color based on effect and element
 	var element_id = 0
-	if card and card.metadata.has("element"):
-		var element_str = card.metadata["element"]
+	if card and card.primary_effect and "element" in card.primary_effect:
+		var element_str = card.primary_effect.element
 		element_id = get_element_id_from_string(element_str)
 
 	var color = get_element_color(element_id)
@@ -68,7 +68,7 @@ static func format_damage_text(
 static func format_heal_text(
 	user: Battler,
 	target: Battler,
-	card: CardData,
+	card: CardConfig,
 	healing: int
 ) -> String:
 
@@ -78,7 +78,7 @@ static func format_heal_text(
 		text += "[b]%s[/b]" % user.character_name
 
 	if card:
-		text += " used [i]%s[/i]" % card.name
+		text += " used [i]%s[/i]" % card.card_description
 	else:
 		text += " used an item"
 
@@ -95,7 +95,7 @@ static func format_heal_text(
 static func format_miss_text(
 	attacker: Battler,
 	target: Battler,
-	card: CardData
+	card: CardConfig
 ) -> String:
 
 	var text = ""
@@ -104,7 +104,7 @@ static func format_miss_text(
 		text += "[b]%s[/b]" % attacker.character_name
 
 	if card:
-		text += " used [i]%s[/i]" % card.name
+		text += " used [i]%s[/i]" % card.card_name
 	else:
 		text += " attacked"
 
@@ -121,7 +121,7 @@ static func format_miss_text(
 static func format_revive_text(
 	user: Battler,
 	target: Battler,
-	card: CardData
+	card: CardConfig
 ) -> String:
 
 	var text = ""
@@ -130,7 +130,7 @@ static func format_revive_text(
 		text += "[b]%s[/b]" % user.character_name
 
 	if card:
-		text += " used [i]%s[/i]" % card.name
+		text += " used [i]%s[/i]" % card.card_description
 	else:
 		text += " used a revival item"
 
@@ -167,20 +167,26 @@ static func format_state_text(
 ## Convert element string to element ID
 static func get_element_id_from_string(element_str: String) -> int:
 	match element_str.to_lower():
-		"physical":
-			return GlobalBattleSettings.Elements.Physical
-		"earth":
-			return GlobalBattleSettings.Elements.EARTH
-		"air":
-			return GlobalBattleSettings.Elements.AIR
+		"none":
+			return GlobalBattleSettings.Elements.NONE
 		"fire":
 			return GlobalBattleSettings.Elements.FIRE
-		"water":
-			return GlobalBattleSettings.Elements.WATER
-		"magic", "holy":
-			return GlobalBattleSettings.Elements.MAGIC
+		"ice":
+			return GlobalBattleSettings.Elements.ICE
+		"lightning":
+			return GlobalBattleSettings.Elements.LIGHTNING
+		"earth":
+			return GlobalBattleSettings.Elements.EARTH
+		"wind", "air":
+			return GlobalBattleSettings.Elements.WIND
+		"light", "holy":
+			return GlobalBattleSettings.Elements.LIGHT
+		"dark":
+			return GlobalBattleSettings.Elements.DARK
+		"physical":
+			return GlobalBattleSettings.Elements.NONE  # Physical uses NONE element
 		_:
-			return GlobalBattleSettings.Elements.Physical
+			return GlobalBattleSettings.Elements.NONE
 
 ## Get color for element (BBCode hex format)
 static func get_element_color(element_id: int) -> Color:
@@ -191,19 +197,21 @@ static func get_element_color(element_id: int) -> Color:
 	
 	# Fallback to hardcoded if not in meta
 	match element_id:
-		GlobalBattleSettings.Elements.Physical:
-			return Color.GRAY
-		GlobalBattleSettings.Elements.EARTH:
-			return Color.DARK_GOLDENROD
-		GlobalBattleSettings.Elements.AIR:
-			return Color.WHITE_SMOKE
-		GlobalBattleSettings.Elements.FIRE:
-			return Color.RED
-		GlobalBattleSettings.Elements.WATER:
-			return Color.SKY_BLUE
-		GlobalBattleSettings.Elements.MAGIC:
-			return Color.MAGENTA
 		GlobalBattleSettings.Elements.NONE:
 			return Color.WHITE
+		GlobalBattleSettings.Elements.FIRE:
+			return Color.RED
+		GlobalBattleSettings.Elements.ICE:
+			return Color.SKY_BLUE
+		GlobalBattleSettings.Elements.LIGHTNING:
+			return Color.YELLOW
+		GlobalBattleSettings.Elements.EARTH:
+			return Color.DARK_GOLDENROD
+		GlobalBattleSettings.Elements.WIND:
+			return Color.WHITE_SMOKE
+		GlobalBattleSettings.Elements.LIGHT:
+			return Color.GOLD
+		GlobalBattleSettings.Elements.DARK:
+			return Color.DARK_MAGENTA
 		_:
 			return Color.WHITE

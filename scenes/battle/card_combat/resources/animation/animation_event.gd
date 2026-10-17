@@ -225,7 +225,7 @@ func _execute_qte_trigger(actor: Node, target: Node, context: Dictionary) -> Dic
 		return result
 	
 	if qte_manager.has_method("start_card_qte"):
-		var qte_started = qte_manager.start_card_qte(context.get("card_data"))
+		var qte_started = qte_manager.start_card_qte(context.get("card_config"))
 		result["success"] = qte_started
 		result["message"] = "QTE trigger processed" if qte_started else "QTE not started"
 	else:

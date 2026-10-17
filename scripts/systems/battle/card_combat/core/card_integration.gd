@@ -33,18 +33,18 @@ func _ready():
 		# For now, this is a placeholder for integration
 		pass
 
-func get_deck_cards(deck_resources: Array[CardData] = []) -> Array[CardData]:
+func get_deck_cards(deck_resources: Array[CardConfig] = []) -> Array[CardConfig]:
 	if deck_resources.is_empty():
 		return []
 	
-	var deck_cards: Array[CardData] = []
+	var deck_cards: Array[CardConfig] = []
 	for card in deck_resources:
 		if card:
 			deck_cards.append(card)
 	
 	return deck_cards
 
-func initialize_for_player(player_battler: Battler, deck_resources: Array[CardData] = []):
+func initialize_for_player(player_battler: Battler, deck_resources: Array[CardConfig] = []):
 	if not card_battle_manager or not player_battler:
 		return
 	
@@ -93,18 +93,14 @@ func get_alive_allies() -> Array[Battler]:
 				alive.append(player)
 	return alive
 
-func _on_card_selected(card: CardData):
+func _on_card_selected(card: CardConfig):
 	# Update back button visibility when card is selected
 	if battle_manager and battle_manager.hud and battle_manager.hud.has_method("_update_back_button_visibility"):
 		battle_manager.hud._update_back_button_visibility()
 	
 	# Use CardConfig system (primary system)
-	if not card.has_card_config():
-		push_error("Card '%s' does not have a CardConfig assigned. All cards must use the CardConfig system." % card.name)
-		return
-	
-	var target_scope_enum = card.card_config.target_type
-	var target_selection_mode = card.card_config.target_selection_mode
+	var target_scope_enum = card.target_type
+	var target_selection_mode = card.target_selection_mode
 	
 	# Get targets based on card configuration
 	var targets = get_targets_for_card(card, target_scope_enum, target_selection_mode)
@@ -159,19 +155,14 @@ func _on_card_selected(card: CardData):
 				card_battle_manager.play_card(card, target)
 
 ## Get targets based on card configuration
-func get_targets_for_card(card: CardData, target_scope: CardConfig.TargetScope, selection_mode: CardConfig.SelectionMode) -> Array:
+func get_targets_for_card(card: CardConfig, target_scope: CardConfig.TargetScope, selection_mode: CardConfig.SelectionMode) -> Array:
 	var available_enemies = get_alive_enemies()
 	var available_allies = get_alive_allies()
 	var actor = card_battle_manager.current_player_battler if card_battle_manager else null
 	
-	# Use CardConfig targeting system
-	if not card.has_card_config():
-		push_error("Card '%s' does not have a CardConfig assigned." % card.name)
-		return []
-	
-	return card.card_config.get_targets(actor, available_enemies, available_allies)
+	return card.get_targets(actor, available_enemies, available_allies)
 
-func start_targeting_mode(card: CardData, target_type: String = "enemy", provided_targets: Array = []):
+func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provided_targets: Array = []):
 	if not battle_manager:
 		return
 	
@@ -231,7 +222,7 @@ func start_targeting_mode(card: CardData, target_type: String = "enemy", provide
 	if battle_manager.hud and battle_manager.hud.has_method("set_targeting_mode"):
 		battle_manager.hud.set_targeting_mode(true)
 
-func start_aoe_targeting_mode(card: CardData, targets: Array[Battler], target_type: String = "enemy"):
+func start_aoe_targeting_mode(card: CardConfig, targets: Array[Battler], target_type: String = "enemy"):
 	if not battle_manager:
 		return
 	
@@ -254,7 +245,7 @@ func start_aoe_targeting_mode(card: CardData, targets: Array[Battler], target_ty
 	
 	# Update HUD: show confirm button, hide individual targeting
 	if battle_manager.hud and battle_manager.hud.has_method("set_aoe_confirmation_mode"):
-		battle_manager.hud.set_aoe_confirmation_mode(true, card.name, targets.size())
+		battle_manager.hud.set_aoe_confirmation_mode(true, card.card_name, targets.size())
 
 func _on_end_turn_pressed():
 	# Execute cards and then let battle manager handle turn advancement

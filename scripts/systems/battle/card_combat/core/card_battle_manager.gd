@@ -3,14 +3,13 @@ extends Node
 ## Bridges the 3D battle system with the card combat addon
 ## Manages card-based combat for the player while enemies use AI attacks
 
-signal card_played(card: CardData, target: Variant)
+signal card_played(card: CardConfig, target: Variant)
 signal turn_ended()
 signal ap_changed(current_ap: int, max_ap: int)
 signal player_attacked(attacker: Battler, damage: int)
 
-## Per-battler sessions and decks (keyed by Battler object)
-var sessions_by_battler: Dictionary = {}  # Battler -> CombatSession
-var decks_by_battler: Dictionary = {}     # Battler -> CombatDeck
+## Per-battler decks (keyed by Battler object)
+var decks_by_battler: Dictionary = {}     # Battler -> SimplifiedDeck
 
 var ap_system: APSystem
 
@@ -56,75 +55,51 @@ func load_card_config() -> CardBattleConfig:
 	var default_config = CardBattleConfig.new()
 	return default_config
 
-## Sets up an independent CombatSession and CombatDeck for one ally battler.
+## Sets up a SimplifiedDeck for one ally battler.
 ## Call this once per ally during battle initialisation.
-func setup_card_combat(player_battler: Battler, card_data_resources: Array[CardData]) -> void:
+func setup_card_combat(player_battler: Battler, card_configs: Array[CardConfig]) -> void:
 	if not player_battler:
 		return
 	
-	# Create combat session with player as side 0
-	var player_combatant = Combatant.new()
-	player_combatant.max_health = player_battler.max_health
-	player_combatant.current_health = player_battler.current_health
-	
-	# Create a dummy enemy combatant for side 1 (enemies use AI, not cards)
-	var enemy_combatant = Combatant.new()
-	enemy_combatant.max_health = 100
-	enemy_combatant.current_health = 100
-	
-	var session = CombatSession.new()
-	session.config = create_combat_config()
-	session.setup_sides([
-		{"hero": player_combatant, "cards": card_data_resources},
-		{"hero": enemy_combatant, "cards": []}
-	], [0, 1])
+	# Create simplified deck
+	var deck = SimplifiedDeck.new()
+	var max_hand = card_battle_config.max_hand_size if card_battle_config else 3
+	deck.setup(card_configs, max_hand)
 	
 	# Store by battler reference
-	sessions_by_battler[player_battler] = session
-	var deck = session.decks[0]
 	decks_by_battler[player_battler] = deck
 	
 	# Connect deck signals
-	if not deck.card_played.is_connected(_on_card_played):
-		deck.card_played.connect(_on_card_played)
-	if not deck.mana_changed.is_connected(_on_mana_changed):
-		deck.mana_changed.connect(_on_mana_changed)
-
-func create_combat_config() -> CombatConfig:
-	var config = CombatConfig.new()
-	if card_battle_config:
-		config.initial_hand_size = card_battle_config.initial_hand_size
-		config.max_hand_size = card_battle_config.max_hand_size
-		config.max_board_size = card_battle_config.max_board_size
-	return config
+	if not deck.card_drawn.is_connected(_on_card_drawn):
+		deck.card_drawn.connect(_on_card_drawn)
 
 ## Returns the current player's active deck. Null if not set up.
-func _get_current_deck() -> CombatDeck:
+func _get_current_deck() -> SimplifiedDeck:
 	if current_player_battler and decks_by_battler.has(current_player_battler):
 		return decks_by_battler[current_player_battler]
 	return null
 
-func get_hand() -> Array[CardData]:
+func get_hand() -> Array[CardConfig]:
 	var deck = _get_current_deck()
 	if deck:
 		return deck.get_hand()
 	return []
 
-func can_play_card(card: CardData) -> bool:
+func can_play_card(card: CardConfig) -> bool:
 	if not _get_current_deck():
 		return false
 	
 	# Check AP on active player battler first, fallback to ap_system
 	if current_player_battler:
-		return current_player_battler.can_spend_ap(card.cost)
+		return current_player_battler.can_spend_ap(card.ap_cost)
 	elif ap_system:
-		return ap_system.can_spend_ap(card.cost)
+		return ap_system.can_spend_ap(card.ap_cost)
 	
 	return true
 
 var is_executing_card: bool = false
 
-func play_card(card: CardData, target: Battler = null) -> bool:
+func play_card(card: CardConfig, target: Battler = null) -> bool:
 	if is_executing_card or not can_play_card(card):
 		return false
 	
@@ -135,8 +110,9 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 			battle_manager.hud.set_ui_state(3) # CARD_EXECUTION_STATE
 	
 	# Camera choreography: wider view for player attack cards only
-	var card_type = card.metadata.get("card_type", "attack")
-	if (card_type == "attack" or card_type == "skill") and battle_manager and battle_manager.battle_camera:
+	var card_tags = card.card_tags
+	var is_attack_card = "attack" in card_tags or "skill" in card_tags
+	if is_attack_card and battle_manager and battle_manager.battle_camera:
 		battle_manager.battle_camera.set_default_camera()
 	
 	# Execute card effect
@@ -144,21 +120,21 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 	
 	# Spend AP from battler systematically only AFTER effect resolves
 	if current_player_battler:
-		current_player_battler.spend_ap(card.cost)
+		current_player_battler.spend_ap(card.ap_cost)
 		if ap_system:
 			ap_system.current_ap = current_player_battler.current_ap
 			ap_system.max_ap = current_player_battler.max_ap
 		ap_changed.emit(current_player_battler.current_ap, current_player_battler.max_ap)
 	elif ap_system:
-		ap_system.spend_ap(card.cost)
+		ap_system.spend_ap(card.ap_cost)
 	
-	# Remove from hand (move to graveyard through deck system without mana restriction)
+	# Remove from hand (move to graveyard through deck system)
 	var deck = _get_current_deck()
 	if deck:
 		deck.discard_card(card)
 	
 	# Restore over-the-shoulder camera on the acting player after attack finishes
-	if (card_type == "attack" or card_type == "skill") and battle_manager and battle_manager.battle_camera and is_instance_valid(current_player_battler):
+	if is_attack_card and battle_manager and battle_manager.battle_camera and is_instance_valid(current_player_battler):
 		battle_manager.battle_camera.set_over_the_shoulder(current_player_battler)
 	
 	is_executing_card = false
@@ -171,7 +147,7 @@ func play_card(card: CardData, target: Battler = null) -> bool:
 
 func execute_queued_cards() -> void:
 	for card_action in queued_cards:
-		var card: CardData = card_action["card"]
+		var card: CardConfig = card_action["card"]
 		var target: Battler = card_action["target"]
 		await execute_card_effect(card, target)
 	
@@ -181,7 +157,7 @@ func execute_queued_cards() -> void:
 	# End turn
 	turn_ended.emit()
 
-func execute_card_effect(card: CardData, target: Battler) -> void:
+func execute_card_effect(card: CardConfig, target: Battler) -> void:
 	if not target:
 		return
 	
@@ -191,18 +167,14 @@ func execute_card_effect(card: CardData, target: Battler) -> void:
 	# Apply state effects BEFORE execution (to avoid target being freed)
 	apply_card_states(card, target)
 	
-	# Use card config if available, otherwise fall back to metadata
-	if card.has_card_config():
-		await execute_card_with_config(card, target)
-	else:
-		# Error: All cards must use CardConfig system
-		push_error("Card '%s' does not have a CardConfig assigned. All cards must use the CardConfig system." % card.name)
+	# Execute using CardConfig directly
+	await execute_card_with_config(card, target)
 
-## Execute card using the new CardConfig system
-func execute_card_with_config(card: CardData, target: Battler) -> void:
-	var card_cfg = card.card_config
+## Execute card using the CardConfig system
+func execute_card_with_config(card: CardConfig, target: Battler) -> void:
+	var card_cfg = card
 	if not card_cfg:
-		push_error("Card has_card_config() returned true but card_config is null")
+		push_error("CardConfig is null")
 		return
 	
 	# Build execution context
@@ -217,7 +189,6 @@ func execute_card_with_config(card: CardData, target: Battler) -> void:
 		allies_array.append(current_player_battler)
 	
 	var context = {
-		"card_data": card,
 		"card_config": card_cfg,
 		"actor": current_player_battler,
 		"target": target,
@@ -439,7 +410,7 @@ func execute_timing_qte(card_cfg: CardConfig, context: Dictionary) -> void:
 	var _time_limit = card_cfg.qte_window_duration
 	
 	# Use the QTEManager's card attack method
-	var qte_started = qte_mgr.start_card_qte(context["card_data"])
+	var qte_started = qte_mgr.start_card_qte(context["card_config"])
 	if qte_started:
 		var qte_success = await await_qte_completion()
 		var multiplier = card_cfg.qte_success_multiplier if qte_success else card_cfg.qte_failure_multiplier
@@ -807,13 +778,16 @@ func apply_strike_damage_inline(context: Dictionary, damage_multiplier: float, q
 	var target = context["target"]
 	var card_cfg = context["card_config"]
 	
-	# Calculate damage with strike multiplier
-	var base_damage = card_cfg.base_damage
-	var strike_damage = int(base_damage * damage_multiplier * qte_multiplier)
-	
-	# Apply damage to target (guard against the target being freed mid-combo)
-	if battle_manager and is_instance_valid(target):
-		await battle_manager.damage_calculation(actor, target, strike_damage, null)
+	# Calculate damage from primary effect
+	if card_cfg.primary_effect:
+		var base_value = card_cfg.primary_effect._calculate_value(actor)
+		var strike_damage = int(base_value * damage_multiplier * qte_multiplier)
+		
+		# Apply damage to target (guard against the target being freed mid-combo)
+		if battle_manager and is_instance_valid(target):
+			var dmg_type = card_cfg.primary_effect.damage_type if "damage_type" in card_cfg.primary_effect else "physical"
+			var elem = card_cfg.primary_effect.element if "element" in card_cfg.primary_effect else "none"
+			await battle_manager.damage_calculation(actor, target, strike_damage, null, dmg_type, elem)
 
 ## Execute effects immediately
 func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
@@ -833,7 +807,9 @@ func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_m
 			var final_val = int(calculated_val * final_multiplier)
 			
 			if card_cfg.primary_effect.effect_type == CardEffect.EffectType.DAMAGE:
-				battle_manager.damage_calculation(actor, target, final_val)
+				var dmg_type = card_cfg.primary_effect.damage_type if "damage_type" in card_cfg.primary_effect else "physical"
+				var elem = card_cfg.primary_effect.element if "element" in card_cfg.primary_effect else "none"
+				battle_manager.damage_calculation(actor, target, final_val, null, dmg_type, elem)
 			elif card_cfg.primary_effect.effect_type == CardEffect.EffectType.HEAL:
 				battle_manager.heal_calculation(actor, target, final_val)
 			else:
@@ -852,7 +828,9 @@ func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_m
 		
 		if conditions_met:
 			if battle_manager and effect.effect_type == CardEffect.EffectType.DAMAGE:
-				battle_manager.damage_calculation(actor, target, effect._calculate_value(actor))
+				var dmg_type = effect.damage_type if "damage_type" in effect else "physical"
+				var elem = effect.element if "element" in effect else "none"
+				battle_manager.damage_calculation(actor, target, effect._calculate_value(actor), null, dmg_type, elem)
 			elif battle_manager and effect.effect_type == CardEffect.EffectType.HEAL:
 				battle_manager.heal_calculation(actor, target, effect._calculate_value(actor))
 			else:
@@ -987,7 +965,7 @@ func execute_audio_phase(card_cfg: CardConfig, context: Dictionary) -> void:
 		await get_tree().create_timer(0.3).timeout # Delay for impact
 		card_cfg.impact_sound.play_audio(self, target.global_position)
 
-func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+func execute_attack_card(card: CardConfig, target: Battler, is_aoe: bool = false) -> void:
 	if not current_player_battler or not target:
 		return
 	
@@ -1044,22 +1022,19 @@ func execute_attack_card(card: CardData, target: Battler, is_aoe: bool = false) 
 	
 	current_player_battler.battle_idle()
 
-func execute_skill_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
+func execute_skill_card(card: CardConfig, target: Battler, is_aoe: bool = false) -> void:
 	await execute_attack_card(card, target, is_aoe)
 
-func execute_defense_card(card: CardData) -> void:
+func execute_defense_card(card: CardConfig) -> void:
 	current_player_battler.defend()
-	if card.metadata.has("defense_boost"):
-		var _boost = card.metadata["defense_boost"]
+	# Defense boost would be handled through stat_modifiers in CardConfig
 
-func execute_heal_card(card: CardData, target: Battler, _is_aoe: bool = false) -> void:
-	var heal_amount = card.health
-	target.take_healing(heal_amount)
-	
-	if battle_manager and battle_manager.hud:
-		battle_manager.hud.update_health_bars()
+func execute_heal_card(card: CardConfig, target: Battler, _is_aoe: bool = false) -> void:
+	# Heal is now handled through CardEffect in the effect phase
+	# This function is kept for compatibility but the actual healing happens in _execute_effects_immediate
+	pass
 
-func execute_buff_card(card: CardData, _target: Battler, _is_aoe: bool = false) -> void:
+func execute_buff_card(card: CardConfig, _target: Battler, _is_aoe: bool = false) -> void:
 	# Handle buff effects like damage multipliers, speed boosts, etc.
 	if card.metadata.has("damage_multiplier"):
 		var _multiplier = card.metadata["damage_multiplier"]
@@ -1073,40 +1048,30 @@ func execute_buff_card(card: CardData, _target: Battler, _is_aoe: bool = false) 
 		var _reduction = card.metadata["damage_reduction"]
 		# This would need a buff system integration
 
-func execute_debuff_card(card: CardData, target: Battler, is_aoe: bool = false) -> void:
-	# Deal initial damage
-	if card.attack > 0:
+func execute_debuff_card(card: CardConfig, target: Battler, is_aoe: bool = false) -> void:
+	# Deal initial damage if primary effect is a damage effect
+	if card.primary_effect and card.primary_effect.effect_type == CardEffect.EffectType.DAMAGE:
 		await execute_attack_card(card, target, is_aoe)
 	
-func apply_card_states(card: CardData, _target: Battler) -> void:
-	if not card.metadata.has("applies_state"):
-		return
-	
-	var _state_name = card.metadata["applies_state"]
-	var state_chance = card.metadata.get("state_chance", 1.0)
-	var _state_duration = card.metadata.get("state_duration", 0)
-	
-	# Check if state should be applied
-	if randf() > state_chance:
-		return
-	
-	# Apply the state to the target
-	# This would need integration with the existing state system
-	# For now, just log the application
+func apply_card_states(card: CardConfig, target: Battler) -> void:
+	# States are applied through CardConfig.applies_states array
+	# This is handled in the effect phase, so this function is now a no-op
+	pass
 
-func draw_card_for_deck(deck: CombatDeck) -> CardData:
+func draw_card_for_deck(deck: SimplifiedDeck) -> CardConfig:
 	if not deck:
 		push_warning("CardBattleManager: draw_card_for_deck called with a null deck")
 		return null
 	
 	# If draw pile is empty, recycle graveyard back into draw pile and shuffle
-	if deck._draw_pile.is_empty() and not deck._graveyard.is_empty():
-		deck._draw_pile.append_array(deck._graveyard)
-		deck._graveyard.clear()
-		deck.shuffle()
+	if deck.draw_pile.is_empty() and not deck.graveyard.is_empty():
+		deck.recycle_graveyard()
 	
 	var drawn_card = deck.draw_card()
 	return drawn_card
+
+func _on_card_drawn(_card: CardConfig):
+	pass
 
 func start_player_turn() -> void:
 	# Always sync to the currently acting player from battle_manager
@@ -1181,14 +1146,6 @@ func end_player_turn() -> void:
 	turn_ended.emit()
 	if battle_manager:
 		battle_manager.end_turn()
-
-func _on_card_played(_card_instance: CardInstance) -> void:
-	pass
-	# Card is already handled in play_card()
-
-func _on_mana_changed(_new_mana: int) -> void:
-	pass
-	# Mana in card system maps to our AP system
 
 func _on_ap_changed(current_ap: int, max_ap: int) -> void:
 	# Forward AP changes to UI

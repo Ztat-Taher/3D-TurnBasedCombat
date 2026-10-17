@@ -4,7 +4,7 @@ extends Control
 ## Shows the player's hand, handles card selection and targeting
 ## Includes Draw Pile (left) and Discard Pile (bottom-right) with animations
 
-signal card_selected(card: CardData)
+signal card_selected(card: CardConfig)
 signal end_turn_pressed()
 
 ## Extra margin around the CardContainer that still counts as "in hand" for
@@ -243,7 +243,7 @@ func _select_current_card() -> void:
 	if selected_card_index >= 0 and selected_card_index < card_buttons.size():
 		var card_button = card_buttons[selected_card_index]
 		if card_button:
-			card_button.card_played.emit(card_button.card_data)
+			card_button.card_played.emit(card_button.card_config)
 
 func _update_card_selection() -> void:
 	for i in range(card_buttons.size()):
@@ -570,7 +570,7 @@ func update_hand_display():
 				# Visual indication for unplayable cards
 				if card_battle_manager:
 					var ap_info = card_battle_manager.get_ap_info()
-					if ap_info.get("current_ap", 0) < card.cost:
+					if ap_info.get("current_ap", 0) < card.ap_cost:
 						var card_content = card_button.get_node_or_null("Card3DContainer/CardViewport/CardContent")
 						if card_content:
 							card_content.modulate = Color(0.4, 0.4, 0.4, 0.8)
@@ -614,7 +614,7 @@ func update_hand_display():
 				# Visual indication for unplayable cards
 				if card_battle_manager:
 					var ap_info = card_battle_manager.get_ap_info()
-					if ap_info.get("current_ap", 0) < card.cost:
+					if ap_info.get("current_ap", 0) < card.ap_cost:
 						var card_content = card_button.get_node_or_null("Card3DContainer/CardViewport/CardContent")
 						if card_content:
 							card_content.modulate = Color(0.4, 0.4, 0.4, 0.8)
@@ -713,10 +713,10 @@ func _smoothly_reposition_existing_cards(old_positions: Array = []) -> void:
 				tween.tween_property(card_button.card_3d_container, "rotation_degrees", 
 					card_button.base_rotation, 0.3)
 
-func create_card_button(card: CardData) -> Control:
+func create_card_button(card: CardConfig) -> Control:
 	if not card_button_scene:
 		var button = Button.new()
-		button.text = card.name + " (Cost: " + str(card.cost) + ")"
+		button.text = card.card_name + " (Cost: " + str(card.ap_cost) + ")"
 		button.pressed.connect(func(): _on_card_button_pressed(card))
 		return button
 	
@@ -725,7 +725,7 @@ func create_card_button(card: CardData) -> Control:
 		card_button.hand_bounds_provider = Callable(self, "get_hand_zone_rect")
 	if card_button.has_method("setup"):
 		card_button.setup(card)
-		card_button.card_played.connect(func(_card_data): _on_card_button_pressed(card))
+		card_button.card_played.connect(_on_card_button_pressed.bind(card))
 		if card_button.has_signal("card_drag_started"):
 			card_button.card_drag_started.connect(_on_card_drag_started)
 		if card_button.has_signal("card_drag_ended"):
@@ -742,7 +742,7 @@ func _on_card_drag_started(card_button: CardButton) -> void:
 
 func _on_card_drag_ended(card_button: CardButton, dropped_in_play_zone: bool) -> void:
 	if dropped_in_play_zone:
-		if not _on_card_button_pressed(card_button.card_data):
+		if not _on_card_button_pressed(card_button.card_config):
 			_slot_card_back_into_hand(card_button)
 	else:
 		_slot_card_back_into_hand(card_button)
@@ -876,18 +876,18 @@ func _compensate_returned_panel(card_button: CardButton, panel_global_before: Ve
 func update_ap_display():
 	pass
 
-func _on_card_button_pressed(card: CardData) -> bool:
+func _on_card_button_pressed(card: CardConfig) -> bool:
 	if card_battle_manager:
 		if card_battle_manager.is_executing_card:
 			return false
 		var ap_info = card_battle_manager.get_ap_info()
-		if ap_info.get("current_ap", 0) < card.cost:
+		if ap_info.get("current_ap", 0) < card.ap_cost:
 			return false
 	
 	# Track which button is being played so _on_card_played can animate it to the discard pile
 	_pending_discard_button = null
 	for cb in card_buttons:
-		if is_instance_valid(cb) and cb is CardButton and (cb as CardButton).card_data == card:
+		if is_instance_valid(cb) and cb is CardButton and (cb as CardButton).card_config == card:
 			_pending_discard_button = cb as CardButton
 			break
 	
@@ -917,12 +917,12 @@ func update_card_playability():
 			continue
 		
 		# Get the card data from the card button
-		var card_data = card_button.card_data
-		if not card_data:
+		var card_config = card_button.card_config
+		if not card_config:
 			continue
 		
 		# Check if card is playable based on AP cost
-		var is_playable = current_ap >= card_data.cost
+		var is_playable = current_ap >= card_config.ap_cost
 		
 		# Update visual indication
 		var card_content = card_button.get_node_or_null("Card3DContainer/CardViewport/CardContent")

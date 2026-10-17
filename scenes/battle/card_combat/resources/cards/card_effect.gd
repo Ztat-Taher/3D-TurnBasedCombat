@@ -40,6 +40,9 @@ enum EffectTargeting {
 @export var can_crit: bool = true                   ## Whether effect can critical hit
 @export var crit_multiplier: float = 2.0            ## Critical hit multiplier
 
+@export var damage_type: String = "physical"        # physical, magical, true_damage
+@export var element: String = "none"                # fire, ice, lightning, earth, air, magic, none
+
 ## Apply this effect to the given context
 func apply_effect(actor: Node, target: Node, all_enemies: Array, all_allies: Array) -> Dictionary:
 	var result = {
@@ -160,7 +163,7 @@ func _apply_to_target(target: Node, calculated_value: int, is_critical: bool, ac
 
 func _apply_damage(target: Node, damage: int, _is_critical: bool, attacker: Node = null) -> int:
 	if target.has_method("take_damage"):
-		target.take_damage(damage, attacker)
+		target.take_damage(damage, attacker, damage_type, element)
 		return damage
 	return 0
 

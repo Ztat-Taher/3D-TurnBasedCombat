@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="HitEffectLibrary" format=3 uid="uid://b5k2m8n4p6q1"]
+
+[ext_resource type="Script" uid="uid://csxuf05w088t3" path="res://scripts/systems/battle/effects/hit_effect_system/hit_effect_library.gd" id="1"]
+[ext_resource type="Resource" uid="uid://8fll8hlf0n6q" path="res://database/effects/hit_physical.tres" id="2"]
+[ext_resource type="Resource" uid="uid://edey46irus00" path="res://database/effects/hit_fire.tres" id="3"]
+[ext_resource type="Resource" uid="uid://b4csqecqsmi0s" path="res://database/effects/hit_ice.tres" id="4"]
+[ext_resource type="Resource" uid="uid://4vr2rrgo8wxa" path="res://database/effects/hit_lightning.tres" id="5"]
+[ext_resource type="Resource" uid="uid://b3m2k8bwiq2pf" path="res://database/effects/hit_bleed.tres" id="6"]
+
+[resource]
+script = ExtResource("1")
+effect_map = {
+"bleed": [ExtResource("6")],
+"fire": [ExtResource("3")],
+"ice": [ExtResource("4")],
+"lightning": [ExtResource("5")],
+"physical": [ExtResource("2")]
+}

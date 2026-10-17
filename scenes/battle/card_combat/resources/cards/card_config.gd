@@ -80,7 +80,7 @@ enum Element {
 @export_group("Multi-Strike")
 @export var is_multi_strike: bool = false              ## Enable the combo sequence. Disable animation_name when true.
 @export var strike_animations: Array[String] = []     ## Animation slot names in order, e.g. ["melee_combo_1", "melee_combo_2", "melee_combo_3"].
-@export var strike_multipliers: Array[float] = []     ## Per-strike damage multiplier on top of base_damage. [1.0, 1.2, 1.5] = escalating hits.
+@export var strike_multipliers: Array[float] = []     ## Per-strike damage multiplier on top of effect value. [1.0, 1.2, 1.5] = escalating hits.
 @export var strike_qte_difficulties: Array[float] = [] ## Per-strike QTE difficulty (0.0 = easy, 1.0 = hard).
 @export var strike_qte_windows: Array[float] = []     ## Per-strike QTE window duration in seconds.
 
@@ -166,17 +166,6 @@ var qte_timing: QTETiming = QTETiming.BEFORE_ATTACK:
 @export var qte_mash_window: float = 3.0               ## Time window for mash QTEs
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Damage and Stats Configuration
-# ─────────────────────────────────────────────────────────────────────────────
-@export_group("Damage & Stats")
-@export var base_damage: int = 0                       ## Base damage value
-@export var damage_scaling: Dictionary = {}            ## Stat scaling (attack, magic, etc.)
-@export var damage_type: DamageType = DamageType.PHYSICAL
-@export var heal_amount: int = 0                       ## Base healing amount
-@export var shield_amount: int = 0                     ## Shield/defense amount
-@export var stat_modifiers: Dictionary = {}           ## Temporary stat changes
-
-# ─────────────────────────────────────────────────────────────────────────────
 # State and Debuff Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 @export_group("States & Debuffs")
@@ -189,22 +178,24 @@ var qte_timing: QTETiming = QTETiming.BEFORE_ATTACK:
 # Card Metadata
 # ─────────────────────────────────────────────────────────────────────────────
 @export_group("Metadata")
+@export var card_name: String = ""                     ## Display name of the card
 @export var card_rarity: CardRarity = CardRarity.COMMON
-@export var card_element: Element = Element.NONE
 @export var card_tags: Array[String] = []              ## Tags for filtering and grouping
 @export var card_description: String = ""              ## Flavor text and description
+@export var ap_cost: int = 1                           ## AP cost to play the card
 
-## Helper function to get total damage with scaling
-func get_scaled_damage(actor_stats: Dictionary) -> int:
-	var total_damage = base_damage
-	
-	# Apply stat scaling
-	for stat_name in damage_scaling:
-		var scaling_value = damage_scaling[stat_name]
-		if actor_stats.has(stat_name):
-			total_damage += int(actor_stats[stat_name] * scaling_value)
-	
-	return total_damage
+# ─────────────────────────────────────────────────────────────────────────────
+# Card Display Assets
+# ─────────────────────────────────────────────────────────────────────────────
+@export_group("Display Assets")
+@export var background_sprite: Texture2D = null        ## Type-based background texture
+@export var main_image: Texture2D = null               ## Character portrait or icon
+@export var attack_icon: Texture2D = null               ## Attack damage icon
+@export var effect_icon: Texture2D = null               ## Effect/special ability icon
+@export var card_frame_texture: Texture2D = null        ## Outer frame/border texture
+@export var name_banner_texture: Texture2D = null      ## Textured banner for card name
+@export var cost_badge_texture: Texture2D = null       ## Cost badge texture
+@export var type_icon: Texture2D = null                 ## Card type indicator icon
 
 ## Helper function to check if card should trigger QTE
 func should_trigger_qte() -> bool:

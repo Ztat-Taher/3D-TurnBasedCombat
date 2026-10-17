@@ -131,10 +131,7 @@ func process_states() -> void:
         if state.damage_per_turn != 0:
             var defense_multiplier = max(0.1, 1.0 - (float(defense) / 100.0))
             
-            # Apply element wheel for states
-            var element_bonus = Formulas.element_wheel(state.element, stats.element)
-            
-            var actual_damage = int(state.damage_per_turn * defense_multiplier * state.damage_reduction * element_bonus)
+            var actual_damage = int(state.damage_per_turn * defense_multiplier * state.damage_reduction)
             actual_damage = max(1, actual_damage)
             
             take_damage(actual_damage)

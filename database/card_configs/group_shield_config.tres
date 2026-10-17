@@ -17,3 +17,5 @@ state_duration = -1
 card_rarity = 1
 card_tags = Array[String](["support", "shield", "aoe", "party"])
 card_description = "Grants protective shields to all allies that ignores the next hit."
+card_name = "Group Shield"
+ap_cost = 2

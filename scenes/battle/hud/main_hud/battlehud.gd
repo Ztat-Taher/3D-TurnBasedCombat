@@ -3,7 +3,7 @@ extends CanvasLayer
 
 signal action_selected(action: String, item: Item)
 signal menu_opened
-signal card_selected(card: CardData)
+signal card_selected(card: CardConfig)
 signal end_turn_pressed
 
 @onready var item_button_scene: PackedScene = preload("res://scenes/battle/hud/action_system/input/item_button/item-button-preset.tscn")

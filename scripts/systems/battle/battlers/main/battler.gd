@@ -257,6 +257,11 @@ var attack_indicator: AttackIndicator3D = null
 ## Duration (seconds) before recovering from being hit by a counter attack
 @export var counter_stun_duration: float = 1.5
 
+@export_group("Hit Effects")
+## Optional per-battler override for hit effect library
+## If null, uses the global GlobalHitEffectLibrary
+@export var hit_effect_library: HitEffectLibrary = null
+
 func _ready():
 	_collect_meshes()
 	
@@ -441,7 +446,47 @@ func get_attack_damage(target) -> int:
 	var damage = attack + randi() % 5
 	return Formulas.physical_damage(self, target, damage)
 
-func take_damage(amount: int, attacker: Battler = null) -> void:
+## Play hit effects based on damage type and element
+## damage_type: e.g., "physical", "magical", "true_damage"
+## element: e.g., "fire", "ice", "lightning", "none"
+## attacker: Optional attacker reference
+func play_hit_effects(damage_type: String, element: String, attacker: Battler = null) -> void:
+	# Get the global hit effect library
+	var library = get_hit_effect_library()
+	if not library:
+		return
+	
+	# Get effects for this damage/element combination
+	var effects = library.get_effects_for_type(damage_type, element)
+	if effects.is_empty():
+		return
+	
+	# Get center position for spawning effects
+	var center_position = get_effect_position(EffectPosition.CENTER)
+	
+	# Spawn all effects with smart spacing
+	for i in range(effects.size()):
+		var effect = effects[i]
+		effect.spawn(self, center_position, i, effects.size())
+
+## Get the hit effect library to use (global or per-battler override)
+func get_hit_effect_library() -> HitEffectLibrary:
+	# Check for per-battler override first
+	if hit_effect_library:
+		return hit_effect_library
+	
+	# Fall back to global library
+	if has_node("/root/GlobalHitEffectLibrary"):
+		var global_lib = get_node("/root/GlobalHitEffectLibrary")
+		if global_lib and global_lib.has_method("get_library"):
+			return global_lib.get_library()
+	
+	return null
+
+func take_damage(amount: int, attacker: Battler = null, damage_type: String = "physical", element: String = "none") -> void:
+	# Play hit effects before damage calculation
+	play_hit_effects(damage_type, element, attacker)
+	
 	# Check for Protected state (shield) - ignores hit entirely
 	if active_states.has("Protected"):
 		var protected_state = active_states["Protected"] as ProtectedState

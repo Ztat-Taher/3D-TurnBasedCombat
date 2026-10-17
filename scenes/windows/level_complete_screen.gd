@@ -14,7 +14,7 @@ signal continue_pressed
 signal main_menu_pressed
 
 ## Folder scanned (recursively) for the reward card pool.
-const CARD_POOL_DIR : String = "res://database/cards"
+const CARD_POOL_DIR : String = "res://database/card_configs"
 ## Cards offered to each party member.
 const OPTIONS_PER_MEMBER : int = 3
 const CARD_BUTTON_SCENE : PackedScene = preload("res://scenes/battle/card_combat/card_components/buttons/card_button.tscn")
@@ -69,21 +69,21 @@ func _set_hovered_button(button: CardButton) -> void:
 		button.set_controller_hover(true)
 
 
-## Recursively load every CardData .tres under CARD_POOL_DIR.
-func _load_card_pool() -> Array[CardData]:
-	var pool : Array[CardData] = []
+## Recursively load every CardConfig .tres under CARD_POOL_DIR.
+func _load_card_pool() -> Array[CardConfig]:
+	var pool : Array[CardConfig] = []
 	_collect_cards(CARD_POOL_DIR, pool)
 	return pool
 
 
-func _collect_cards(dir_path : String, out : Array[CardData]) -> void:
+func _collect_cards(dir_path : String, out : Array[CardConfig]) -> void:
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
 		return
 	for file_name in dir.get_files():
 		if file_name.get_extension() != "tres":
 			continue
-		var card := load(dir_path.path_join(file_name)) as CardData
+		var card := load(dir_path.path_join(file_name)) as CardConfig
 		if card != null:
 			out.append(card)
 	for sub_dir in dir.get_directories():
@@ -130,15 +130,15 @@ func _build_card_choices() -> void:
 ## Choose up to OPTIONS_PER_MEMBER distinct cards from the pool, skipping cards
 ## already in the member's deck (falling back to duplicates if the deck has them
 ## all).
-func _pick_choices(pool : Array[CardData], member : AllyPartyMember) -> Array[CardData]:
+func _pick_choices(pool : Array[CardConfig], member : AllyPartyMember) -> Array[CardConfig]:
 	var shuffled := pool.duplicate()
 	shuffled.shuffle()
 	var deck := member.get_deck()
-	var choices : Array[CardData] = []
+	var choices : Array[CardConfig] = []
 	for card in shuffled:
 		if choices.size() >= OPTIONS_PER_MEMBER:
 			break
-		if deck != null and _deck_has_card_id(deck, card.card_id):
+		if deck != null and _deck_has_card(deck, card):
 			continue
 		choices.append(card)
 	if choices.is_empty():
@@ -147,11 +147,9 @@ func _pick_choices(pool : Array[CardData], member : AllyPartyMember) -> Array[Ca
 	return choices
 
 
-func _deck_has_card_id(deck : DeckResource, card_id : String) -> bool:
-	if card_id.is_empty():
-		return false
+func _deck_has_card(deck : DeckResource, card : CardConfig) -> bool:
 	for existing in deck.cards:
-		if existing != null and existing.card_id == card_id:
+		if existing != null and existing == card:
 			return true
 	return false
 
@@ -173,11 +171,11 @@ func _on_continue_button_pressed() -> void:
 		return
 	for member in GameState.get_party():
 		var chosen_button := _selected_buttons.get(member.id) as CardButton
-		if not is_instance_valid(chosen_button) or chosen_button.card_data == null:
+		if not is_instance_valid(chosen_button) or chosen_button.card_config == null:
 			return
 		var deck := member.get_deck()
 		if deck != null:
-			deck.add_card(chosen_button.card_data)
+			deck.add_card(chosen_button.card_config)
 		_picked_member_ids.append(member.id)
 		chosen_button.set_highlighted(false)
 		chosen_button.modulate = Color(0.72, 1.0, 0.78, 1.0)

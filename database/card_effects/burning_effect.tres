@@ -1,10 +1,19 @@
-[gd_resource type="Resource" script_class="CardEffect" format=3 uid="uid://burning_card_effect"]
+[gd_resource type="Resource" script_class="CardEffect" format=3 uid="uid://bby76vep26ixa"]
 
-[ext_resource type="Script" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
+[ext_resource type="Script" uid="uid://by6qea4gp8ecb" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-effect_type = 4  # DEBUFF
-value = 3  # 3 burn stacks
-targeting = 1  # TARGET
+effect_type = 4
+value = 0
+targeting = 1
+scaling = {}
+conditions = []
+is_percentage = false
+delay = 0.0
+duration = 0.0
 stack_count = 3
+can_crit = false
+crit_multiplier = 1.0
+damage_type = "physical"
+element = "fire"

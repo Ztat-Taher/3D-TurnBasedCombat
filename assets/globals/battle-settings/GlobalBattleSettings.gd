@@ -18,13 +18,14 @@ var ally_party: int = 0
 var Global_Damage_Calc_Type : Damage_Calc_Type = Damage_Calc_Type.PKMN
 
 enum Elements {
-	Physical = 0,
-	EARTH = 1,
-	AIR = 2,
-	FIRE = 3,
-	WATER = 4,
-	MAGIC = 5,
-	NONE = 6, # In theory this would ensure everyone can be effected.
+	NONE = 0,
+	FIRE = 1,
+	ICE = 2,
+	LIGHTNING = 3,
+	EARTH = 4,
+	WIND = 5,
+	LIGHT = 6,
+	DARK = 7,
 	ENDLIST}
 
 
@@ -64,13 +65,14 @@ enum Damage_Calc_Type {
 
 # Element colors for battle affliction text display (BBCode format)
 var element_colors = {
-	0: Color.GRAY,                    # Physical
-	1: Color.DARK_GOLDENROD,         # EARTH
-	2: Color.WHITE_SMOKE,            # AIR
-	3: Color.RED,                    # FIRE
-	4: Color.SKY_BLUE,               # WATER
-	5: Color.MAGENTA,                # MAGIC
-	6: Color.WHITE                   # NONE
+	0: Color.WHITE,                   # NONE
+	1: Color.RED,                    # FIRE
+	2: Color.SKY_BLUE,               # ICE
+	3: Color.YELLOW,                 # LIGHTNING
+	4: Color.DARK_GOLDENROD,         # EARTH
+	5: Color.WHITE_SMOKE,            # WIND
+	6: Color.GOLD,                   # LIGHT
+	7: Color.DARK_MAGENTA,           # DARK
 }
 
 # Battle Configuration - Set before starting a battle

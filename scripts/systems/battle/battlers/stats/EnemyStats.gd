@@ -13,7 +13,6 @@ extends Resource
 @export var attack: int = 10
 @export var defense: int = 5
 @export var agility: int = 5
-@export var element: int = GlobalBattleSettings.Elements.Physical
 
 @export_group("Attacks & Skills")
 ## Available attacks the AI can select from in combat

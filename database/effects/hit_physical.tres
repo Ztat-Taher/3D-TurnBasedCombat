@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="HitEffectConfig" format=3 uid="uid://8fll8hlf0n6q"]
+
+[ext_resource type="Script" uid="uid://dn4quj7fw2asf" path="res://scripts/systems/battle/effects/hit_effect_system/hit_effect_config.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://by0ectt410tlu" path="res://assets/effects/hits/hit_physical.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+spritesheet_texture = ExtResource("2")
+hframes = 8

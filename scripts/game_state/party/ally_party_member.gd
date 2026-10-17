@@ -111,7 +111,7 @@ func duplicate_deck() -> DeckResource:
 	var copy := source.duplicate() as DeckResource
 	if copy == null:
 		return null
-	var cards : Array[CardData] = []
+	var cards : Array[CardConfig] = []
 	for card in source.cards:
 		cards.append(card)
 	copy.cards = cards
