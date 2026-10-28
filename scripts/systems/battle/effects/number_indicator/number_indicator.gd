@@ -19,13 +19,10 @@ var active_numbers: Dictionary = {
 var stack_timers: Dictionary = {}
 
 func show_damage(value: int, is_critical: bool = false, is_weakness: bool = false) -> void:
-	print("[NumberIndicator] show_damage called: ", value)
 	if value <= 0:
-		print("[NumberIndicator] Value is 0, skipping")
 		return
 	
 	var item = number_item_scene.instantiate() as NumberItem
-	print("[NumberIndicator] NumberItem instantiated: ", item)
 	item.number_type = NumberItem.NumberType.DAMAGE
 	item.value = value
 	item.is_critical = is_critical
@@ -69,7 +66,6 @@ func add_number_item(item: NumberItem, type_key: String) -> void:
 	
 	# Center the item
 	item.position = Vector2(size.x / 2 - item.size.x / 2, size.y / 2 - item.size.y / 2)
-	print("[NumberIndicator] Added item at position: ", item.position, " viewport size: ", size)
 	
 	# Handle stacking
 	var stack = active_numbers[type_key]

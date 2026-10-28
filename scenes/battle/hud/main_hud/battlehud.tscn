@@ -5,15 +5,14 @@
 [ext_resource type="PackedScene" uid="uid://cn21e4r3htvwd" path="res://scenes/battle/hud/information_display/text/battleresults.tscn" id="6_g4nh0"]
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://scripts/juice/buttons/button_juice.gd" id="7_p32nk"]
 [ext_resource type="Texture2D" uid="uid://b2nrjutwl7rx7" path="res://assets/images/ui/menu/button_normal.png" id="8_27igj"]
-[ext_resource type="PackedScene" uid="uid://bsdjvwbf7iv4s" path="res://scenes/battle/hud/health_display/bars/boss/BossBar.tscn" id="8_bossbar"]
 [ext_resource type="Texture2D" uid="uid://mivsro58mpwj" path="res://assets/images/ui/menu/button_pressed.png" id="9_dab75"]
-[ext_resource type="Script" uid="uid://igumddyitxrw" path="res://scripts/systems/effects/visual/flash/screen_flash.gd" id="9_flash"]
-[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="10_4ei2w"]
-[ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://scenes/battle/hud/action_system/input/input_prompt.gd" id="10_input"]
-[ext_resource type="PackedScene" uid="uid://c57p8obm33ioi" path="res://scenes/battle/hud/action_system/action_buttons/action_buttons.tscn" id="12_action_buttons"]
-[ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://scripts/systems/effects/visual/shadows/drop_shadow.gd" id="13_dab75"]
-[ext_resource type="PackedScene" uid="uid://d1n1invd7ckr8" path="res://scenes/battle/hud/turn_system/queue/ui/turn_queue_ui.tscn" id="13_turn_queue_ui"]
-[ext_resource type="PackedScene" uid="uid://d0g1vty6xfk1y" path="res://scenes/battle/card_combat/main_ui/card_ui.tscn" id="13_xkcqd"]
+[ext_resource type="Script" uid="uid://igumddyitxrw" path="res://scripts/systems/effects/visual/flash/screen_flash.gd" id="10_flash"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="11_4ei2w"]
+[ext_resource type="Script" uid="uid://btxuwk80fln1s" path="res://scenes/battle/hud/action_system/input/input_prompt.gd" id="12_input"]
+[ext_resource type="PackedScene" uid="uid://c57p8obm33ioi" path="res://scenes/battle/hud/action_system/action_buttons/action_buttons.tscn" id="13_action_buttons"]
+[ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://scripts/systems/effects/visual/shadows/drop_shadow.gd" id="14_dab75"]
+[ext_resource type="PackedScene" uid="uid://d1n1invd7ckr8" path="res://scenes/battle/hud/turn_system/queue/ui/turn_queue_ui.tscn" id="15_turn_queue_ui"]
+[ext_resource type="PackedScene" uid="uid://d0g1vty6xfk1y" path="res://scenes/battle/card_combat/main_ui/card_ui.tscn" id="16_xkcqd"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7jqjx"]
 
@@ -29,11 +28,11 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_uiugx")
 
-[node name="CardUI" parent="Control" unique_id=1376086127 instance=ExtResource("13_xkcqd")]
+[node name="CardUI" parent="Control" unique_id=1376086127 instance=ExtResource("16_xkcqd")]
 visible = false
 layout_mode = 1
 
-[node name="TurnQueueUI" parent="Control" unique_id=1146046375 instance=ExtResource("13_turn_queue_ui")]
+[node name="TurnQueueUI" parent="Control" unique_id=1146046375 instance=ExtResource("15_turn_queue_ui")]
 layout_mode = 0
 
 [node name="EnemyHealthBarsContainer" type="Control" parent="Control" unique_id=2090000003]
@@ -95,7 +94,7 @@ mouse_filter = 2
 visible = false
 layout_mode = 1
 
-[node name="ActionButtons" parent="Control" unique_id=1087849572 instance=ExtResource("12_action_buttons")]
+[node name="ActionButtons" parent="Control" unique_id=1087849572 instance=ExtResource("13_action_buttons")]
 visible = false
 layout_mode = 1
 anchors_preset = 8
@@ -159,7 +158,7 @@ theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
 theme_override_constants/shadow_offset_x = -5
 theme_override_constants/shadow_offset_y = 5
-theme_override_fonts/font = ExtResource("10_4ei2w")
+theme_override_fonts/font = ExtResource("11_4ei2w")
 theme_override_font_sizes/font_size = 30
 text = "Back"
 horizontal_alignment = 1
@@ -180,7 +179,7 @@ offset_bottom = 10.0
 grow_horizontal = 0
 grow_vertical = 2
 text = "[B]"
-script = ExtResource("10_input")
+script = ExtResource("12_input")
 
 [node name="ButtonJuice" type="Node" parent="Control/BackButton" unique_id=1929906410]
 script = ExtResource("7_p32nk")
@@ -195,13 +194,9 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 stretch_mode = 5
-script = ExtResource("13_dab75")
+script = ExtResource("14_dab75")
 shadow_offset = Vector2(8, 10)
 blur_amount = 0.5
-
-[node name="BossBar" parent="Control" unique_id=1980246889 instance=ExtResource("8_bossbar")]
-visible = false
-layout_mode = 1
 
 [node name="MoveBanner" type="Control" parent="Control" unique_id=2090000002]
 visible = false
@@ -250,6 +245,6 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(1, 1, 1, 0)
-script = ExtResource("9_flash")
+script = ExtResource("10_flash")
 
 [connection signal="pressed" from="Control/BackButton" to="." method="_on_global_back_pressed"]

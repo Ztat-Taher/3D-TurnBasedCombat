@@ -15,7 +15,11 @@ var current_mode: CameraMode = CameraMode.DEFAULT
 var tween: Tween
 
 var _default_transform: Transform3D
-var _default_fov: float
+var default_fov: float  # Public accessor for default FOV
+var _fov_tween: Tween
+var _target_fov_tween: Tween
+var _distance_tween: Tween
+var _evasion_distance_offset: float = 0.0
 
 @export var ots_camera_scene: PackedScene = preload("res://scenes/battle/cameras/perspective/over_the_shoulder_camera.tscn")
 @export var overview_camera_scene: PackedScene = preload("res://scenes/battle/cameras/overview/enemy_overview_camera.tscn")
@@ -23,6 +27,7 @@ var _default_fov: float
 
 @export var transition_duration: float = 0.45
 @export var fov_padding: float = 1.3 # Multiplier to add some padding around the subject
+@export var wide_fov_padding: float = 2.0 # Higher padding for wide shots (overview, over-the-shoulder)
 
 # Cached instances (kept out of tree)
 var _ots_instance: Camera3D
@@ -37,7 +42,8 @@ func _setup_camera() -> void:
 		camera = _find_camera()
 	if camera:
 		_default_transform = camera.global_transform
-		_default_fov = camera.fov
+		default_fov = camera.fov
+		_evasion_distance_offset = 0.0
 
 ## Resolves the gameplay Camera3D wherever it lives:
 ##  - the active camera of this controller's own viewport (legacy layout)
@@ -82,7 +88,7 @@ func set_default_camera() -> void:
 	current_mode = CameraMode.DEFAULT
 	if not camera:
 		return
-	_animate_camera(_default_transform, _default_fov)
+	_animate_camera(_default_transform, default_fov)
 
 ## Returns the resolved gameplay camera (re-resolves on demand).
 func get_camera() -> Camera3D:
@@ -154,44 +160,61 @@ func _get_or_create_instance(scene: PackedScene, cached_instance: Camera3D) -> C
 			return instance
 	return null
 
-func _calculate_dynamic_fov(camera_global_pos: Vector3, target_nodes: Array) -> float:
+func _calculate_dynamic_fov(camera_global_pos: Vector3, target_nodes: Array, use_wide_padding: bool = false) -> float:
 	var combined_aabb := AABB()
 	var has_bounds := false
-	
+
 	for node in target_nodes:
 		if not is_instance_valid(node):
 			continue
-		var visuals = _find_all_visuals(node)
-		for vis in visuals:
-			if vis is VisualInstance3D:
-				var vis_aabb = vis.get_aabb()
-				# Approximate global AABB
-				var global_center = vis.global_transform * vis_aabb.get_center()
-				var global_size = vis_aabb.size * vis.global_transform.basis.get_scale()
-				var global_aabb = AABB(global_center - global_size/2.0, global_size)
-				
-				if not has_bounds:
-					combined_aabb = global_aabb
-					has_bounds = true
-				else:
-					combined_aabb = combined_aabb.merge(global_aabb)
-	
+
+		# If the node is a Battler, use its cached combined AABB method
+		if node is Battler and node.has_method("get_combined_aabb"):
+			var battler_aabb = node.get_combined_aabb()
+			# Transform local AABB to global space
+			var global_center = node.global_transform * battler_aabb.get_center()
+			var global_size = battler_aabb.size * node.global_transform.basis.get_scale()
+			var global_aabb = AABB(global_center - global_size/2.0, global_size)
+
+			if not has_bounds:
+				combined_aabb = global_aabb
+				has_bounds = true
+			else:
+				combined_aabb = combined_aabb.merge(global_aabb)
+		else:
+			# Fallback to finding all VisualInstance3D children
+			var visuals = _find_all_visuals(node)
+			for vis in visuals:
+				if vis is VisualInstance3D:
+					var vis_aabb = vis.get_aabb()
+					# Approximate global AABB
+					var global_center = vis.global_transform * vis_aabb.get_center()
+					var global_size = vis_aabb.size * vis.global_transform.basis.get_scale()
+					var global_aabb = AABB(global_center - global_size/2.0, global_size)
+
+					if not has_bounds:
+						combined_aabb = global_aabb
+						has_bounds = true
+					else:
+						combined_aabb = combined_aabb.merge(global_aabb)
+
 	if not has_bounds or combined_aabb.size == Vector3.ZERO:
 		return 75.0 # Fallback default FOV
-		
+
 	var dist = camera_global_pos.distance_to(combined_aabb.get_center())
 	if dist < 0.1:
 		return 75.0
-		
+
 	# Get the largest dimension of the AABB
 	var max_size = max(combined_aabb.size.x, max(combined_aabb.size.y, combined_aabb.size.z))
-	
+
 	# Basic trigonometry: tan(fov/2) = (size/2) / dist
 	var needed_fov_rad = 2.0 * atan((max_size / 2.0) / dist)
 	var needed_fov_deg = rad_to_deg(needed_fov_rad)
-	
-	# Apply padding and clamp
-	return clamp(needed_fov_deg * fov_padding, 30.0, 100.0)
+
+	# Apply padding - use wider padding for overview/OTS shots to fit everything
+	var padding = wide_fov_padding if use_wide_padding else fov_padding
+	return clamp(needed_fov_deg * padding, 30.0, 120.0)
 
 func _find_all_visuals(node: Node) -> Array[Node]:
 	var visuals: Array[Node] = []
@@ -205,23 +228,22 @@ func set_over_the_shoulder(player_battler: Battler) -> void:
 	current_mode = CameraMode.OVER_THE_SHOULDER
 	if not camera or not player_battler or not is_instance_valid(player_battler):
 		return
-		
+
 	_ots_instance = _get_or_create_instance(ots_camera_scene, _ots_instance)
 	if _ots_instance:
 		# Calculate global transform by applying prefab's local transform to the battler's global transform
 		var target_transform = player_battler.global_transform * _ots_instance.transform
-		var target_fov = _calculate_dynamic_fov(target_transform.origin, [player_battler])
-		
-		# Optional: Use prefab's base FOV if dynamic is too small
-		target_fov = max(target_fov, _ots_instance.fov)
-		
+
+		# Use prefab's default FOV and position (no distance adjustment)
+		var target_fov = _ots_instance.fov
+
 		_animate_camera(target_transform, target_fov)
 
 func set_enemy_overview(enemies: Array) -> void:
 	current_mode = CameraMode.ENEMY_OVERVIEW
 	if not camera or enemies.is_empty():
 		return
-		
+
 	var center_pos = Vector3.ZERO
 	var count = 0
 	var valid_enemies = []
@@ -230,45 +252,162 @@ func set_enemy_overview(enemies: Array) -> void:
 			center_pos += enemy.global_position
 			count += 1
 			valid_enemies.append(enemy)
-			
+
 	if count == 0:
 		return
 	center_pos /= float(count)
-	
+
 	_overview_instance = _get_or_create_instance(overview_camera_scene, _overview_instance)
 	if _overview_instance:
 		# Create a basis that looks roughly from the enemies towards the players (assuming players are around Z=0)
 		# For now, just use an identity basis at the center position
 		var center_transform = Transform3D(Basis(), center_pos)
 		var target_transform = center_transform * _overview_instance.transform
-		
-		var target_fov = _calculate_dynamic_fov(target_transform.origin, valid_enemies)
-		target_fov = max(target_fov, _overview_instance.fov)
-		
-		_animate_camera(target_transform, target_fov)
+
+		# Keep original FOV, adjust distance instead
+		var target_fov = _overview_instance.fov
+		var adjusted_transform = _adjust_distance_for_aabb(target_transform, valid_enemies, true)
+
+		_animate_camera(adjusted_transform, target_fov)
 
 func set_target_focus(target_battler: Battler) -> void:
 	current_mode = CameraMode.TARGET_FOCUS
 	if not camera or not target_battler or not is_instance_valid(target_battler):
 		return
-		
+
 	_focus_instance = _get_or_create_instance(focus_camera_scene, _focus_instance)
 	if _focus_instance:
 		var target_transform = target_battler.global_transform * _focus_instance.transform
-		var target_fov = _calculate_dynamic_fov(target_transform.origin, [target_battler])
-		target_fov = max(target_fov, _focus_instance.fov)
-		
-		_animate_camera(target_transform, target_fov)
+
+		# Keep original FOV, adjust distance instead
+		var target_fov = _focus_instance.fov
+		var adjusted_transform = _adjust_distance_for_aabb(target_transform, [target_battler], false)
+
+		_animate_camera(adjusted_transform, target_fov)
 
 func _animate_camera(target_transform: Transform3D, target_fov: float) -> void:
 	if not camera or not is_instance_valid(camera):
 		return
 	if tween and tween.is_running():
 		tween.kill()
-	
+
 	tween = create_tween()
 	tween.set_parallel(true)
 	tween.set_ease(Tween.EaseType.EASE_OUT)
 	tween.set_trans(Tween.TransitionType.TRANS_CUBIC)
 	tween.tween_property(camera, "global_transform", target_transform, transition_duration)
 	tween.tween_property(camera, "fov", target_fov, transition_duration)
+
+## Adjust camera distance to fit target AABBs without changing FOV
+## Returns adjusted transform with camera moved to appropriate distance
+func _adjust_distance_for_aabb(target_transform: Transform3D, target_nodes: Array, use_wide_padding: bool = false) -> Transform3D:
+	var combined_aabb := AABB()
+	var has_bounds := false
+
+	for node in target_nodes:
+		if not is_instance_valid(node):
+			continue
+
+		# If the node is a Battler, use its cached combined AABB method
+		if node is Battler and node.has_method("get_combined_aabb"):
+			var battler_aabb = node.get_combined_aabb()
+			# Transform local AABB to global space
+			var global_center = node.global_transform * battler_aabb.get_center()
+			var global_size = battler_aabb.size * node.global_transform.basis.get_scale()
+			var global_aabb = AABB(global_center - global_size/2.0, global_size)
+
+			if not has_bounds:
+				combined_aabb = global_aabb
+				has_bounds = true
+			else:
+				combined_aabb = combined_aabb.merge(global_aabb)
+		else:
+			# Fallback to finding all VisualInstance3D children
+			var visuals = _find_all_visuals(node)
+			for vis in visuals:
+				if vis is VisualInstance3D:
+					var vis_aabb = vis.get_aabb()
+					# Approximate global AABB
+					var global_center = vis.global_transform * vis_aabb.get_center()
+					var global_size = vis_aabb.size * vis.global_transform.basis.get_scale()
+					var global_aabb = AABB(global_center - global_size/2.0, global_size)
+
+					if not has_bounds:
+						combined_aabb = global_aabb
+						has_bounds = true
+					else:
+						combined_aabb = combined_aabb.merge(global_aabb)
+
+	if not has_bounds or combined_aabb.size == Vector3.ZERO:
+		return target_transform  # No adjustment needed
+
+	var camera_pos = target_transform.origin
+	var combined_size = combined_aabb.size
+	var max_size = max(combined_size.x, max(combined_size.y, combined_size.z))
+
+	# Calculate required distance to fit AABB in current FOV
+	# FOV is in degrees, convert to radians
+	var fov_rad = deg_to_rad(camera.fov)
+	# tan(fov/2) = (size/2) / distance  =>  distance = (size/2) / tan(fov/2)
+	var required_distance = (max_size / 2.0) / tan(fov_rad / 2.0)
+
+	# Apply padding
+	var padding = wide_fov_padding if use_wide_padding else fov_padding
+	required_distance *= padding
+
+	# Calculate direction from AABB center to camera
+	var aabb_center = combined_aabb.get_center()
+	var direction = (camera_pos - aabb_center).normalized()
+
+	# Move camera to required distance
+	var new_camera_pos = aabb_center + direction * required_distance
+
+	# Preserve camera orientation, only change position
+	var adjusted_transform = target_transform
+	adjusted_transform.origin = new_camera_pos
+
+	return adjusted_transform
+
+## Adjust camera distance for evasion maneuvers (dodge/jump)
+## Moves camera back by specified distance offset
+func adjust_camera_distance_for_evasion(distance_offset: float, duration: float) -> void:
+	if not camera or not is_instance_valid(camera):
+		return
+
+	# Cancel existing distance tween
+	if _distance_tween and _distance_tween.is_valid():
+		_distance_tween.kill()
+
+	_evasion_distance_offset = distance_offset
+
+	# Move camera back along its current look direction
+	var camera_forward = -camera.global_transform.basis.z.normalized()
+	var target_position = camera.global_position + camera_forward * distance_offset
+
+	_distance_tween = camera.create_tween()
+	_distance_tween.set_ease(Tween.EaseType.EASE_OUT)
+	_distance_tween.set_trans(Tween.TransitionType.TRANS_CUBIC)
+	_distance_tween.tween_property(camera, "global_position", target_position, duration)
+
+## Reset camera distance after evasion maneuvers
+func reset_camera_distance() -> void:
+	if not camera or not is_instance_valid(camera):
+		return
+
+	if _evasion_distance_offset == 0.0:
+		return  # No offset to reset
+
+	# Cancel existing distance tween
+	if _distance_tween and _distance_tween.is_valid():
+		_distance_tween.kill()
+
+	# Move camera back to original position (reverse of evasion)
+	var camera_forward = -camera.global_transform.basis.z.normalized()
+	var target_position = camera.global_position - camera_forward * _evasion_distance_offset
+
+	_distance_tween = camera.create_tween()
+	_distance_tween.set_ease(Tween.EaseType.EASE_OUT)
+	_distance_tween.set_trans(Tween.TransitionType.TRANS_CUBIC)
+	_distance_tween.tween_property(camera, "global_position", target_position, 0.3)
+
+	_evasion_distance_offset = 0.0

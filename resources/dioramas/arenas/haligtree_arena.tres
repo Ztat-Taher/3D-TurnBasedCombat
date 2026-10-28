@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="DioramaArena25D" format=3 uid="uid://bsileayt1svcm"]
+
+[ext_resource type="Script" uid="uid://uf3m3jktgj8d" path="res://scripts/systems/battle/core/diorama/diorama_arena_25d.gd" id="1_arena"]
+[ext_resource type="Script" uid="uid://bh8xvhw0rs1qo" path="res://scripts/systems/battle/core/diorama/diorama_element_25d.gd" id="1_n2idj"]
+[ext_resource type="Texture2D" uid="uid://buv2otj0nxhw1" path="res://assets/textures/diorama/test_arena/floor_stone_albedo.png" id="2_floor_alb"]
+[ext_resource type="Texture2D" uid="uid://c836dka4v5nxc" path="res://assets/textures/diorama/test_arena/floor_stone_normal.png" id="3_floor_norm"]
+[ext_resource type="Resource" uid="uid://dyc62vrlu1c8i" path="res://resources/dioramas/rings/haligtree_outer_ring.tres" id="4_ring"]
+[ext_resource type="Script" uid="uid://dp8635tc3pjmn" path="res://scripts/systems/battle/core/diorama/diorama_ring_layer_25d.gd" id="6_7s1ia"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_x6tm4"]
+top_radius = 10.0
+bottom_radius = 10.0
+height = 1.0
+radial_segments = 32
+rings = 0
+cap_bottom = false
+
+[resource]
+script = ExtResource("1_arena")
+arena_name = "Haligtree Vista Arena"
+floor_radius = 0.0
+floor_mesh = SubResource("CylinderMesh_x6tm4")
+floor_albedo = ExtResource("2_floor_alb")
+floor_normal = ExtResource("3_floor_norm")
+floor_uv_scale = Vector2(70, 80)
+panorama_rings = Array[ExtResource("6_7s1ia")]([ExtResource("4_ring")])
+fog_enabled = true

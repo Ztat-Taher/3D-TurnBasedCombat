@@ -48,32 +48,39 @@ func apply_camera_effects(camera: Camera3D, actor: Node, target: Node, projectil
 	if not camera:
 		push_warning("CameraEffectConfig: No camera provided")
 		return
-	
+
 	if camera_shake_enabled:
 		_apply_shake(camera)
-	
+
 	if camera_zoom_enabled:
 		_apply_zoom(camera)
-	
+
 	if tracking_mode != TrackingMode.NONE:
 		_apply_tracking(camera, actor, target, projectile)
-	
+
 	if camera_tilt != Vector3.ZERO:
 		_apply_tilt(camera)
-	
+
 	if camera_fov >= 0:
 		_apply_fov(camera)
 
 ## Apply camera shake
 func _apply_shake(camera: Camera3D):
 	var original_position = camera.global_position
+	var shake_tween = camera.create_tween()
+	shake_tween.set_parallel(true)
+
+	# Create a custom shake tween that updates position each frame
 	var shake_timer = 0.0
-	
-	var total_frames = int(shake_duration * 60) # Assuming 60 FPS
-	for i in range(total_frames):
+	var update_func = func(delta):
+		shake_timer += delta
+		if shake_timer >= shake_duration:
+			camera.global_position = original_position
+			return
+
 		var decay = 1.0 - (shake_timer / shake_duration) * shake_decay
 		var current_intensity = shake_intensity * decay
-		
+
 		var shake_offset = Vector3.ZERO
 		match shake_style:
 			ShakeStyle.RANDOM:
@@ -91,12 +98,14 @@ func _apply_shake(camera: Camera3D):
 					sin(angle) * current_intensity,
 					0
 				)
-		
+
 		camera.global_position = original_position + shake_offset
-		shake_timer += 1.0 / 60.0 # Assume 60 FPS
-		await camera.get_tree().process_frame
-	
-	camera.global_position = original_position
+
+	# Use tween_method for smooth updates
+	shake_tween.tween_method(update_func, 0.0, shake_duration, shake_duration)
+	shake_tween.tween_callback(func():
+		camera.global_position = original_position
+	)
 
 ## Apply camera zoom
 func _apply_zoom(camera: Camera3D):
@@ -121,27 +130,25 @@ func _apply_tracking(camera: Node3D, actor: Node, target: Node, projectile: Node
 	var track_target = _get_tracking_target(actor, target, projectile)
 	if not track_target:
 		return
-	
+
 	var original_position = camera.global_position
-	var _tracking_timer = 0.0
-	
-	var total_frames = int(tracking_duration * 60) # Assuming 60 FPS
-	for i in range(total_frames):
+	var tracking_tween = camera.create_tween()
+
+	# Use tween to smoothly track the target
+	var update_func = func(progress):
 		var target_position = track_target.global_position + tracking_offset
-		var direction = (target_position - camera.global_position).normalized()
-		var distance = camera.global_position.distance_to(target_position)
-		
+		var direction = (target_position - original_position).normalized()
+		var distance = original_position.distance_to(target_position)
+
 		if distance > 0.1:
-			var move_amount = min(distance, tracking_speed / 60.0)
-			camera.global_position += direction * move_amount
-		
-		_tracking_timer += 1.0 / 60.0 # Assume 60 FPS
-		await camera.get_tree().process_frame
-	
+			var move_amount = min(distance * progress, tracking_speed * 0.016)
+			camera.global_position = original_position + direction * move_amount
+
+	tracking_tween.tween_method(update_func, 0.0, 1.0, tracking_duration)
+
 	# Return to original position if configured
 	if tracking_mode == TrackingMode.NONE:
-		var return_tween = camera.create_tween()
-		return_tween.tween_property(camera, "global_position", original_position, 0.5)
+		tracking_tween.tween_property(camera, "global_position", original_position, 0.5)
 
 ## Get target to track based on tracking mode
 func _get_tracking_target(actor: Node, target: Node, projectile: Node) -> Node:

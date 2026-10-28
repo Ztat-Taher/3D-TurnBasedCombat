@@ -13,4 +13,4 @@ shader_parameter/noise_texture = ExtResource("2_8kdhl")
 shader_parameter/pan_speed = Vector2(0, 0)
 shader_parameter/distortion_strength = 0.15
 shader_parameter/trail_length_fade_power = 1.00000004424012
-shader_parameter/edge_fade_power = 2.5
+shader_parameter/edge_fade_power = 3.0

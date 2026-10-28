@@ -21,7 +21,7 @@ enum FlashType {
 
 func _ready() -> void:
 	visible = false
-	modulate = Color.TRANSPARENT
+	color = Color.TRANSPARENT
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Ensure this renders on top of everything
 	z_index = 1000
@@ -59,23 +59,23 @@ func _start_flash(flash_color: Color, duration: float) -> void:
 	# Cancel any existing flash
 	if flash_tween and flash_tween.is_valid():
 		flash_tween.kill()
-	
+
 	is_flashing = true
 	flash_started.emit()
-	
+
 	visible = true
-	modulate = flash_color
-	
+	color = flash_color
+
 	flash_tween = create_tween()
-	
+
 	# Fade out
-	flash_tween.tween_property(self, "modulate:a", 0.0, duration)
+	flash_tween.tween_property(self, "color:a", 0.0, duration)
 	flash_tween.tween_callback(_on_flash_finished)
 
 func _on_flash_finished() -> void:
 	is_flashing = false
 	visible = false
-	modulate = Color.TRANSPARENT
+	color = Color.TRANSPARENT
 	flash_finished.emit()
 
 func stop_flash() -> void:
@@ -83,23 +83,23 @@ func stop_flash() -> void:
 		flash_tween.kill()
 	is_flashing = false
 	visible = false
-	modulate = Color.TRANSPARENT
+	color = Color.TRANSPARENT
 	flash_finished.emit()
 
 # Flash with custom curve for more control
 func flash_with_curve(flash_color: Color, duration: float, curve: Tween.TransitionType) -> void:
 	if flash_tween and flash_tween.is_valid():
 		flash_tween.kill()
-	
+
 	is_flashing = true
 	flash_started.emit()
-	
+
 	visible = true
-	modulate = flash_color
-	
+	color = flash_color
+
 	flash_tween = create_tween()
 	flash_tween.set_trans(curve)
-	flash_tween.tween_property(self, "modulate:a", 0.0, duration)
+	flash_tween.tween_property(self, "color:a", 0.0, duration)
 	flash_tween.tween_callback(_on_flash_finished)
 
 # Quick flash for rapid-fire effects

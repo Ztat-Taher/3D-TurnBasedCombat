@@ -1,4 +1,8 @@
-[gd_resource type="AnimationNodeStateMachine" format=3 uid="uid://8pbhl24jtx0m"]
+[gd_resource type="AnimationNodeBlendTree" format=3 uid="uid://8pbhl24jtx0m"]
+
+[sub_resource type="AnimationNodeAdd2" id="add2_layer"]
+filter_enabled = true
+filters = ["", "%GeneralSkeleton:Chest", "%GeneralSkeleton:Head", "%GeneralSkeleton:LeftHand", "%GeneralSkeleton:LeftIndexDistal", "%GeneralSkeleton:LeftIndexIntermediate", "%GeneralSkeleton:LeftIndexProximal", "%GeneralSkeleton:LeftLittleDistal", "%GeneralSkeleton:LeftLittleIntermediate", "%GeneralSkeleton:LeftLittleProximal", "%GeneralSkeleton:LeftLowerArm", "%GeneralSkeleton:LeftMiddleDistal", "%GeneralSkeleton:LeftMiddleIntermediate", "%GeneralSkeleton:LeftMiddleProximal", "%GeneralSkeleton:LeftRingDistal", "%GeneralSkeleton:LeftRingIntermediate", "%GeneralSkeleton:LeftRingProximal", "%GeneralSkeleton:LeftShoulder", "%GeneralSkeleton:LeftThumbDistal", "%GeneralSkeleton:LeftThumbMetacarpal", "%GeneralSkeleton:LeftThumbProximal", "%GeneralSkeleton:LeftUpperArm", "%GeneralSkeleton:Neck", "%GeneralSkeleton:RightHand", "%GeneralSkeleton:RightIndexDistal", "%GeneralSkeleton:RightIndexIntermediate", "%GeneralSkeleton:RightIndexProximal", "%GeneralSkeleton:RightLittleDistal", "%GeneralSkeleton:RightLittleIntermediate", "%GeneralSkeleton:RightLittleProximal", "%GeneralSkeleton:RightLowerArm", "%GeneralSkeleton:RightMiddleDistal", "%GeneralSkeleton:RightMiddleIntermediate", "%GeneralSkeleton:RightMiddleProximal", "%GeneralSkeleton:RightRingDistal", "%GeneralSkeleton:RightRingIntermediate", "%GeneralSkeleton:RightRingProximal", "%GeneralSkeleton:RightShoulder", "%GeneralSkeleton:RightThumbDistal", "%GeneralSkeleton:RightThumbMetacarpal", "%GeneralSkeleton:RightThumbProximal", "%GeneralSkeleton:RightUpperArm", "%GeneralSkeleton:Spine", "%GeneralSkeleton:UpperChest", "AnimationPlayer:speed_scale"]
 
 [sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_1"]
 animation = &"monster_01/monster_swipe_var001"
@@ -73,9 +77,6 @@ graph_offset = Vector2(-89, 42.10706)
 [sub_resource type="AnimationNodeAnimation" id="anim_death"]
 animation = &"monster_01/monster_death_var001"
 
-[sub_resource type="AnimationNodeAnimation" id="anim_hit"]
-animation = &"monster_02/zombie_reaction_hit_var001"
-
 [sub_resource type="AnimationNodeAnimation" id="anim_idle"]
 animation = &"monster_01/monster_breath_idle_var001"
 
@@ -98,47 +99,71 @@ xfade_time = 0.2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_walk_back"]
 xfade_time = 0.2
+advance_condition = &"is_walking"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="walk_back_to_idle"]
 xfade_time = 0.2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_combat"]
-xfade_time = 0.15
+xfade_time = 0.05
 advance_condition = &"is_attacking"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="walk_to_combat"]
-xfade_time = 0.15
+xfade_time = 0.05
 advance_condition = &"is_attacking"
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_hit"]
-advance_condition = &"is_hit"
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="hit_to_idle"]
-xfade_time = 0.1
-switch_mode = 2
-advance_mode = 2
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_death"]
-advance_condition = &"is_dead"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_07edp"]
 switch_mode = 2
 advance_mode = 0
 
-[resource]
+[sub_resource type="AnimationNodeStateMachineTransition" id="combat_to_walk_back"]
+xfade_time = 0.05
+advance_condition = &"is_walking"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_death"]
+advance_condition = &"is_dead"
+
+[sub_resource type="AnimationNodeStateMachine" id="base_sm"]
 states/End/position = Vector2(1300, 200)
 states/Start/position = Vector2(38, 200)
 states/combat_actions/node = SubResource("combat_actions_sm")
 states/combat_actions/position = Vector2(619.4607, 199.96031)
 states/death/node = SubResource("anim_death")
 states/death/position = Vector2(37.344, 49.504)
-states/hit/node = SubResource("anim_hit")
-states/hit/position = Vector2(240, 49.4432)
 states/idle1/node = SubResource("anim_idle")
 states/idle1/position = Vector2(240, 200)
 states/walk/node = SubResource("anim_walk")
 states/walk/position = Vector2(240.768, 347.85828)
 states/walk_back/node = SubResource("anim_walk_back")
 states/walk_back/position = Vector2(240, 468.4)
-transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "idle1", "hit", SubResource("idle_to_hit"), "hit", "idle1", SubResource("hit_to_idle"), "idle1", "death", SubResource("idle_to_death"), "combat_actions", "idle1", SubResource("AnimationNodeStateMachineTransition_07edp")]
+transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "combat_actions", "idle1", SubResource("AnimationNodeStateMachineTransition_07edp"), "combat_actions", "walk_back", SubResource("combat_to_walk_back"), "idle1", "death", SubResource("idle_to_death")]
 graph_offset = Vector2(-170.40161, 20.287735)
+
+[sub_resource type="AnimationNodeAnimation" id="anim_hit"]
+animation = &"monster_02/zombie_reaction_hit_var001"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="empty_to_hit"]
+advance_mode = 2
+advance_condition = &"is_hit"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="hit_to_empty"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachine" id="hit_sm"]
+states/End/position = Vector2(812, 179)
+states/Start/position = Vector2(38, 200)
+states/hit/node = SubResource("anim_hit")
+states/hit/position = Vector2(587, 188)
+transitions = ["Start", "hit", SubResource("empty_to_hit"), "hit", "End", SubResource("hit_to_empty")]
+graph_offset = Vector2(-335.4016, -45.712265)
+
+[resource]
+nodes/output/position = Vector2(880, 80)
+nodes/Add2/node = SubResource("add2_layer")
+nodes/Add2/position = Vector2(620, 100)
+nodes/BaseSM/node = SubResource("base_sm")
+nodes/BaseSM/position = Vector2(60, -40)
+nodes/HitSM/node = SubResource("hit_sm")
+nodes/HitSM/position = Vector2(60, 240)
+node_connections = [&"output", 0, &"Add2", &"Add2", 0, &"BaseSM", &"Add2", 1, &"HitSM"]

@@ -3,11 +3,12 @@
 [ext_resource type="Script" uid="uid://bqvsfh10bn27f" path="res://database/troops/enemy_group.gd" id="1_6o0q3"]
 [ext_resource type="Script" uid="uid://rub0awaryv0r" path="res://database/troops/troops_template.gd" id="1_abc12"]
 [ext_resource type="PackedScene" uid="uid://bmu11p8vvo71p" path="res://scenes/battle/core/enemies/enemy.tscn" id="1_tl6uc"]
+[ext_resource type="PackedScene" uid="uid://cdex70rdn23j2" path="res://scenes/battle/core/enemies/boss.tscn" id="2_72cmg"]
 
 [sub_resource type="Resource" id="Resource_tl6uc"]
 script = ExtResource("1_6o0q3")
 group_name = "Test"
-enemy_scenes = Array[PackedScene]([ExtResource("1_tl6uc"), ExtResource("1_tl6uc")])
+enemy_scenes = Array[PackedScene]([ExtResource("1_tl6uc"), ExtResource("2_72cmg"), ExtResource("1_tl6uc")])
 metadata/_custom_type_script = "uid://bqvsfh10bn27f"
 
 [resource]

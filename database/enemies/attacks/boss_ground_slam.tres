@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EnemyAttackConfig" format=3 uid="uid://dfk8c2m3n4o5q"]
+
+[ext_resource type="Script" uid="uid://286lbfhgjnsn" path="res://scripts/systems/battle/battlers/stats/EnemyAttackConfig.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+attack_name = "Ground Slam"
+animation_name = "melee_combo_2"
+damage_multiplier = 2.0
+weight = 2.0
+description = "The boss slams the ground with massive force - must jump to avoid, cannot be parried."
+can_dodge = false
+can_parry = false
+requires_jump = true

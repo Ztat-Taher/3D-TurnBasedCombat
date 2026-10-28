@@ -6,4 +6,4 @@
 [resource]
 script = ExtResource("1")
 spritesheet_texture = ExtResource("2")
-hframes = 8
+hframes = 5

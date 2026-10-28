@@ -206,15 +206,19 @@ func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provi
 			battler.is_selectable = false
 			battler.is_targeted = false
 	
-	if available_targets.size() > 0:
-		battle_manager.current_controller_target = available_targets[0]
-		battle_manager.current_default_selector = available_targets[0]
-		battle_manager.current_controller_target.set_as_keyboard_target()
-	
+	# Enable targets as valid/selectable WITHOUT setting keyboard target initially
+	# This prevents the camera from focusing on the first target in overview mode
 	for target in available_targets:
 		if target is Battler:
 			target.is_valid_target = true
 			target.is_selectable = true
+	
+	# Set the first target as the default selector ONLY for navigation purposes
+	# But don't call set_as_keyboard_target() which would trigger camera focus
+	if available_targets.size() > 0:
+		battle_manager.current_default_selector = available_targets[0]
+		# Don't set current_controller_target yet - only set it when user actually cycles or selects
+		# This keeps the camera in overview mode until a target is explicitly selected
 	
 	battle_manager.set_meta("pending_card", card)
 	

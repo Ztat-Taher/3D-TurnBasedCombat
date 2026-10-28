@@ -41,15 +41,12 @@ var started_fade: bool = false
 var base_position: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
-	print("[NumberItem] _ready called, value: ", value, " type: ", number_type)
 	# Don't show 0 damage/XP numbers
 	if value <= 0 and number_type != NumberType.SHIELD:
-		print("[NumberItem] Value is 0, queue_free")
 		queue_free()
 		return
 	
 	setup_appearance()
-	print("[NumberItem] Appearance set, position: ", position, " size: ", size)
 	play_pop_animation()
 	
 func setup_appearance() -> void:

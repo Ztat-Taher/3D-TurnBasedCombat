@@ -76,6 +76,7 @@ var is_advancing: bool = false
 var advance_target_position: Vector3
 var original_position: Vector3
 var _counter_handled_return: bool = false
+var _original_position_saved_this_turn: bool = false
 
 # Per-battler movement settings
 @export_group("Movement Settings", "movement")
@@ -101,9 +102,8 @@ var _counter_handled_return: bool = false
 ## Helper method to set animation tree conditions
 func set_animation_condition(condition_name: String, value: bool) -> void:
 	if anim_tree:
-		print("[Battler %s] Setting %s = %s" % [character_name, condition_name, value])
-		anim_tree.set("parameters/conditions/" + condition_name, value)
-		print("[Battler %s] After set, %s = %s" % [character_name, condition_name, anim_tree.get("parameters/conditions/" + condition_name)])
+		anim_tree.set("parameters/BaseSM/conditions/" + condition_name, value)
+	anim_tree.set("parameters/BaseSM/combat_actions/conditions/" + condition_name, value)
 
 
 
@@ -196,6 +196,10 @@ func _rebuild_overlay_chain() -> void:
 			current = overlay_instance
 
 @onready var select_outline: Shader = preload("res://assets/shaders/battler_select_shader.gdshader")
+var select_ring_scene: PackedScene = null
+var select_ring_vfx: VFXInstance = null
+var use_vfx_selection: bool = true
+
 var is_selectable: bool = false:
 	set(value):
 		is_selectable = value
@@ -225,12 +229,30 @@ func _update_highlight() -> void:
 	# Remove existing highlight overlay
 	remove_overlay("highlight")
 	
+	# Remove existing selection ring VFX
+	if select_ring_vfx and is_instance_valid(select_ring_vfx):
+		select_ring_vfx.stop()
+		select_ring_vfx.queue_free()
+		select_ring_vfx = null
+	
 	if !is_selectable or !is_valid_target:
 		return
 	
-	# Mouse hover takes priority over everything else
+	# Use VFX selection if enabled and available (lazy load)
+	if use_vfx_selection:
+		# Lazy load the scene only when needed
+		if not select_ring_scene:
+			select_ring_scene = load("res://assets/effects/ground/vfx_battler_select.tscn") as PackedScene
+		
+		if select_ring_scene:
+			if mouse_hover and is_selectable:
+				_spawn_selection_ring(Color.WHITE)
+			elif is_targeted or is_mouse_selected or is_keyboard_selected or is_default_target:
+				_spawn_selection_ring(Color.CYAN)
+			return
+	
+	# Fallback to shader overlay system
 	if mouse_hover and is_selectable:
-		# White hover outline (highest priority)
 		var hover_mat = ShaderMaterial.new()
 		hover_mat.shader = select_outline
 		hover_mat.set_shader_parameter("color", Color.WHITE)
@@ -238,7 +260,6 @@ func _update_highlight() -> void:
 		hover_mat.set_shader_parameter("alpha", 0.6)
 		add_overlay(OverlayType.HIGHLIGHT, hover_mat, 10, "highlight")
 	elif is_targeted or is_mouse_selected or is_keyboard_selected or is_default_target:
-		# Main selection outline (cyan for all input methods)
 		var shader_mat = ShaderMaterial.new()
 		shader_mat.shader = select_outline
 		shader_mat.set_shader_parameter("color", Color.CYAN)
@@ -246,8 +267,37 @@ func _update_highlight() -> void:
 		shader_mat.set_shader_parameter("alpha", 1.0)
 		add_overlay(OverlayType.HIGHLIGHT, shader_mat, 10, "highlight")
 
+func _spawn_selection_ring(color: Color) -> void:
+	if not select_ring_scene:
+		return
+	
+	select_ring_vfx = select_ring_scene.instantiate() as VFXInstance
+	if not select_ring_vfx:
+		return
+	
+	# Add VFX as child of battler so it moves with it
+	add_child(select_ring_vfx)
+	
+	# Position at ground level relative to battler (y=0 relative to battler's y)
+	select_ring_vfx.position = Vector3(0, -global_position.y, 0)
+	
+	# Set ring color directly on the shader material
+	var ring_mesh = select_ring_vfx.get_node("SelectionRing") as MeshInstance3D
+	if ring_mesh and ring_mesh.material_override is ShaderMaterial:
+		ring_mesh.material_override.set_shader_parameter("color", color)
+	
+	select_ring_vfx.play()
+
+func _exit_tree():
+	# Clean up selection ring VFX when battler is destroyed
+	if select_ring_vfx and is_instance_valid(select_ring_vfx):
+		select_ring_vfx.stop()
+		select_ring_vfx.queue_free()
+		select_ring_vfx = null
+
 @export_group("Special Dependencies")
 @onready var anim_tree: AnimationTree = $AnimationTree
+
 var state_machine: AnimationNodeStateMachinePlayback
 @export var number_indicator: NumberIndicator3D = null
 @export var attack_indicator_scene: PackedScene = preload("res://scenes/battle/effects/attack_indicator/attack_indicator_3d.tscn")
@@ -281,7 +331,7 @@ func _ready():
 	SignalBus.hover_target.connect(check_hover_target)
 	SignalBus.clear_default_selection.connect(_clear_default_selection)
 	
-	state_machine = anim_tree.get("parameters/playback") as AnimationNodeStateMachinePlayback
+	state_machine = anim_tree.get("parameters/BaseSM/playback") as AnimationNodeStateMachinePlayback
 
 	# Verify state_machine is valid
 	if not state_machine:
@@ -290,7 +340,7 @@ func _ready():
 
 	# Initialize animation conditions
 	if anim_tree:
-		anim_tree.set("parameters/conditions/allow_combat_to_idle", true)
+		anim_tree.set("parameters/BaseSM/conditions/allow_combat_to_idle", true)
 	
 	# Meshes are collected in _collect_meshes() at the start of _ready().
 	# Material overrides with duplicated surface materials are set there;
@@ -549,6 +599,10 @@ func take_damage(amount: int, attacker: Battler = null, damage_type: String = "p
 			return
 		_is_despawning = true
 		var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+
+		# Unregister from impact frame system when defeated
+		if battle_manager and battle_manager.effect_manager:
+			battle_manager.effect_manager.unregister_impact_node(self)
 		
 		# Award XP to the attacker who killed the enemy
 		if battle_manager and team == TEAM.ENEMY and enemy_stats and attacker:
@@ -700,6 +754,9 @@ func attack_anim(target, attack_config: EnemyAttackConfig = null) -> void:
 	current_target = target
 	_counter_handled_return = false
 	
+	# Save original position before any movement
+	save_original_position()
+	
 	var rtdm: RealTimeDefenseManager = get_tree().get_first_node_in_group("real_time_defense_manager")
 	if rtdm and target.team == TEAM.ALLY:
 		rtdm.open_buffer(self, target, attack_config)
@@ -742,11 +799,19 @@ func attack_anim(target, attack_config: EnemyAttackConfig = null) -> void:
 	var raw_damage := int(base_atk * multiplier)
 	var mitigated := _apply_defense_to_damage(raw_damage, defense_result)
 	
+	# Save whether we need to return before damage
+	var should_return = original_position != Vector3.ZERO and not _counter_handled_return
+	
 	if battle_manager and target and mitigated > 0:
 		await battle_manager.damage_calculation(self, target, mitigated, attack_config)
 		if target.is_defeated():
 			if rtdm:
 				rtdm.close_buffer()
+			# Still return to original position even if target died
+			if should_return:
+				return_to_original_position()
+				while is_advancing:
+					await get_tree().create_timer(0.1).timeout
 			return
 	
 	if defense_result == "perfect_parry" and rtdm:
@@ -773,7 +838,7 @@ func attack_anim(target, attack_config: EnemyAttackConfig = null) -> void:
 		await get_tree().create_timer(counter_stun_duration).timeout
 		is_counter_stunned = false
 	
-	if not _counter_handled_return and original_position != Vector3.ZERO:
+	if should_return:
 		return_to_original_position()
 		while is_advancing:
 			await get_tree().create_timer(0.1).timeout
@@ -807,43 +872,25 @@ func battle_idle():
 	_try_animation("idle1")
 	# Clear all animation conditions so no state is accidentally held
 	if anim_tree:
-		anim_tree.set("parameters/conditions/is_walking", false)
-		anim_tree.set("parameters/conditions/is_attacking", false)
-		anim_tree.set("parameters/conditions/is_dodging", false)
-		anim_tree.set("parameters/conditions/is_parrying", false)
-		anim_tree.set("parameters/conditions/is_jumping", false)
-		anim_tree.set("parameters/conditions/is_hit", false)
-		anim_tree.set("parameters/conditions/allow_combat_to_idle", true)
+		anim_tree.set("parameters/BaseSM/conditions/is_walking", false)
+		anim_tree.set("parameters/BaseSM/combat_actions/conditions/is_walking", false)
+		anim_tree.set("parameters/BaseSM/conditions/is_attacking", false)
+		anim_tree.set("parameters/BaseSM/conditions/is_dodging", false)
+		anim_tree.set("parameters/BaseSM/conditions/is_parrying", false)
+		anim_tree.set("parameters/BaseSM/conditions/is_jumping", false)
+		anim_tree.set("parameters/BaseSM/conditions/is_hit", false)
+		anim_tree.set("parameters/BaseSM/conditions/allow_combat_to_idle", true)
 
-## Plays the standardised hit flinch. The "hit" root state plays once, then
-## the code explicitly travels back to idle1 (hit_to_idle is manual advance_mode=0).
+## Plays the standardised hit flinch animation.
+## This blends the hit animation additively on top of the current animation.
+## Forces the animation to restart from the beginning each time, even if already playing.
 func play_hit_reaction() -> void:
-	if not anim_tree:
-		return
-	# Ensure the is_hit condition is set so the idle->hit transition can fire.
-	anim_tree.set("parameters/conditions/is_hit", true)
-	# From any state, first return to idle1 (which has incoming transitions from
-	# every other state), then travel to hit via the idle_to_hit transition.
-	# Reset any combat_actions sub-machine playback first so we actually land in
-	# idle1 instead of staying visually stuck in a previous attack/cast pose.
-	var root_sm := anim_tree.tree_root as AnimationNodeStateMachine
-	# REMOVED: Resetting to Start here causes T-pose because Start has no animation!
-	# if root_sm.has_node("combat_actions"):
-	# 	var ca_sm := anim_tree.get("parameters/combat_actions/playback") as AnimationNodeStateMachinePlayback
-	# 	if ca_sm:
-	# 		ca_sm.travel("Start")
-	state_machine.travel("idle1")
-	await get_tree().create_timer(0.1).timeout
-	_try_animation(AnimationMapping.HIT)
-	# Wait for the hit clip so the flinch plays fully before take_damage continues
-	# (counter logic, defeat check, etc. should not interrupt the reaction).
-	var duration = _get_animation_duration(AnimationMapping.HIT)
-	if duration > 0.0:
-		await get_tree().create_timer(duration).timeout
-	# Explicitly travel back to idle1 (hit_to_idle no longer auto-advances).
-	# Clear is_hit first so the idle_to_hit transition doesn't immediately re-fire.
-	anim_tree.set("parameters/conditions/is_hit", false)
-	state_machine.travel("idle1")
+	var hit_sm := anim_tree.get("parameters/HitSM/playback") as AnimationNodeStateMachinePlayback
+	if hit_sm:
+		hit_sm.start("hit")
+		anim_tree.set("parameters/HitSM/conditions/is_hit", true)
+		await get_tree().create_timer(_get_animation_duration(AnimationMapping.HIT)).timeout
+		anim_tree.set("parameters/HitSM/conditions/is_hit", false)
 
 func advance_to_target(target: Battler) -> bool:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
@@ -857,7 +904,8 @@ func advance_to_target(target: Battler) -> bool:
 	if is_advancing:
 		return false
 	
-	var movement_distance = custom_movement_distance
+	# Calculate dynamic stop distance based on target's AABB
+	var movement_distance = get_target_stop_distance(target)
 	var movement_speed = custom_movement_speed
 	
 	# Apply speed multiplier from battle manager
@@ -866,9 +914,6 @@ func advance_to_target(target: Battler) -> bool:
 	var distance_to_target = global_position.distance_to(target.global_position)
 	if distance_to_target <= movement_distance:
 		return false
-	
-	# Reset original_position to current position before moving
-	original_position = global_position
 	
 	var direction = (target.global_position - global_position).normalized()
 	advance_target_position = target.global_position - direction * movement_distance
@@ -898,15 +943,17 @@ func _try_animation(anim_name: String) -> bool:
 		return false
 	if not state_machine:
 		return false
-	if not anim_tree or not (anim_tree.tree_root is AnimationNodeStateMachine):
+	if not anim_tree:
 		return false
 
-	var root_sm := anim_tree.tree_root as AnimationNodeStateMachine
+	# Get the BaseSM state machine from the BlendTree
+	var root_sm := anim_tree.tree_root.get_node("BaseSM") as AnimationNodeStateMachine
+	if not root_sm:
+		push_error("[Battler] BaseSM not found in AnimationTree on '%s'" % character_name)
+		return false
 
 	# Resolve via animation mapping (slot -> character-specific state name).
 	var resolved_name := get_resolved_animation(anim_name)
-
-	print("[Battler %s] _try_animation(%s) -> %s, current_root=%s, allow_combat_to_idle=%s" % [character_name, anim_name, resolved_name, state_machine.get_current_node() if state_machine else "null", anim_tree.get("parameters/conditions/allow_combat_to_idle") if anim_tree else "null"])
 
 	# Canonical offensive slots live inside the combat_actions sub-machine.
 	var combat_slots: Array = [
@@ -942,16 +989,15 @@ func _try_animation(anim_name: String) -> bool:
 		if was_outside:
 			state_machine.travel("combat_actions")
 
-		var ca_sm := anim_tree.get("parameters/combat_actions/playback") as AnimationNodeStateMachinePlayback
+		var ca_sm := anim_tree.get("parameters/BaseSM/combat_actions/playback") as AnimationNodeStateMachinePlayback
 		if not ca_sm:
-			push_warning("[Battler] Missing combat_actions/playback on '%s'" % character_name)
+			push_warning("[Battler] Missing BaseSM/combat_actions/playback on '%s'" % character_name)
 			return false
 
 		if was_outside:
 			ca_sm.start(leaf_name)
 		else:
 			ca_sm.travel(leaf_name)
-		print("[Battler %s] After CA travel to %s, CA current node: %s" % [character_name, leaf_name, ca_sm.get_current_node() if ca_sm else "null"])
 
 		# Resolve clip duration and schedule hit_moment at the correct frame.
 		var resolved_clip_name = _resolve_state_animation_name(leaf_name)
@@ -965,14 +1011,12 @@ func _try_animation(anim_name: String) -> bool:
 		# With switch_mode=Immediate on combat_to_idle, the outer SM will blend
 		# directly from the held last-combat-frame into the target state without
 		# needing to push the inner sub-machine to End first (which caused a T-pose).
-		print("[Battler %s] Exiting combat_actions (Immediate blend) before travelling to %s" % [character_name, resolved_name])
+		pass
 
 	if not root_sm.has_node(resolved_name):
 		push_error("[Battler] Animation state '%s' does not exist on '%s'" % [resolved_name, character_name])
 		return false
-	print("[Battler %s] Final travel to %s" % [character_name, resolved_name])
 	state_machine.travel(resolved_name)
-	print("[Battler %s] After final travel, current_node: %s" % [character_name, state_machine.get_current_node()])
 	return true
 
 ## Looks up the length of an animation from AnimationPlayer by state name.
@@ -1053,7 +1097,9 @@ func _get_hit_moment_time(anim_name: String) -> float:
 func _resolve_state_animation_name(state_name: String) -> String:
 	if not anim_tree:
 		return ""
-	var root_sm := anim_tree.tree_root as AnimationNodeStateMachine
+	
+	# Get the BaseSM state machine from the BlendTree
+	var root_sm := anim_tree.tree_root.get_node("BaseSM") as AnimationNodeStateMachine
 	if not root_sm:
 		return ""
 
@@ -1121,13 +1167,18 @@ func _start_movement_timeout() -> void:
 func return_to_original_position():
 	if is_advancing or global_position.distance_to(original_position) < 0.05:
 		return
-		
+	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if not battle_manager:
 		return
 	
 	var movement_speed = custom_movement_speed
 	movement_speed *= battle_manager.speed_multiplier
+	
+	# Set is_walking condition to trigger idle -> walk_back transition in animation tree
+	if anim_tree:
+		anim_tree.set("parameters/BaseSM/conditions/is_walking", true)
+		anim_tree.set("parameters/BaseSM/combat_actions/conditions/is_walking", true)
 	
 	set_advancing(true)
 	_try_animation(AnimationMapping.WALK_BACK)
@@ -1143,30 +1194,34 @@ func return_to_original_position():
 func perform_dodge_dash() -> void:
 	if is_advancing:
 		return
-	
+
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if not battle_manager:
 		return
-	
+
 	# Store current position before dodge
 	var dodge_start_position = global_position
-	
+
 	# Calculate backward direction (opposite to current facing direction)
 	var backward_direction = -global_transform.basis.z.normalized()
-	
+
 	# Fixed dodge distance
 	var dodge_distance = 2.0
 	var dodge_target_position = global_position + backward_direction * dodge_distance
-	
+
+	# Move camera back to keep dodging battler in frame
+	if battle_manager.battle_camera:
+		battle_manager.battle_camera.adjust_camera_distance_for_evasion(2.0, 0.5)
+
 	set_advancing(true)
 	# Play the standardised dodge animation (falls back to walk if unavailable).
 	await _try_animation(AnimationMapping.DODGE)
 	if not _try_animation(AnimationMapping.DODGE):
 		await _try_animation(AnimationMapping.WALK)
-	
+
 	var movement_speed = custom_movement_speed
 	movement_speed *= battle_manager.speed_multiplier * 1.5  # Faster movement for dodge
-	
+
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
 	tween.tween_property(self, "global_position", dodge_target_position,
@@ -1188,6 +1243,11 @@ func _on_dodge_dash_complete(p_original_position: Vector3):
 	var movement_speed = custom_movement_speed
 	movement_speed *= battle_manager.speed_multiplier
 
+	# Set is_walking condition to trigger idle -> walk_back transition in animation tree
+	if anim_tree:
+		anim_tree.set("parameters/BaseSM/conditions/is_walking", true)
+		anim_tree.set("parameters/BaseSM/combat_actions/conditions/is_walking", true)
+
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
 	tween.tween_property(self, "global_position", p_original_position,
@@ -1196,29 +1256,78 @@ func _on_dodge_dash_complete(p_original_position: Vector3):
 
 func _on_return_complete():
 	set_advancing(false)
+
+	# Reset camera distance after dodge is complete
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager and battle_manager.battle_camera:
+		battle_manager.battle_camera.reset_camera_distance()
+
+	# Clear is_walking condition to trigger walk_back -> idle transition in animation tree
+	if anim_tree:
+		anim_tree.set("parameters/BaseSM/conditions/is_walking", false)
+		anim_tree.set("parameters/BaseSM/combat_actions/conditions/is_walking", false)
 	# NOTE: Do NOT travel to idle1 here - it fights whatever the caller triggers next
 
 ## Performs a jump-dodge evasion: plays jump -> jump_land -> idle1.
 ## jump and jump_land are defensive maneuvers used to avoid ground-sweeping attacks.
 ## Falls back to a simple tween arc when neither animation state exists.
 func perform_jump_evade() -> void:
-	var has_jump := state_machine != null and anim_tree.tree_root is AnimationNodeStateMachine \
-		and (anim_tree.tree_root as AnimationNodeStateMachine).has_node(AnimationMapping.JUMP)
+	# Move camera back to keep jumping battler in frame
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager and battle_manager.battle_camera:
+		battle_manager.battle_camera.adjust_camera_distance_for_evasion(2.5, 0.6)
+
+	var base_sm := anim_tree.tree_root.get_node("BaseSM") as AnimationNodeStateMachine if anim_tree else null
+	var has_jump := state_machine != null and base_sm != null and base_sm.has_node(AnimationMapping.JUMP)
 
 	if has_jump:
-		# Play the jump ascent animation.
+		# Set jumping condition so the animation tree can transition idle -> jump
+		if anim_tree:
+			anim_tree.set("parameters/BaseSM/conditions/is_jumping", true)
+			anim_tree.set("parameters/BaseSM/conditions/is_landing", false)
+			anim_tree.set("parameters/BaseSM/conditions/allow_jump_to_idle", false)
+		
+		# Start jump animation and physical movement
 		_try_animation(AnimationMapping.JUMP)
-		var jump_dur: float = max(0.25, _get_animation_duration(AnimationMapping.JUMP))
-		await get_tree().create_timer(jump_dur).timeout
+		var jump_height := 1.8
+		var jump_duration := 0.45
+		var start_y := global_position.y
+		
+		# Ascent phase (most of the jump)
+		var ascent_duration := jump_duration * 0.75
+		var tween := create_tween()
+		tween.tween_property(self, "global_position:y", start_y + jump_height, ascent_duration) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		await tween.finished
+		
+		# Descent phase - start landing animation just before ground contact
+		var descent_duration := jump_duration * 0.25
+		var landing_trigger_time := 0.05  # Trigger landing 0.05s before ground contact
+		
+		var tween2 := create_tween()
+		tween2.tween_property(self, "global_position:y", start_y, descent_duration) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		
+		# Wait until just before landing, then trigger landing animation
+		await get_tree().create_timer(descent_duration - landing_trigger_time).timeout
+		
+		if anim_tree:
+			anim_tree.set("parameters/BaseSM/conditions/is_landing", true)
+			anim_tree.set("parameters/BaseSM/conditions/is_jumping", false)
+		_try_animation(AnimationMapping.JUMP_LAND)
+		
+		# Wait for the final descent to complete
+		await get_tree().create_timer(landing_trigger_time).timeout
 
-		# Transition to landing animation if it exists.
-		var root_sm := anim_tree.tree_root as AnimationNodeStateMachine
-		if root_sm.has_node(AnimationMapping.JUMP_LAND):
-			_try_animation(AnimationMapping.JUMP_LAND)
-			var land_dur: float = max(0.2, _get_animation_duration(AnimationMapping.JUMP_LAND))
-			await get_tree().create_timer(land_dur).timeout
-
+		# Clear conditions and return to idle
+		if anim_tree:
+			anim_tree.set("parameters/BaseSM/conditions/is_landing", false)
+			anim_tree.set("parameters/BaseSM/conditions/allow_jump_to_idle", true)
 		_try_animation("idle1")
+
+		# Reset camera distance after jump is complete
+		if battle_manager and battle_manager.battle_camera:
+			battle_manager.battle_camera.reset_camera_distance()
 	else:
 		# Fallback: tween a simple vertical arc when character has no jump clip.
 		var jump_height := 1.8
@@ -1233,6 +1342,10 @@ func perform_jump_evade() -> void:
 		tween2.tween_property(self, "global_position:y", start_y, jump_duration * 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		await tween2.finished
+
+		# Reset camera distance after jump is complete
+		if battle_manager and battle_manager.battle_camera:
+			battle_manager.battle_camera.reset_camera_distance()
 
 # # #
 # Animation Damage & Effects Application
@@ -1433,6 +1546,80 @@ func _calculate_effect_positions() -> void:
 func invalidate_effect_cache() -> void:
 	_effect_center_cached = false
 
+## Calculate the target's AABB size for dynamic movement distance
+## Returns the combined AABB size of all MeshInstance3D children
+func _get_target_aabb_size(target: Battler) -> Vector3:
+	var combined_aabb = AABB()
+	var has_mesh = false
+
+	# Combine AABBs of all MeshInstance3D children
+	for child in target.find_children("*", "MeshInstance3D", true, false):
+		if child is MeshInstance3D:
+			var mesh_aabb = child.get_aabb()
+			if mesh_aabb != AABB():
+				if not has_mesh:
+					combined_aabb = mesh_aabb
+					has_mesh = true
+				else:
+					combined_aabb = combined_aabb.merge(mesh_aabb)
+
+	# If no meshes found, return default size
+	if not has_mesh:
+		return Vector3(1.0, 1.5, 1.0)
+
+	return combined_aabb.size
+
+## Get the battler's combined AABB for camera FOV calculations
+## Returns the combined AABB of all MeshInstance3D children
+func get_combined_aabb() -> AABB:
+	var combined_aabb = AABB()
+	var has_mesh = false
+
+	# Combine AABBs of all MeshInstance3D children
+	for child in find_children("*", "MeshInstance3D", true, false):
+		if child is MeshInstance3D:
+			var mesh_aabb = child.get_aabb()
+			if mesh_aabb != AABB():
+				if not has_mesh:
+					combined_aabb = mesh_aabb
+					has_mesh = true
+				else:
+					combined_aabb = combined_aabb.merge(mesh_aabb)
+
+	# If no meshes found, return default AABB
+	if not has_mesh:
+		return AABB(Vector3(-0.5, 0, -0.5), Vector3(1.0, 1.5, 1.0))
+
+	return combined_aabb
+
+## Calculate the dynamic stop distance based on target's AABB
+## Returns the distance to stop at the edge of target's hit zone
+func get_target_stop_distance(target: Battler) -> float:
+	var target_aabb_size = _get_target_aabb_size(target)
+	var attacker_reach = 0.5  # Attacker's reach distance
+	var buffer = 0.2  # Small buffer to prevent clipping
+	
+	# Calculate stop distance based on target's Z size (depth)
+	var stop_distance = target_aabb_size.z / 2.0 + attacker_reach + buffer
+	
+	# Clamp to reasonable bounds
+	stop_distance = clamp(stop_distance, 1.0, 4.0)
+	
+	return stop_distance
+
+## Save the current position as the original position to return to after attacks
+## This should be called at the start of each turn before any movement
+func save_original_position() -> void:
+	if _original_position_saved_this_turn:
+		return
+	
+	original_position = global_position
+	_original_position_saved_this_turn = true
+
+## Reset the original position saved flag at the start of a new turn
+func reset_original_position_flag() -> void:
+	_original_position_saved_this_turn = false
+
 ## Apply an aura effect to this battler at the height center
 ## aura_scene: PackedScene to instantiate
 ## Returns the created aura instance
@@ -1553,7 +1740,6 @@ func process_states() -> void:
 
 func set_advancing(value: bool):
 	is_advancing = value
-	print("[Battler %s] set_advancing(%s), allow_combat_to_idle = %s" % [character_name, value, anim_tree.get("parameters/conditions/allow_combat_to_idle") if anim_tree else "null"])
 	anim_tree.set("parameters/conditions/is_walking", value)
 
 func set_defending(value: bool):

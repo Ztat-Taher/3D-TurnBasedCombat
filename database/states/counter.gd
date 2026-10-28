@@ -71,6 +71,11 @@ func _execute_counter_attack(defender: Battler, attacker: Battler) -> void:
 	)
 	attacker.take_damage(counter_damage, defender)
 
+	# Trigger camera shake for counter attack
+	var battle_manager = defender.get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager and battle_manager.effect_manager:
+		battle_manager.effect_manager.apply_camera_shake(0.25, 0.35)  # Strong shake for counter
+
 ## Wait for attacker to return to original position before counter
 func _wait_for_attacker_return(attacker: Battler) -> void:
 	var timeout = 5.0

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EnemyAttackConfig" format=3 uid="uid://dfk8b1m2n3o4p"]
+
+[ext_resource type="Script" uid="uid://286lbfhgjnsn" path="res://scripts/systems/battle/battlers/stats/EnemyAttackConfig.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+attack_name = "Infernal Strike"
+damage_multiplier = 1.5
+weight = 4.0
+description = "A devastating flame-infused claw strike from the Infernal Overlord."

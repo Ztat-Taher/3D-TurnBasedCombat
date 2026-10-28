@@ -240,11 +240,6 @@ func execute_card_with_config(card: CardConfig, target: Battler) -> void:
 	# damage_applied_at_hit; multi-strike cards set skip_primary_effect. Either way the
 	# primary damage is never applied twice here. Secondary effects / states still resolve.
 	await execute_effect_phase(card_cfg, context)
-
-	# Stop if target died during effect phase
-	var effect_target = context.get("target")
-	if effect_target and effect_target.has_method("is_defeated") and effect_target.is_defeated():
-		return
 	
 	# Phase 5: VFX Phase
 	if card_cfg.vfx_on_actor or card_cfg.vfx_on_target or card_cfg.vfx_on_projectile:
@@ -610,7 +605,6 @@ func execute_multi_strike_sequence(card_cfg: CardConfig, context: Dictionary) ->
 
 	# Prevent combat_to_idle AUTO transition during multi-strike to avoid idle insertion
 	if actor and actor.has_method("set_animation_condition"):
-		print("[CardBattleManager] Setting allow_combat_to_idle = false before multi-strike")
 		actor.set_animation_condition("allow_combat_to_idle", false)
 	
 	for strike_index in range(strike_count):
@@ -670,7 +664,6 @@ func execute_multi_strike_sequence(card_cfg: CardConfig, context: Dictionary) ->
 
 	# Re-enable combat_to_idle AUTO transition after multi-strike completes
 	if actor and actor.has_method("set_animation_condition"):
-		print("[CardBattleManager] Setting allow_combat_to_idle = true after multi-strike")
 		actor.set_animation_condition("allow_combat_to_idle", true)
 
 ## Unified per-strike timing offset (seconds).

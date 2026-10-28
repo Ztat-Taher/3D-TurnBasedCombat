@@ -20,7 +20,6 @@ signal end_turn_pressed
 @onready var item_select: Control = $Control/Items
 @onready var card_ui: Control = $Control/CardUI
 @onready var party_status_panel: VBoxContainer = $Control/PartyStatusPanel
-@onready var boss_bar = $Control/BossBar
 @onready var enemy_health_bars_container: Control = $Control/EnemyHealthBarsContainer
 @onready var move_banner: Control = $Control/MoveBanner
 @onready var move_banner_actor: Label = $Control/MoveBanner/Panel/VBox/ActorLabel
@@ -43,6 +42,8 @@ var aoe_confirm_button: Button = null
 
 ## Enemy health bar scene: static UI panel at top of screen
 const ENEMY_HEALTH_BAR_SCENE: PackedScene = preload("res://scenes/battle/hud/health_display/bars/enemy_overhead/EnemyHealthBar.tscn")
+## Boss health bar scene: larger health bar with boss-specific styling and full functionality
+const BOSS_HEALTH_BAR_SCENE: PackedScene = preload("res://scenes/battle/hud/health_display/bars/boss/BossHealthBar.tscn")
 
 # Maps enemy battler -> health bar node
 var enemy_health_bar_map: Dictionary = {}
@@ -63,6 +64,8 @@ enum UIState {
 var current_ui_state: UIState = UIState.BASE_STATE
 var previous_ui_state: UIState = UIState.BASE_STATE
 var _just_restored_from_card: bool = false
+var _restored_frames_remaining: int = 0  # Frame counter to prevent premature hiding after restoration
+var _saved_button_states: Dictionary = {}  # Save button states before entering targeting mode
 
 ## Returns the BattleCamera controller from the battle manager.
 ## This is the single authoritative source for the active camera — BattleCamera
@@ -91,8 +94,18 @@ func set_ui_state(new_state: Variant) -> void:
 		new_state = new_state as UIState
 	
 	# Save previous state when entering special states (but don't trigger hiding animations)
+	# Only save if we're not already handling it in set_targeting_mode
 	if (new_state == UIState.CARD_EXECUTION_STATE or new_state == UIState.TARGETING_STATE) and current_ui_state != new_state:
-		previous_ui_state = current_ui_state
+		# Don't save here if set_targeting_mode already handled it
+		# We only save here for execution state, targeting state is handled by set_targeting_mode
+		if new_state == UIState.CARD_EXECUTION_STATE:
+			# If we're transitioning from TARGETING_STATE to CARD_EXECUTION_STATE,
+			# don't save TARGETING_STATE as previous - keep the state before targeting
+			if current_ui_state != UIState.TARGETING_STATE:
+				previous_ui_state = current_ui_state
+			else:
+				# Keep the previous state from before targeting
+				pass
 	
 	current_ui_state = new_state
 	
@@ -227,15 +240,9 @@ func _on_cursor_clicked(position: Vector2) -> void:
 	pass
 
 func _on_cbm_card_played(_card = null, _target = null) -> void:
-	# Always restore state after card execution completes (systematic for all card types)
-	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
-	if card_battle_manager:
-		var hand = card_battle_manager.get_hand()
-		if hand.is_empty():
-			set_ui_state(UIState.BASE_STATE)
-		else:
-			# Always restore to CARD_SELECT_STATE if hand not empty
-			set_ui_state(UIState.CARD_SELECT_STATE)
+	# Restore to the previous UI state (before targeting/execution)
+	# Use the saved previous_ui_state directly - don't override it
+	set_ui_state(previous_ui_state)
 	
 	# Restore action buttons visibility
 	if action_buttons and activeBattler:
@@ -256,11 +263,19 @@ func _on_cbm_card_played(_card = null, _target = null) -> void:
 					action_buttons.show_button("Items")
 	
 	# Mark that we just restored from card execution to prevent update_hud from overriding
+	# Set frame counter to give restoration time to complete before _process can hide buttons again
 	_just_restored_from_card = true
+	_restored_frames_remaining = 5  # Guard for 5 frames to ensure restoration is visible
 
 func _process(_delta: float) -> void:
 	# ── Health bars: ALWAYS update every frame regardless of battle state ──
 	_update_enemy_health_bar_positions()
+	
+	# ── Frame counter for restoration guard ──
+	if _restored_frames_remaining > 0:
+		_restored_frames_remaining -= 1
+		if _restored_frames_remaining == 0:
+			_just_restored_from_card = false
 	
 	# ── Action buttons: guarded by battle state ──
 	if current_ui_state == UIState.CARD_EXECUTION_STATE or current_ui_state == UIState.TARGETING_STATE:
@@ -270,8 +285,10 @@ func _process(_delta: float) -> void:
 	
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and (battle_manager.is_animating or battle_manager.in_target_selection):
-		if action_buttons and action_buttons.visible:
-			action_buttons.hide()
+		# Don't hide if we just restored from card execution (guard against premature hiding)
+		if not _just_restored_from_card:
+			if action_buttons and action_buttons.visible:
+				action_buttons.hide()
 		return
 	
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
@@ -349,7 +366,6 @@ func on_start_combat(enemy_node: Node):
 	if not active_enemies.has(enemy_node):
 		active_enemies.append(enemy_node)
 		_spawn_enemy_health_bar(enemy_node)
-		_check_boss_bar(enemy_node)
 		# Register enemy with cursor system
 		if cursor_system:
 			cursor_system.register_enemy_battler(enemy_node)
@@ -366,7 +382,6 @@ func on_add_character(character: Node):
 		if not active_enemies.has(character):
 			active_enemies.append(character)
 		_spawn_enemy_health_bar(character)
-		_check_boss_bar(character)
 
 func _rebuild_party_status_panel() -> void:
 	if not party_status_panel:
@@ -445,6 +460,18 @@ func set_activebattler(character: Node):
 func update_health_bars():
 	update_party_status()
 
+## Check if an enemy battler is a boss
+func _is_enemy_boss(enemy_node: Battler) -> bool:
+	if not is_instance_valid(enemy_node):
+		return false
+	if "enemy_stats" in enemy_node and enemy_node.enemy_stats and "is_boss" in enemy_node.enemy_stats:
+		return enemy_node.enemy_stats.is_boss
+	elif "is_boss" in enemy_node:
+		return enemy_node.is_boss
+	elif "stats" in enemy_node and enemy_node.stats and "is_boss" in enemy_node.stats:
+		return enemy_node.stats.is_boss
+	return false
+
 ## Spawn a health bar for a given enemy (if not already spawned).
 ## The bar is added to enemy_health_bars_container at the top of the screen.
 func _spawn_enemy_health_bar(enemy_node: Battler) -> void:
@@ -455,7 +482,9 @@ func _spawn_enemy_health_bar(enemy_node: Battler) -> void:
 	if not enemy_health_bars_container:
 		return
 	
-	var bar = ENEMY_HEALTH_BAR_SCENE.instantiate()
+	var is_boss = _is_enemy_boss(enemy_node)
+	var bar_scene = BOSS_HEALTH_BAR_SCENE if is_boss else ENEMY_HEALTH_BAR_SCENE
+	var bar = bar_scene.instantiate()
 	enemy_health_bars_container.add_child(bar)
 	bar.setup(enemy_node)
 	bar.bar_died.connect(func() -> void:
@@ -470,20 +499,6 @@ func _remove_enemy_health_bar(enemy_node: Battler) -> void:
 		enemy_health_bar_map.erase(enemy_node)
 		if is_instance_valid(bar):
 			bar.queue_free()
-
-## Check if enemy_node is a boss and show the boss bar if so.
-func _check_boss_bar(enemy_node: Node) -> void:
-	if not boss_bar or not is_instance_valid(enemy_node):
-		return
-	var is_boss_enemy := false
-	if "enemy_stats" in enemy_node and enemy_node.enemy_stats and "is_boss" in enemy_node.enemy_stats:
-		is_boss_enemy = enemy_node.enemy_stats.is_boss
-	elif "is_boss" in enemy_node:
-		is_boss_enemy = enemy_node.is_boss
-	elif "stats" in enemy_node and enemy_node.stats and "is_boss" in enemy_node.stats:
-		is_boss_enemy = enemy_node.stats.is_boss
-	if is_boss_enemy:
-		boss_bar.show_boss(enemy_node as Battler)
 
 func show_action_buttons(character: Node):
 	if not action_buttons:
@@ -645,10 +660,34 @@ func _on_item_back_pressed() -> void:
 	_close_items_menu()
 
 func _close_items_menu():
-	set_ui_state(UIState.BASE_STATE)
+	# Restore to previous state (typically BASE_STATE)
+	set_ui_state(previous_ui_state)
+	# Ensure card UI is hidden when returning to BASE_STATE
+	if previous_ui_state == UIState.BASE_STATE and card_ui:
+		card_ui.visible = false
+	# Restore action buttons with Attack and Items visible
+	if action_buttons and activeBattler:
+		action_buttons.show()
+		action_buttons.animate_buttons_in()
+		if attack_button:
+			action_buttons.show_button("Attack")
+		if items_button:
+			action_buttons.show_button("Items")
 
 func _close_card_menu():
-	set_ui_state(UIState.BASE_STATE)
+	# Restore to previous state (typically BASE_STATE)
+	set_ui_state(previous_ui_state)
+	# Ensure card UI is hidden when returning to BASE_STATE
+	if previous_ui_state == UIState.BASE_STATE and card_ui:
+		card_ui.visible = false
+	# Restore action buttons with Attack and Items visible
+	if action_buttons and activeBattler:
+		action_buttons.show()
+		action_buttons.animate_buttons_in()
+		if attack_button:
+			action_buttons.show_button("Attack")
+		if items_button:
+			action_buttons.show_button("Items")
 
 func _on_item_selected(item: Item) -> void:
 	set_ui_state(UIState.CARD_SELECT_STATE)
@@ -656,6 +695,8 @@ func _on_item_selected(item: Item) -> void:
 	action_selected.emit("item", item)
 
 func _on_attack_pressed() -> void:
+	# Save previous state before entering card select state
+	previous_ui_state = current_ui_state
 	set_ui_state(UIState.CARD_SELECT_STATE)
 	
 	# Use juice system to handle button visibility transitions
@@ -670,6 +711,8 @@ func close_card_ui() -> void:
 
 func _on_items_pressed() -> void:
 	setup_item_list(activeBattler)
+	# Save previous state before entering items menu
+	previous_ui_state = current_ui_state
 	set_ui_state(UIState.ITEMS_MENU_STATE)
 	
 	# Use juice system to show Attack button and hide Items button
@@ -682,8 +725,13 @@ func _on_items_pressed() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var handled = false
 	
-	# Only process action buttons when action buttons list is visible
-	if action_buttons and action_buttons.visible:
+	# Handle cancel key globally first (highest priority for menu navigation)
+	if event.is_action_pressed("ui_cancel"):
+		_on_global_back_pressed()
+		handled = true
+	
+	# Only process action buttons when action buttons list is visible and not already handled
+	if not handled and action_buttons and action_buttons.visible:
 		if event.is_action_pressed("attack"):
 			if attack_button and action_buttons.is_button_visible("Attack"):
 				_on_attack_pressed()
@@ -704,11 +752,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_on_global_back_pressed()
 			handled = true
 	
-	# Handle cancel key for all menus via global back (B button also cancels)
-	if not handled and event.is_action_pressed("ui_cancel"):
-		_on_global_back_pressed()
-		handled = true
-	
 	# Only consume input if we actually handled it
 	if handled:
 		get_viewport().set_input_as_handled()
@@ -725,6 +768,16 @@ func _on_end_turn_button_pressed() -> void:
 func set_targeting_mode(enabled: bool) -> void:
 	# Handle targeting mode visibility
 	if enabled:
+		# Save current UI state and button states before entering targeting mode
+		previous_ui_state = current_ui_state
+		if action_buttons:
+			_saved_button_states = {
+				"Attack": action_buttons.is_button_visible("Attack"),
+				"Items": action_buttons.is_button_visible("Items"),
+				"Run": action_buttons.is_button_visible("Run"),
+				"EndTurnButton": action_buttons.is_button_visible("EndTurnButton")
+			}
+		
 		set_ui_state(UIState.TARGETING_STATE)
 		# Update cursor system for targeting
 		if cursor_system:
@@ -732,16 +785,10 @@ func set_targeting_mode(enabled: bool) -> void:
 	else:
 		# Only set CARD_EXECUTION_STATE if we're actually exiting targeting mode
 		# Don't interfere with normal card execution flow for self-targeting cards
+		# Note: State restoration is handled by _on_global_back_pressed when canceling
+		# This path is only for internal state changes during execution
 		if current_ui_state == UIState.TARGETING_STATE:
 			set_ui_state(UIState.CARD_EXECUTION_STATE)
-		# Restore cursor system state
-		if cursor_system:
-			cursor_system.restore_previous_state()
-		
-		# Notify card UI to return pending card to hand if targeting was cancelled
-		var card_ui_node = get_tree().get_first_node_in_group("card_ui")
-		if card_ui_node and card_ui_node.has_method("return_pending_card_to_hand"):
-			card_ui_node.return_pending_card_to_hand()
 
 func set_aoe_confirmation_mode(enabled: bool, card_name: String = "", target_count: int = 0) -> void:
 	if enabled:
@@ -797,7 +844,56 @@ func _on_global_back_pressed() -> void:
 			var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 			if battle_manager and battle_manager.has_method("exit_targeting_mode"):
 				battle_manager.exit_targeting_mode()
-			set_targeting_mode(false)
+			
+			# Restore cursor system state
+			if cursor_system:
+				cursor_system.restore_previous_state()
+			
+			# Notify card UI to return pending card to hand if targeting was cancelled
+			var card_ui_node = get_tree().get_first_node_in_group("card_ui")
+			if card_ui_node and card_ui_node.has_method("return_pending_card_to_hand"):
+				card_ui_node.return_pending_card_to_hand()
+			
+			# Restore to previous UI state and button states
+			_restore_from_targeting_mode()
+
+func _restore_from_targeting_mode() -> void:
+	# Restore to the previous UI state (before targeting)
+	set_ui_state(previous_ui_state)
+	
+	# Ensure card UI is visible if we're restoring to CARD_SELECT_STATE
+	if previous_ui_state == UIState.CARD_SELECT_STATE and card_ui:
+		card_ui.visible = true
+	
+	# Restore action buttons with saved button states
+	if action_buttons and activeBattler:
+		action_buttons.show()
+		action_buttons.animate_buttons_in()
+		
+		# Restore button states from saved values exactly as they were
+		if _saved_button_states.has("Attack"):
+			if _saved_button_states["Attack"]:
+				action_buttons.show_button("Attack")
+			else:
+				action_buttons.hide_button("Attack")
+		if _saved_button_states.has("Items"):
+			if _saved_button_states["Items"]:
+				action_buttons.show_button("Items")
+			else:
+				action_buttons.hide_button("Items")
+		if _saved_button_states.has("Run"):
+			if _saved_button_states["Run"]:
+				action_buttons.show_button("Run")
+			else:
+				action_buttons.hide_button("Run")
+		if _saved_button_states.has("EndTurnButton"):
+			if _saved_button_states["EndTurnButton"]:
+				action_buttons.show_button("EndTurnButton")
+			else:
+				action_buttons.hide_button("EndTurnButton")
+	
+	# Clear saved button states
+	_saved_button_states.clear()
 
 func update_ui():
 	update_character_info()

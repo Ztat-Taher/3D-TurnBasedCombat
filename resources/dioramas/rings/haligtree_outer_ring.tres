@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="DioramaRingLayer25D" format=3 uid="uid://dyc62vrlu1c8i"]
+
+[ext_resource type="Texture2D" uid="uid://0u4px5ckoblc" path="res://assets/textures/diorama/test_arena/haligtree_ambient.png" id="1_1mtb0"]
+[ext_resource type="Script" uid="uid://dp8635tc3pjmn" path="res://scripts/systems/battle/core/diorama/diorama_ring_layer_25d.gd" id="1_ring"]
+[ext_resource type="Texture2D" uid="uid://cxn7ucnlga5yb" path="res://assets/textures/diorama/test_arena/haligtree_displacement.png" id="2_awfol"]
+[ext_resource type="Texture2D" uid="uid://bg3jrqkfgtjgi" path="res://assets/textures/diorama/test_arena/Haligtree.png" id="2_tex"]
+[ext_resource type="Texture2D" uid="uid://dv43s61hd8eih" path="res://assets/textures/diorama/test_arena/haligtree_normal.png" id="3_1mtb0"]
+[ext_resource type="Texture2D" uid="uid://bcarixg0gqc2a" path="res://assets/textures/diorama/test_arena/haligtree_specular.png" id="5_ba3rg"]
+
+[resource]
+script = ExtResource("1_ring")
+name = "Haligtree Outer Vista Ring"
+texture = ExtResource("2_tex")
+normal_texture = ExtResource("3_1mtb0")
+normal_scale = 0.5
+specular_texture = ExtResource("5_ba3rg")
+specular_strength = 0.25
+ambient_texture = ExtResource("1_1mtb0")
+ambient_strength = 0.5
+displacement_texture = ExtResource("2_awfol")
+displacement_scale = 0.026
+displacement_min_layers = 32
+displacement_max_layers = 64
+radius = 20.0
+height = 40.0
+vertical_offset = 1.25
+bottom_flatten = 0.95
+uv_equator = 0.6
+horizontal_repeats = 1.5
+rotation_offset_uv = 0.6
+camera_yaw_parallax = 0.1
+camera_pitch_parallax = 0.2
+zoom_scale = 0.8
+emission_energy = 1.0
+color_saturation = 1.0
+top_fade_margin = 0.5
+bottom_fade_margin = 0.5

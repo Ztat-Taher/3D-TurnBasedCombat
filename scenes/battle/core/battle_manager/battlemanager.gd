@@ -413,9 +413,12 @@ func initialize_battle():
 			e.character_name = e.character_name + " %d" % (i + 1)
 	
 	for player in players:
+		# Register player with impact frame system for freeze effects
+		if effect_manager:
+			effect_manager.register_impact_node(player)
 		hud.on_add_character(player)
 		player.battle_idle()
-		
+
 		# Play spawn effect for allies
 		_play_spawn_effect(player)
 	
@@ -423,6 +426,9 @@ func initialize_battle():
 	turn_order = players + enemies
 	
 	for enemy in enemies:
+		# Register enemy with impact frame system for freeze effects
+		if effect_manager:
+			effect_manager.register_impact_node(enemy)
 		hud.on_start_combat(enemy)
 		enemy.battle_idle()
 	
@@ -608,6 +614,12 @@ func start_next_turn():
 		hud.turn_queue_ui.update_queue(turn_order, current_turn)
 	
 	if current_character in players:
+		# Reset original position flag at start of turn
+		if current_character.has_method("reset_original_position_flag"):
+			current_character.reset_original_position_flag()
+		# Save original position before any movement in player turn
+		if current_character.has_method("save_original_position"):
+			current_character.save_original_position()
 		player_turn(current_character)
 		if battle_camera:
 			battle_camera.set_over_the_shoulder(current_character)
@@ -830,25 +842,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	var current_time = Time.get_ticks_msec() / 1000.0
 	
 	# Handle targeting-specific inputs only
-	# D-pad navigation (instant)
+	# D-pad navigation (instant) - only left/right, not up/down
 	if event.is_action_pressed("ui_right") or event.is_action_pressed("ui_left"):
 		_cycle_controller_target(1 if event.is_action_pressed("ui_right") else -1)
 		handled = true
+	# Explicitly reject up/down navigation to prevent WASD W/S from cycling
+	elif event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
+		handled = true  # Consume the input but don't cycle
 	# RB/LB button navigation (instant)
 	elif event.is_action_pressed("cycle_target_forward") or event.is_action_pressed("cycle_target_backward"):
 		_cycle_controller_target(1 if event.is_action_pressed("cycle_target_forward") else -1)
 		handled = true
-	# Joystick navigation (stepped with cooldown)
+	# Joystick navigation (stepped with cooldown) - only left/right axis
 	elif event is InputEventJoypadMotion:
 		var axis_value = event.axis_value
-		if event.axis == 0:  # Left/right axis
+		if event.axis == 0:  # Left/right axis only
 			# Determine direction
 			var new_direction = 0
 			if axis_value > target_navigation_threshold:
 				new_direction = 1
 			elif axis_value < -target_navigation_threshold:
 				new_direction = -1
-			
+
 			# If direction changed, reset cooldown and navigate immediately
 			if new_direction != 0 and new_direction != target_joystick_active_direction:
 				target_joystick_active_direction = new_direction
@@ -894,25 +909,38 @@ func _handle_mouse_click_target_selection() -> void:
 	if not battle_camera:
 		push_warning("[MouseTarget] battle_camera is null — assign it in the Inspector!")
 		return
-	
+
 	var cam: Camera3D = battle_camera.get_camera()
 	if not cam:
 		return
-	
+
 	# Use the camera's own viewport for the mouse position so SubViewport
 	# offset/scale is already accounted for by BattleCamera.screen_to_viewport().
 	var root_mouse_pos = get_viewport().get_mouse_position()
-	
+
 	# project_ray_origin/normal already convert from root HUD space → SubViewport space
 	var ray_origin = battle_camera.project_ray_origin(root_mouse_pos)
 	var ray_direction = battle_camera.project_ray_normal(root_mouse_pos)
-	
+
 	# Create ray parameters
 	var ray_params = PhysicsRayQueryParameters3D.new()
 	ray_params.from = ray_origin
 	ray_params.to = ray_origin + ray_direction * 1000
 	ray_params.collision_mask = 0xFFFFFFFF  # All layers — must hit enemies AND allies
-	
+
+	# Exclude battlers that are NOT valid targets from raycast
+	# This prevents blocking while allowing both enemy and ally selection
+	var exclude_bodies: Array[RID] = []
+	var all_battlers = get_tree().get_nodes_in_group("players") + get_tree().get_nodes_in_group("enemies")
+	for battler in all_battlers:
+		if battler is Battler and is_instance_valid(battler):
+			# Only exclude if this battler is NOT a valid target
+			if battler not in valid_targets:
+				# Add the battler and all its collision bodies to exclude list
+				_find_and_exclude_collision_bodies(battler, exclude_bodies)
+
+	ray_params.exclude = exclude_bodies
+
 	# Resolve the 3D physics space state (critical when inside a SubViewport)
 	var space_state: PhysicsDirectSpaceState3D = null
 	if cam.get_world_3d():
@@ -921,13 +949,13 @@ func _handle_mouse_click_target_selection() -> void:
 		space_state = cam.get_viewport().find_world_3d().direct_space_state
 	elif get_world_3d():
 		space_state = get_world_3d().direct_space_state
-	
+
 	if not space_state:
 		push_warning("[MouseTarget] Could not obtain PhysicsDirectSpaceState3D for raycasting!")
 		return
-		
+
 	var result = space_state.intersect_ray(ray_params)
-	
+
 	if result.has("collider"):
 		var collider = result["collider"]
 		# Find the Battler node: collider itself or one of its ancestors
@@ -941,7 +969,7 @@ func _handle_mouse_click_target_selection() -> void:
 					battler = curr
 					break
 				curr = curr.get_parent()
-		
+
 		if battler and battler is Battler:
 			# Check if this is a valid target
 			if battler.is_selectable and battler.is_valid_target:
@@ -960,47 +988,116 @@ func _handle_mouse_click_target_selection() -> void:
 					else:
 						_use_action_on_target()
 					return
-				
+
 				# Otherwise: first click selects and focuses the target
 				# Clear ALL targets' selection states first - only ONE highlight allowed
 				for t in valid_targets:
 					if t is Battler:
 						t.deselect_as_target()
-				
+
 				# Update index if the clicked target is in valid_targets
 				var idx = valid_targets.find(battler)
 				if idx != -1:
 					keyboard_target_index = idx
-				
+
 				current_controller_target = battler
 				current_default_selector = battler
 				current_target = battler
 				battler.set_as_keyboard_target()
-				
+
 				# Move camera to focus on the newly selected target
 				if battle_camera:
 					battle_camera.set_target_focus(battler)
+
+## Recursively find and exclude all collision bodies in a node tree
+func _find_and_exclude_collision_bodies(node: Node, exclude_list: Array[RID]) -> void:
+	if not node or not is_instance_valid(node):
+		return
+
+	# If this is a physics body, add its RID to exclude list
+	if node is PhysicsBody3D:
+		exclude_list.append(node.get_rid())
+
+	# If this is a collision shape, add its parent physics body to exclude list
+	if node is CollisionShape3D or node is CollisionPolygon3D:
+		var parent = node.get_parent()
+		if parent and parent is PhysicsBody3D:
+			exclude_list.append(parent.get_rid())
+
+	# Recursively check children
+	for child in node.get_children():
+		_find_and_exclude_collision_bodies(child, exclude_list)
 
 func _cycle_controller_target(direction: int) -> void:
 	# Clear ALL targets' selection states first - only ONE highlight allowed
 	for battler in valid_targets:
 		if battler is Battler:
 			battler.deselect_as_target()
-	
-	# Calculate new index with proper wrapping
-	keyboard_target_index += direction
-	if keyboard_target_index >= valid_targets.size():
-		keyboard_target_index = 0
-	elif keyboard_target_index < 0:
-		keyboard_target_index = valid_targets.size() - 1
-	
+
+	# Determine if we're targeting enemies or allies based on the first valid target
+	var targeting_enemies = false
+	if valid_targets.size() > 0 and valid_targets[0] is Battler:
+		targeting_enemies = valid_targets[0] in enemies
+
+	# Use the authoritative array for order (enemies or players)
+	var ordered_battlers = enemies if targeting_enemies else players
+
+	# Invert direction for enemies since they face the center while allies face away
+	var actual_direction = direction
+	if targeting_enemies:
+		actual_direction = -direction
+
+	# Find current target's index in the ordered array
+	var current_index = -1
+	if current_controller_target and current_controller_target in ordered_battlers:
+		current_index = ordered_battlers.find(current_controller_target)
+	else:
+		# If no current target or it's not in the array, start from first valid target
+		for i in range(ordered_battlers.size()):
+			if ordered_battlers[i] in valid_targets:
+				current_index = i
+				break
+
+	# If still no valid target found, return
+	if current_index == -1:
+		return
+
+	# Cycle through the ordered array, skipping invalid targets
+	var new_index = current_index
+	var attempts = 0
+	var max_attempts = ordered_battlers.size()
+
+	while attempts < max_attempts:
+		new_index += actual_direction
+
+		# Wrap around
+		if new_index >= ordered_battlers.size():
+			new_index = 0
+		elif new_index < 0:
+			new_index = ordered_battlers.size() - 1
+
+		# Check if this target is valid
+		if ordered_battlers[new_index] in valid_targets:
+			# Found a valid target
+			break
+
+		attempts += 1
+
+	# If we couldn't find a valid target after full cycle, return
+	if attempts >= max_attempts:
+		return
+
 	# Set new keyboard target
-	if valid_targets.size() > 0 and valid_targets[keyboard_target_index] is Battler:
-		current_controller_target = valid_targets[keyboard_target_index]
+	var new_target = ordered_battlers[new_index]
+	if new_target is Battler:
+		current_controller_target = new_target
 		current_default_selector = current_controller_target
 		current_controller_target.set_as_keyboard_target()
-		
-		# Move camera to show the newly highlighted enemy
+
+		# Update keyboard_target_index to match the valid_targets array for mouse selection
+		keyboard_target_index = valid_targets.find(new_target)
+
+		# Move camera to show the newly highlighted target
 		if battle_camera:
 			battle_camera.set_target_focus(current_controller_target)
 
@@ -1209,6 +1306,13 @@ func enemy_turn(character:Battler) -> void:
 	# SET THESE BEFORE AI CHOOSES ACTION
 	current_character = character
 	current_battler = character
+	
+	# Reset original position flag at start of turn
+	if character.has_method("reset_original_position_flag"):
+		character.reset_original_position_flag()
+	# Save original position before any movement in enemy turn
+	if character.has_method("save_original_position"):
+		character.save_original_position()
 
 	# No ally is "active" during an enemy turn - clear any leftover highlight.
 	if hud:

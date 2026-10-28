@@ -139,7 +139,11 @@ func execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> void
 	var final_counter_dmg := Formulas.physical_damage(defender, attacker, max(1, base_counter_dmg))
 	await attacker.take_damage(final_counter_dmg, defender)
 
+	# Trigger camera shake for perfect parry counter
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager and battle_manager.effect_manager:
+		battle_manager.effect_manager.apply_camera_shake(0.25, 0.35)  # Strong shake for counter
+
 	if battle_manager and battle_manager.hud:
 		battle_manager.hud.update_health_bars()
 

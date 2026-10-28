@@ -10,6 +10,7 @@ signal all_effects_finished
 var screen_flash: ScreenFlash
 var time_slow: TimeSlow
 var impact_frame: ImpactFrame
+var camera_shake_tween: Tween
 
 var active_effects: Array[String] = []
 var effect_queue: Array[Dictionary] = []
@@ -48,62 +49,111 @@ func setup_screen_flash(flash: ScreenFlash) -> void:
 		screen_flash.flash_started.connect(_on_effect_started.bind("screen_flash"))
 		screen_flash.flash_finished.connect(_on_effect_finished.bind("screen_flash"))
 
+# Apply camera shake to the battle camera
+func apply_camera_shake(duration: float, intensity: float) -> void:
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if not battle_manager or not battle_manager.battle_camera:
+		return
+
+	var camera = battle_manager.battle_camera.get_camera()
+	if not camera:
+		return
+
+	# Cancel existing shake
+	if camera_shake_tween and camera_shake_tween.is_valid():
+		camera_shake_tween.kill()
+
+	var original_position = camera.global_position
+	camera_shake_tween = camera.create_tween()
+	camera_shake_tween.set_parallel(true)
+
+	var shake_timer = 0.0
+	var update_func = func(delta):
+		shake_timer += delta
+		if shake_timer >= duration:
+			camera.global_position = original_position
+			return
+
+		var decay = 1.0 - (shake_timer / duration)
+		var current_intensity = intensity * decay
+
+		var shake_offset = Vector3(
+			randf_range(-current_intensity, current_intensity),
+			randf_range(-current_intensity, current_intensity),
+			randf_range(-current_intensity, current_intensity)
+		)
+
+		camera.global_position = original_position + shake_offset
+
+	camera_shake_tween.tween_method(update_func, 0.0, duration, duration)
+	camera_shake_tween.tween_callback(func():
+		camera.global_position = original_position
+	)
+
 # Combined effect presets for common combat events
 
 # Normal hit
 func trigger_normal_hit() -> void:
 	if screen_flash:
-		screen_flash.damage_flash(0.5, 1.0)  # Increased duration and intensity for testing
+		screen_flash.damage_flash(0.08, 0.6)  # Reduced duration and intensity for subtlety
 	if impact_frame:
 		impact_frame.normal_hit_freeze(0.05)
+	apply_camera_shake(0.1, 0.15)  # Light shake for normal hits
 
 # Critical hit
 func trigger_critical_hit() -> void:
 	if screen_flash:
-		screen_flash.critical_flash(0.15, 0.8)
+		screen_flash.critical_flash(0.1, 0.7)  # Reduced duration for subtlety
 	if time_slow:
 		time_slow.critical_slow(0.15, 0.2)
 	if impact_frame:
 		impact_frame.critical_freeze(0.1)
+	apply_camera_shake(0.2, 0.3)  # Stronger shake for critical hits
 
 # Perfect parry
 func trigger_perfect_parry() -> void:
 	if screen_flash:
-		screen_flash.block_flash(0.2, 0.6)
+		screen_flash.block_flash(0.1, 0.5)  # Reduced duration for subtlety
 	if time_slow:
 		time_slow.perfect_parry_slow(0.15, 0.2)
 	if impact_frame:
 		impact_frame.perfect_parry_freeze(0.15)
+	apply_camera_shake(0.15, 0.25)  # Medium shake for perfect parry
 
 # AOE attack
 func trigger_aoe_attack() -> void:
 	if screen_flash:
-		screen_flash.aoe_flash(0.25, 0.7)
+		screen_flash.aoe_flash(0.12, 0.5)  # Reduced duration for subtlety
 	if impact_frame:
 		impact_frame.aoe_freeze(0.1)
+	apply_camera_shake(0.2, 0.25)  # Medium shake for AOE
 
 # Big damage
 func trigger_big_damage() -> void:
 	if screen_flash:
-		screen_flash.damage_flash(0.15, 0.7)
+		screen_flash.damage_flash(0.1, 0.5)  # Reduced duration and intensity for subtlety
 	if time_slow:
 		time_slow.big_damage_slow(0.1, 0.2)
 	if impact_frame:
 		impact_frame.big_damage_freeze(0.08)
+	apply_camera_shake(0.15, 0.25)  # Medium shake for big damage
 
 # Block/parry
 func trigger_block() -> void:
 	if screen_flash:
-		screen_flash.block_flash(0.15, 0.5)
+		screen_flash.block_flash(0.08, 0.4)  # Reduced duration and intensity for subtlety
 	if impact_frame:
 		impact_frame.block_freeze(0.05)
+	apply_camera_shake(0.08, 0.1)  # Light shake for block
 
 # Dodge
 func trigger_dodge() -> void:
 	if screen_flash:
-		screen_flash.dodge_flash(0.1, 0.4)
+		screen_flash.dodge_flash(0.06, 0.3)  # Reduced duration and intensity for subtlety
 	if impact_frame:
 		impact_frame.dodge_freeze(0.05)
+	apply_camera_shake(0.06, 0.08)  # Very light shake for dodge
+	# Camera distance adjustment is handled directly in perform_dodge_dash()
 
 # Hit stop - combines time slow and impact freeze for maximum impact
 func trigger_hit_stop(duration: float = 0.1, time_scale: float = 0.1) -> void:
@@ -178,6 +228,8 @@ func stop_all_effects() -> void:
 	screen_flash.stop_flash()
 	time_slow.stop_slow()
 	impact_frame.stop_freeze()
+	if camera_shake_tween and camera_shake_tween.is_valid():
+		camera_shake_tween.kill()
 	active_effects.clear()
 	effect_queue.clear()
 	is_processing_queue = false

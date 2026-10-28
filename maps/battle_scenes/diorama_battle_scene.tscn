@@ -1,0 +1,78 @@
+[gd_scene format=3 uid="uid://bd4opq3l2oj80"]
+
+[ext_resource type="PackedScene" uid="uid://bvhah4cfn4txb" path="res://scenes/battle/core/battle_manager/BattleManager.tscn" id="1_mgr"]
+[ext_resource type="PackedScene" uid="uid://wxuxctidimwu" path="res://scenes/battle/core/allies/models/y_bot-ally.tscn" id="2_ally"]
+[ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="3_psx"]
+[ext_resource type="Resource" uid="uid://d0noky2jlhk4u" path="res://database/troops/test_troop.tres" id="4_troop"]
+[ext_resource type="PackedScene" path="res://scenes/battle/core/diorama/DioramaRig3D.tscn" id="5_rig"]
+[ext_resource type="Resource" uid="uid://bsileayt1svcm" path="res://resources/dioramas/arenas/haligtree_arena.tres" id="6_arena_res"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_psx"]
+shader = ExtResource("3_psx")
+shader_parameter/enabled = true
+shader_parameter/dithering = true
+shader_parameter/colors = 16
+shader_parameter/dither_size = 1
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_knoeh"]
+sky_top_color = Color(0.447336, 0.519571, 0.620102, 1)
+sky_cover_modulate = Color(0.801182, 0.452923, 0.347646, 1)
+
+[sub_resource type="Sky" id="Sky_4vui1"]
+sky_material = SubResource("ProceduralSkyMaterial_knoeh")
+
+[sub_resource type="Environment" id="Environment_520kk"]
+background_mode = 2
+sky = SubResource("Sky_4vui1")
+fog_enabled = true
+fog_light_energy = 1.34
+volumetric_fog_density = 0.02
+
+[node name="Battle-Manager" unique_id=241725287 node_paths=PackedStringArray("enemy_markers") instance=ExtResource("1_mgr")]
+speed_key = "Tab"
+speed_increase_amount = 2.0
+speed_is_toggle = true
+formation_spacing = 4.0
+instant_turning = true
+active_troop = ExtResource("4_troop")
+enemy_markers = NodePath("SubViewportContainer/SubViewport/FRONTROW")
+use_procedural_formation = false
+
+[node name="SubViewportContainer" type="SubViewportContainer" parent="." index="1" unique_id=1175905045]
+material = SubResource("ShaderMaterial_psx")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 6
+size_flags_vertical = 6
+stretch = true
+stretch_shrink = 2
+mouse_target = true
+
+[node name="SubViewport" type="SubViewport" parent="SubViewportContainer" index="0" unique_id=1614226519]
+handle_input_locally = false
+size = Vector2i(640, 360)
+render_target_update_mode = 4
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="SubViewportContainer/SubViewport" index="0" unique_id=1751801121]
+environment = SubResource("Environment_520kk")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport/WorldEnvironment" index="0" unique_id=1305043278]
+transform = Transform3D(1, 0, 0, 0, 0.0715845, 0.997435, 0, -0.997435, 0.0715845, 0, 17.7598, 0)
+light_energy = 1.646
+shadow_enabled = true
+
+[node name="DioramaRig3D" parent="SubViewportContainer/SubViewport" index="1" unique_id=1567072539 instance=ExtResource("5_rig")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+arena_resource = ExtResource("6_arena_res")
+
+[node name="Ally1" parent="SubViewportContainer/SubViewport" index="2" unique_id=306467406 instance=ExtResource("2_ally")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -1.006)
+
+[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport" index="3" unique_id=1327336196 groups=["battle_camera"]]
+transform = Transform3D(-0.7305871, -0.22846128, 0.6434656, -0.03311281, 0.95311093, 0.3008042, -0.68201613, 0.19845672, -0.7038955, 2.48554, 3.00572, -3.08627)
+
+[node name="FRONTROW" type="Marker3D" parent="SubViewportContainer/SubViewport" index="4" unique_id=952362055 groups=["FRONTROW"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)

@@ -60,20 +60,33 @@ Battler (CharacterBody3D - battler.gd)
 
 ## 3. Animation State Routing (`AnimationTree`)
 
-Rather than invoking `AnimationPlayer.play()` directly, the game uses an **`AnimationTree` State Machine** with hierarchical state navigation to ensure smooth blending and state safety.
+Rather than invoking `AnimationPlayer.play()` directly, the game uses an **`AnimationTree` BlendTree** with hierarchical state navigation to ensure smooth blending and state safety.
 
-### State Structure:
-- **Root State Machine**: Contains base states like `idle1`, `walk`, `dodge`, `parry`, `jump`, `jump_land`, `hit`, `death`, and a sub-state machine `combat_actions`.
-- **`combat_actions` Sub-Machine**: Houses the standardised offensive slots `melee_combo_1..3` and `ranged_cast_1..2`.
+### BlendTree Structure:
+- **Root: AnimationNodeBlendTree** - Uses an Add2 node to blend animations additively
+  - **Input 0: BaseSM** - A state machine containing base states like `idle1`, `walk`, `dodge`, `parry`, `jump`, `jump_land`, `death`, and a sub-state machine `combat_actions`
+  - **Input 1: HitSM** - A state machine for additive hit reactions
+- **BaseSM State Machine**: Contains the main animation states
+  - Root states: `idle1`, `walk`, `dodge`, `parry`, `jump`, `jump_land`, `death`
+  - Sub-state machine: `combat_actions` - Houses the standardised offensive slots `melee_combo_1..3` and `ranged_cast_1..2`
+- **HitSM State Machine**: Contains the hit reaction animation state
+  - States: `empty` (no animation), `hit` (additive hit animation)
+  - Transitions based on `is_hit` condition
+
+### Additive Hit Blending
+The Add2 node blends BaseSM and HitSM additively:
+- When `is_hit` is false, HitSM is in the `empty` state, so nothing is added to the base animation
+- When `is_hit` is true, HitSM transitions to the `hit` state, which adds the hit animation on top of whatever base animation is playing
+- This allows hit reactions to play during any animation (idle, walking, attacking, etc.) without interrupting the base animation
 
 ### Two-Step Nested Travel Pattern
-Because Godot's root `AnimationNodeStateMachinePlayback` cannot travel into child state machine nodes in a single jump, `_try_animation()` performs a two-step travel:
+Because Godot's root `AnimationNodeStateMachinePlayback` cannot travel into child state machine nodes in a single jump, `_try_animation()` performs a two-step travel through the BaseSM:
 
 ```gdscript
 # Step 1: Travel root playback into the combat_actions container
 state_machine.travel("combat_actions")
 # Step 2: Travel child playback into the specific attack leaf state
-var ca_sm = anim_tree.get("parameters/combat_actions/playback")
+var ca_sm = anim_tree.get("parameters/BaseSM/combat_actions/playback")
 if ca_sm:
     ca_sm.travel(target_leaf)  # e.g. "melee_combo_1"
 ```
@@ -260,10 +273,12 @@ transition above means the battler is already idle before Phase 10 runs.
 
 ### Hit Reaction
 `Battler.take_damage()` calls `play_hit_reaction()` whenever the battler takes
-damage (`damage_taken > 0`, still alive). The `hit` root state plays its flinch
-clip fully, then the code explicitly travels back to `idle1`. `is_hit` is
-cleared before the return travel so the `idle_to_hit` transition doesn't
-immediately re-fire. Fully-avoided hits (dodge/jump → 0 damage) do not flinch.
+damage (`damage_taken > 0`, still alive). The hit reaction uses the additive blending system:
+- Sets `parameters/HitSM/conditions/is_hit` to true, transitioning HitSM from `empty` to `hit`
+- The hit animation blends additively on top of whatever base animation is currently playing
+- After the hit animation duration, `is_hit` is set to false, transitioning HitSM back to `empty`
+- This allows hit reactions to play during any animation (idle, walking, attacking, etc.) without interrupting the base animation
+- Fully-avoided hits (dodge/jump → 0 damage) do not flinch
 
 ### Dodge & Parry
 The `dodge_to_idle` and `parry_to_idle` transitions also use manual

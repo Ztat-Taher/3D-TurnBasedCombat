@@ -202,21 +202,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		_select_current_card()
 		handled = true
 	elif event.is_action_pressed("ui_cancel"):
-		if battle_manager and battle_manager.has_method("exit_targeting_mode"):
-			battle_manager.exit_targeting_mode()
-		
-		if battle_manager and battle_manager.has_meta("pending_card"):
-			battle_manager.set_meta("pending_card", null)
-		
-		# Return the pending card to hand if targeting was cancelled
-		if is_instance_valid(_pending_discard_button):
-			return_card_to_hand(_pending_discard_button)
-			_pending_discard_button = null
-		
-		if not (battle_manager and battle_manager.in_target_selection) and visible:
-			var battlehud = get_tree().get_first_node_in_group("BattleHud")
-			if battlehud and battlehud.has_method("_on_global_back_pressed"):
-				battlehud._on_global_back_pressed()
+		# Check if we're in targeting mode
+		if battle_manager and battle_manager.in_target_selection:
+			if battle_manager.has_method("exit_targeting_mode"):
+				battle_manager.exit_targeting_mode()
+			
+			if battle_manager.has_meta("pending_card"):
+				battle_manager.set_meta("pending_card", null)
+			
+			# Return the pending card to hand if targeting was cancelled
+			if is_instance_valid(_pending_discard_button):
+				return_card_to_hand(_pending_discard_button)
+				_pending_discard_button = null
+		else:
+			# Not in targeting mode, just close the card UI
+			if visible:
+				var battlehud = get_tree().get_first_node_in_group("BattleHud")
+				if battlehud and battlehud.has_method("_on_global_back_pressed"):
+					battlehud._on_global_back_pressed()
 		
 		handled = true
 	

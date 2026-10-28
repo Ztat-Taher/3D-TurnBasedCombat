@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="DioramaArena25D" format=3 uid="uid://p73x6ki2pata"]
+
+[ext_resource type="Script" uid="uid://uf3m3jktgj8d" path="res://scripts/systems/battle/core/diorama/diorama_arena_25d.gd" id="1_arena"]
+[ext_resource type="Script" uid="uid://bh8xvhw0rs1qo" path="res://scripts/systems/battle/core/diorama/diorama_element_25d.gd" id="1_ctktu"]
+[ext_resource type="Texture2D" uid="uid://buv2otj0nxhw1" path="res://assets/textures/diorama/test_arena/floor_stone_albedo.png" id="2_fl_alb"]
+[ext_resource type="Texture2D" uid="uid://c836dka4v5nxc" path="res://assets/textures/diorama/test_arena/floor_stone_normal.png" id="3_fl_norm"]
+[ext_resource type="Texture2D" uid="uid://la64i8re3jg4" path="res://assets/textures/diorama/test_arena/Haligtree.png" id="6_uac6a"]
+[ext_resource type="Resource" path="res://resources/dioramas/elements/pillar_northeast.tres" id="7_ne"]
+[ext_resource type="Resource" path="res://resources/dioramas/elements/pillar_southwest.tres" id="8_sw"]
+
+[resource]
+script = ExtResource("1_arena")
+arena_name = "Ancient Horizon Ruins"
+floor_albedo = ExtResource("2_fl_alb")
+floor_normal = ExtResource("3_fl_norm")
+floor_roughness = 0.85
+panorama_texture = ExtResource("6_uac6a")
+panorama_light_influence = 0.45
+panorama_parallax_warp_scale = 0.06
+sky_color_top = Color(0.25, 0.42, 0.68, 1)
+sky_color_horizon = Color(0.72, 0.8, 0.88, 1)
+elements = Array[ExtResource("1_ctktu")]([ExtResource("7_ne"), ExtResource("8_sw")])
+fog_density = 0.005
