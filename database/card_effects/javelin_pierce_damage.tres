@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="CardEffect" format=3 uid="uid://dj83n2x7v5m4p"]
+
+[ext_resource type="Script" uid="uid://by6qea4gp8ecb" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+value = 26
+scaling = {
+"attack": 0.6
+}
+crit_multiplier = 1.75
+element = "bleed"

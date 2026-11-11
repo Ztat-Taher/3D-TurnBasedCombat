@@ -339,7 +339,7 @@ func _setup_description_popup():
 	var status_effects = _get_card_status_effects()
 	
 	if description_popup.has_method("setup"):
-		description_popup.setup(self, card_config.card_name, status_effects)
+		description_popup.setup(self, card_config.card_description, status_effects)
 	
 	description_popup.visible = false
 

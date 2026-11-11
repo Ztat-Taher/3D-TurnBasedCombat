@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="CardConfig" format=3 uid="uid://cibk3xqlrmwpq"]
+
+[ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
+[ext_resource type="Resource" uid="uid://dj83n2x7v5m4p" path="res://database/card_effects/javelin_pierce_damage.tres" id="2"]
+[ext_resource type="Resource" uid="uid://cfcgtctwxdn1f" path="res://database/state_configs/bleed_state_config.tres" id="3"]
+
+[sub_resource type="Curve" id="Curve_arc"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.5, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_speed"]
+_data = [Vector2(0, 0.2), 0.0, 0.0, 0, 0, Vector2(0.3, 0.4), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+script = ExtResource("1")
+animation_name = "ranged_cast_1"
+primary_effect = ExtResource("2")
+effect_timing = 0
+projectile_enabled = true
+projectile_scene = "res://assets/effects/attacks/projectiles/vfx_javeli_projectile_01.tscn"
+projectile_speed = 8.0
+projectile_speed_curve = SubResource("Curve_speed")
+projectile_lifetime = 2.0
+projectile_arc = 1.5
+projectile_arc_curve = SubResource("Curve_arc")
+projectile_curve_influence = 0.8
+qte_type_string = "timing"
+qte_difficulty = 0.45
+qte_window_duration = 0.45
+qte_failure_multiplier = 0.8
+qte_mash_count = 0
+qte_mash_window = 0.0
+applies_states = Array[Resource]([ExtResource("3")])
+state_duration = 3
+card_name = "Javelin Volley"
+card_rarity = 1
+card_tags = Array[String](["attack", "ranged", "physical", "bleed"])
+card_description = "Hurl a piercing javelin that strikes a single enemy and inflicts Bleed."

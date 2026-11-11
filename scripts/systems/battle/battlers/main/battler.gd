@@ -433,8 +433,15 @@ func set_selectable(can_target: bool) -> void:
 	_update_highlight()
 
 func check_select_target(target:Battler) -> void:
-	if target != self and is_targeted:
-		deselect_as_target()
+	# Check if we're in AOE mode - if so, don't deselect other targets
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	var is_aoe = false
+	if battle_manager and battle_manager.has_meta("is_aoe_mode"):
+		is_aoe = battle_manager.get_meta("is_aoe_mode", false)
+	
+	if not is_aoe:
+		if target != self and is_targeted:
+			deselect_as_target()
 
 func check_hover_target(_target: Battler) -> void:
 	SignalBus.clear_default_selection.emit()

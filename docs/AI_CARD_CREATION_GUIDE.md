@@ -416,13 +416,252 @@ script = ExtResource("1")
 
 ### Projectile Configuration
 
-**Required Fields:**
-- `projectile_enabled`: Boolean
-- `projectile_scene`: String (path to projectile scene)
-- `projectile_speed`: Float (travel speed in units/second)
-- `projectile_lifetime`: Float (maximum projectile lifetime in seconds)
-- `projectile_arc`: Float (arc height for projectile trajectory)
-- `projectile_spawn_point`: String ("actor", "weapon", "custom")
+**Overview:** The projectile system supports single projectiles, multi-projectile volleys, AOE projectiles, curved trajectories, and sophisticated spread patterns. Projectiles are object-pooled for performance and support both sequential and simultaneous firing modes.
+
+**Required Fields for Projectile Cards:**
+- `projectile_enabled`: Boolean (set to `true` to enable projectile system)
+- `projectile_scene`: String (path to projectile VFX scene file)
+- `projectile_speed`: Float (travel speed in world units/second, typically 10-30)
+- `projectile_lifetime`: Float (maximum projectile lifetime in seconds, typically 2-5)
+- `projectile_arc`: Float (arc height for projectile trajectory in world units)
+- `projectile_spawn_point`: String ("actor" - spawns in front of actor)
+
+**Optional Projectile Properties:**
+
+**Curve and Trajectory Control:**
+- `projectile_speed_curve`: Curve resource (speed varies over time: slow start, fast travel, etc.)
+  - Subresource in card config (inline Curve, not separate file)
+  - Example: `[(0, 0.2), (0.3, 0.4), (1, 1)]` for accelerating projectile
+- `projectile_arc_curve`: Curve resource (arc height varies over time for dynamic curvature)
+  - Subresource in card config (inline Curve, not separate file)
+  - Example: `[(0, 0), (0.5, 1), (1, 0)]` for parabolic arc
+- `projectile_curve_influence`: Float (0.0-1.0, how much the curve affects path)
+  - 0.0 = straight line (no arc)
+  - 1.0 = full curve from arc_curve
+  - 0.5 = half arc (balanced)
+
+**Projectile Scaling:**
+- `projectile_scale`: Vector3 (scale of projectile VFX, default `Vector3(1, 1, 1)`)
+  - Use larger scales for AOE effects (e.g., `Vector3(2, 2, 2)` for wide slash)
+  - Use smaller scales for rapid-fire projectiles (e.g., `Vector3(0.3, 0.3, 0.3)` for fireballs)
+
+**Multi-Projectile Configuration:**
+- `projectile_fire_simultaneously`: Boolean (fire all projectiles at once vs sequentially)
+  - `true`: All projectiles spawn simultaneously (best for Card Salvo, volleys)
+  - `false`: Projectiles fire one at a time (default, works with wait_for_impact)
+- `projectile_spawn_spread`: Float (spread radius in world units for spawn position)
+  - Creates a ring facing forward from the actor
+  - Higher values = wider ring, more visual spread
+  - Typical values: 0.5-2.0 for most cards
+- `projectile_trajectory_spread`: Float (variance in arc height for path variety)
+  - Randomizes arc height by ±spread value
+  - Projectiles always reach target but take different curved paths
+  - Higher values = more arc height variation
+  - Typical values: 0.2-1.0 for variety
+
+**Multi-Strike with Projectiles:**
+- `projectile_wait_for_impact`: Boolean (wait for projectile impact before next strike)
+  - `true`: Next strike waits for current projectile to hit (sequential, controlled)
+  - `false`: Next strike fires immediately without waiting (rapid-fire, chaotic)
+  - Works with multi-strike cards only
+- `projectile_strike_delay`: Float (delay between strikes if not waiting for impact)
+  - Only used when `projectile_wait_for_impact = false`
+  - Controls spacing between rapid-fire projectiles
+  - Typical values: 0.0-0.3 seconds
+
+**AOE Projectile Configuration:**
+- `projectile_aoe`: Boolean (single projectile damages all targets instead of one per target)
+  - `true`: One projectile damages multiple targets (e.g., Horizontal Slash)
+  - `false`: Each projectile damages one target (default)
+  - For AOE cards, projectile travels to center of all targets
+  - Damage applied to all targets on impact simultaneously
+
+**Projectile System Architecture:**
+
+**Object Pooling:**
+- Projectiles use object pooling for performance (20 pre-allocated containers)
+- Eliminates node instantiation overhead during combat
+- Pooled projectiles are reset (position, rotation, scale, damage_data) before reuse
+- Pool creates new projectiles if exhausted (fallback safety)
+
+**Scene Caching and Preloading:**
+- Projectile scenes are cached after first load to avoid repeated `load()` calls
+- All projectile scenes are preloaded at combat start from deck draw piles
+- Background loading prevents frame stutter during projectile spawning
+- Synchronous fallback if preload doesn't complete in time
+
+**Spread System:**
+- **Spawn Spread**: Creates a ring facing forward from the actor
+  - Uses `sqrt(randf())` for uniform area distribution (prevents center bias)
+  - Spatial grid collision detection prevents overlap (O(1) lookup)
+  - Up to 10 attempts to find unique position before using last candidate
+  - Global grid for simultaneous fire (shared across volley)
+  - Local grid for sequential fire (per-projectile)
+
+- **Trajectory Spread**: Randomizes arc height, not target position
+  - Variance: `(randf() - 0.5) * 2.0 * trajectory_spread`
+  - Projectiles always reach actual target
+  - Visual variety in curved paths without breaking targeting
+
+**AOE Execution Context:**
+- AOE projectiles use `ProjectileExecutionContext` for data passing
+- Context contains: center position, target list
+- Stored in `card_battle_manager._aoe_execution_context` dictionary
+- Keyed by CardConfig resource
+- Cleaned up after card execution completes
+- Replaces fragile metadata-based passing
+
+**Damage Application:**
+- Damage applied when projectile arrives at target
+- AOE projectiles: damage all targets from context simultaneously (no await)
+- Single-target projectiles: damage single target
+- Damage data stored in projectile's `damage_data` dictionary
+- Includes: actor, target, card_cfg, damage_multiplier, aoe_targets
+- Pool return clears damage_data to prevent stale data
+
+**Projectile VFX Orientation:**
+- Projectile container uses `look_at()` to face travel direction
+- VFX child nodes may need manual rotation due to baked scene transforms
+- System applies +PI/2 Y rotation to align VFX with forward direction
+- VFX scenes should be authored with +Y facing forward for best results
+
+**Animation Integration:**
+- Projectile cards use `ranged_cast_1` or `ranged_cast_2` animations
+- Hit moment callback triggers projectile launch
+- Multi-strike cards: each strike can launch its own projectile
+- Movement to target happens before first projectile (for melee-range hybrids)
+- No movement if purely ranged (distance check configurable)
+
+**Example: Basic Single Projectile Card**
+```gdscript
+projectile_enabled = true
+projectile_scene = "res://assets/effects/attacks/projectiles/vfx_basic_projectile_01.tscn"
+projectile_speed = 20.0
+projectile_lifetime = 2.0
+projectile_arc = 0.0
+projectile_scale = Vector3(1, 1, 1)
+projectile_aoe = false
+projectile_fire_simultaneously = false
+projectile_spawn_spread = 0.0
+projectile_trajectory_spread = 0.0
+projectile_wait_for_impact = true
+animation_name = "ranged_cast_1"
+```
+
+**Example: Multi-Projectile Volley (Card Salvo)**
+```gdscript
+projectile_enabled = true
+projectile_scene = "res://assets/effects/attacks/projectiles/vfx_evil_projectile_01.tscn"
+projectile_speed = 25.0
+projectile_lifetime = 2.0
+projectile_arc = 1.5
+projectile_arc_curve = SubResource("Curve_arc")  # Parabolic
+projectile_curve_influence = 0.7
+projectile_scale = Vector3(0.5, 0.5, 0.5)
+projectile_fire_simultaneously = true  # All at once
+projectile_spawn_spread = 1.0  # Ring facing forward
+projectile_trajectory_spread = 0.5  # Arc height variety
+projectile_speed_curve = SubResource("Curve_speed")  # Accelerating
+is_multi_strike = true
+strike_animations = Array[String](["ranged_cast_1", "ranged_cast_1", "ranged_cast_1"])
+strike_multipliers = Array[float]([0.8, 1.0, 1.2])
+```
+
+**Example: AOE Projectile (Horizontal Slash)**
+```gdscript
+projectile_enabled = true
+projectile_scene = "res://assets/effects/attacks/slash/vfx_blank_slash.tscn"
+projectile_speed = 30.0
+projectile_lifetime = 1.0
+projectile_arc = 0.0  # Straight line
+projectile_scale = Vector3(2, 2, 2)  # Large slash
+projectile_aoe = true  # One projectile, damages all targets
+target_type = 2  # ALL_ENEMIES
+animation_name = "melee_combo_1"  # Melee animation with projectile
+```
+
+**Example: Rapid-Fire Multi-Strike (Pyroclast Barrage)**
+```gdscript
+projectile_enabled = true
+projectile_scene = "res://assets/effects/attacks/projectiles/vfx_fire_projectile_01.tscn"
+projectile_speed = 20.0
+projectile_lifetime = 2.0
+projectile_arc = 2.0
+projectile_arc_curve = SubResource("Curve_arc")
+projectile_curve_influence = 0.7
+projectile_scale = Vector3(0.3, 0.3, 0.3)  # Small fireballs
+projectile_fire_simultaneously = false  # Sequential
+projectile_spawn_spread = 1.0
+projectile_trajectory_spread = 5.0  # High arc variety
+projectile_wait_for_impact = false  # Don't wait, rapid-fire
+projectile_strike_delay = 0.0  # No delay
+projectile_speed_curve = SubResource("Curve_speed")
+is_multi_strike = true
+strike_animations = Array[String](["melee_combo_1", "melee_combo_2", "melee_combo_3"])
+strike_multipliers = Array[float]([0.8, 1.0, 1.4])
+```
+
+**Best Practices:**
+
+1. **Curve Resources**: Use inline Curve subresources in card config, not separate files
+   - Click "Curve" in inspector to edit points
+   - X-axis = time (0-1), Y-axis = value
+   - First point at (0, 0), last point at (1, 1) for normalized curves
+
+2. **Spread Tuning**:
+   - Spawn spread: 0.5-1.0 for tight volleys, 1.5-2.0 for wide spreads
+   - Trajectory spread: 0.2-0.5 for subtle variety, 1.0+ for chaotic paths
+   - Adjust based on projectile count (more projectiles = higher spread)
+
+3. **AOE Projectiles**:
+   - Use `projectile_aoe = true` for cards that should hit all targets with one projectile
+   - Set target_type to ALL_ENEMIES, ALL_ALLIES, or ALL_UNITS
+   - Use larger projectile_scale for visual clarity
+   - Arc height typically 0 (straight line to center)
+
+4. **Performance**:
+   - Object pooling handles up to 20 simultaneous projectiles efficiently
+   - Preloading prevents stutter on first projectile spawn
+   - Avoid excessive projectile counts (>10) unless using simultaneous fire
+   - Use projectile_lifetime to prevent stuck projectiles
+
+5. **Visual Clarity**:
+   - Larger projectiles for main attacks, smaller for rapid-fire
+   - Use speed curves for dramatic effect (slow start, fast impact)
+   - Arc curves for gravity-based projectiles (fireballs, arrows)
+   - Straight arcs for magical energy beams
+
+6. **Multi-Strike Integration**:
+   - Use `projectile_wait_for_impact = true` for controlled, sequential strikes
+   - Use `projectile_wait_for_impact = false` for chaotic, rapid-fire attacks
+   - Adjust `projectile_strike_delay` to space out rapid-fire projectiles
+   - Combine with trajectory spread for visual variety per strike
+
+**Common Pitfalls:**
+
+1. **Targeting Broken by Trajectory Spread**: Never use trajectory spread on single-target cards that must hit precisely. Use it only on multi-strike or AOE cards where slight path variation is acceptable.
+
+2. **Projectile Not Reaching Target**: If projectile seems to miss, check:
+   - `projectile_speed` is too low (increase)
+   - `projectile_lifetime` is too short (increase)
+   - Arc height is too high for the distance (reduce)
+   - VFX scene has baked transforms affecting rotation
+
+3. **Overlapping Projectiles**: If projectiles overlap visually:
+   - Increase `projectile_spawn_spread`
+   - Check if `projectile_fire_simultaneously` is set correctly
+   - For sequential fire, ensure spread collision detection is working
+
+4. **Stale Damage Data**: If wrong damage is applied:
+   - Check pool return clears damage_data (fixed in current system)
+   - Ensure damage is applied before pool return
+   - Verify callback data is stored correctly
+
+5. **AOE Only Damaging One Target**: If AOE projectile only hits one enemy:
+   - Verify `projectile_aoe = true` is set
+   - Check target_type is ALL_ENEMIES (2) or similar
+   - Ensure execution context is created and passed correctly
+   - Verify context cleanup doesn't happen too early
 
 ### Audio Configuration
 
@@ -513,506 +752,3 @@ script = ExtResource("1")
 - `applies_self_states`: Array of StateConfig resources (empty if none)
 - `state_chance`: Float (0.0-1.0 chance to apply states)
 - `state_duration`: Integer (duration in turns)
-
-**StateConfig Resource Configuration:**
-
-**File Location:** `database/state_configs/[state_name]_state.tres`
-
-**Required Script:**
-```
-[ext_resource type="Script" path="res://battle-manager/card_combat/resources/state_config.gd" id="1"]
-script = ExtResource("1")
-```
-
-**Required Fields:**
-- `state_id`: String (reference to state resource)
-- `state_name`: String (display name of the state)
-- `duration`: Integer (duration in turns)
-- `chance`: Float (application chance 0.0-1.0)
-- `stacking_behavior`: Integer from StackingBehavior enum
-
-**Stacking Behavior Enum:**
-- 0 = NONE (no stacking allowed)
-- 1 = REFRESH (refresh duration on reapply)
-- 2 = ADDITIVE (add to existing duration)
-- 3 = MULTIPLICATIVE (multiply existing effect)
-- 4 = INDEPENDENT (multiple instances can exist independently)
-
-**Optional Fields:**
-- `max_stacks`: Integer (maximum number of stacks)
-- `can_dispel`: Boolean (whether state can be dispelled)
-- `is_purgeable`: Boolean (whether state can be purged)
-- `applies_to_actor`: Boolean (whether state applies to actor instead of target)
-- `spread_on_contact`: Boolean (whether state spreads on contact)
-- `spread_chance`: Float (chance to spread on contact)
-- `spread_range`: Float (range for spreading)
-- `tick_damage`: Integer (damage per tick for DoT effects)
-- `tick_interval`: Float (time between ticks in seconds)
-- `tick_count`: Integer (number of ticks, 0 = use duration)
-- `remove_on_damage`: Boolean (whether state removes when taking damage)
-- `remove_on_move`: Boolean (whether state removes when moving)
-- `immunity_duration`: Integer (immunity duration after state ends)
-
-### Card Metadata
-
-**Required Fields:**
-- `card_rarity`: Integer from CardRarity enum
-- `card_tags`: Array[String] (tags for filtering and grouping)
-- `card_description`: String (flavor text and description)
-
-**Card Rarity Enum:**
-- 0 = COMMON (common cards)
-- 1 = UNCOMMON (uncommon cards)
-- 2 = RARE (rare cards)
-- 3 = EPIC (epic cards)
-- 4 = LEGENDARY (legendary cards)
-
-**Note:** Element is now set in CardEffect (for hit effects), not in CardConfig.
-
-## AI Agent Card Creation Process
-
-### Phase 1: File Creation
-AI agents create all necessary .tres files with proper ExtResource references.
-
-### Phase 2: Resource Linking
-Resources are linked directly in the .tres files using ExtResource format:
-1. Create CardConfig resource in `database/card_configs/`
-2. Create CardEffect resource(s) in `database/card_effects/`
-3. Link CardConfig.primary_effect to CardEffect using ExtResource
-4. Add CardConfig to DeckResource.cards array
-5. No CardData creation needed
-
-### Example Request: "Create a lightning bolt card that deals 40 damage to a single enemy with a 0.5 difficulty timing QTE, stun chance of 30%, rare rarity, and lightning element"
-
-### AI Agent Process:
-
-1. **Create CardConfig resource** (`database/card_configs/lightning_bolt_config.tres`)
-   - Set card_name to "Lightning Bolt"
-   - Set ap_cost to 1 (or appropriate value)
-   - Configure targeting as SINGLE_ENEMY (1)
-   - Configure QTE as TIMING (1) with difficulty 0.5
-   - Set animation_name to "ranged_cast_1" (canonical cast slot)
-   - Set card_rarity to RARE (2)
-   - Set applies_states to reference stun state configuration
-   - Link primary_effect to CardEffect resource via ExtResource
-
-2. **Create CardEffect resource** (`database/card_effects/lightning_damage.tres`)
-   - Set effect_type to DAMAGE (0)
-   - Set value to 40
-   - Set targeting to TARGET (1)
-   - Set scaling to {"attack": 0.5} (or appropriate scaling)
-   - Set damage_type to "physical" (or "magical" if applicable)
-   - Set element to "lightning" (for hit effects)
-
-3. **Create StateConfig resource** (if applying states) (`database/state_configs/stun_state.tres`)
-   - Set state_id to "stun"
-   - Configure duration and chance
-
-4. **Add to DeckResource** (`database/decks/player_deck.tres`)
-   - Add CardConfig ExtResource reference to cards array
-
-### Example Cards Created
-The card database contains the following example cards:
-- `basic_attack_config.tres` - Basic single-target attack
-- `bleed_strike_config.tres` - Attack with bleed status effect
-- `blizzard_config.tres` - AOE ice damage
-- `burning_card_config.tres` - Fire damage with burn status
-- `electrocuted_card_config.tres` - Lightning damage with electrocuted status
-- `flurry_attack_config.tres` - Multi-strike attack
-- `group_heal_config.tres` - AOE heal
-- `group_shield_config.tres` - AOE shield
-- `ice_spear_config.tres` - Single-target ice damage
-- `ice_strike_config.tres` - Ice damage with chilled status
-- `minor_heal_config.tres` - Single-target heal
-- `single_shield_config.tres` - Single-target shield
-
-### AI Agent Template Example
-
-### Request Format
-When requesting card creation, AI agents should provide:
-
-```
-Create a card with the following specifications:
-- Card Name: [name]
-- Card Type: [attack/skill/heal/buff/debuff]
-- Target: [single enemy/all enemies/single ally/all allies/self]
-- Damage/Heal: [value]
-- Cost: [AP cost]
-- Animation: [animation name]
-- QTE: [type and difficulty]
-- Effects: [list of effects]
-- States: [states to apply]
-- Visual Effects: [VFX requirements]
-- Audio: [sound requirements]
-- Rarity: [rarity tier]
-- Element: [element type]
-- Special Conditions: [any special requirements]
-```
-
-### Creation Checklist
-
-AI agents must ensure:
-
-1. **File Structure:**
-   - CardConfig in `database/card_configs/[card_name]_config.tres`
-   - CardEffect in `database/card_effects/[effect_name].tres`
-   - Related resources in appropriate subdirectories
-
-2. **Resource References:**
-   - All resource references use proper ExtResource format
-   - Script references are correct and paths are valid
-   - Circular references are avoided
-
-3. **Enum Values:**
-   - All enum values are within valid ranges
-   - Enums match the definitions in this guide
-   - Default values are used where appropriate
-
-4. **Configuration Completeness:**
-   - All required fields are populated
-   - Optional fields are included when relevant
-   - Validation would pass (check each resource's validate() method)
-
-5. **Integration:**
-   - CardConfig references all sub-resources correctly via ExtResource
-   - File paths are relative to project root (res://)
-   - No CardData needed - CardConfig is the top-level resource
-
-## Example Card Creation Process
-
-### Example Request: "Create a fireball card that deals 50 damage to all enemies with a 0.4 difficulty timing QTE"
-
-### AI Agent Process:
-
-1. **Create CardConfig resource** (`database/card_configs/fireball_config.tres`)
-   - Set card_name to "Fireball"
-   - Set ap_cost to 2 (AOE cards typically cost more)
-   - Configure targeting as ALL_ENEMIES (2)
-   - Configure QTE as TIMING (1) with difficulty 0.4
-   - Set animation_name to "ranged_cast_1" (canonical cast slot)
-   - Set card_rarity to UNCOMMON (1)
-   - Link primary_effect to CardEffect resource via ExtResource
-
-2. **Create CardEffect resource** (`database/card_effects/fireball_damage.tres`)
-   - Set effect_type to DAMAGE (0)
-   - Set value to 50
-   - Set targeting to ALL_ENEMIES (2)
-   - Set scaling to {"attack": 0.5}
-   - Set damage_type to "physical"
-   - Set element to "fire" (for hit effects)
-
-3. **Add to DeckResource** (`database/decks/player_deck.tres`)
-   - Add CardConfig ExtResource reference to cards array
-
-## Common Card Patterns
-
-### Basic Attack Card
-- Target: SINGLE_ENEMY
-- Effect: DAMAGE with attack stat scaling
-- Animation: "attack"
-- QTE: TIMING with 0.3-0.5 difficulty
-- No states or complex effects
-
-### AOE Attack Card
-- Target: ALL_ENEMIES
-- Effect: DAMAGE (possibly with multiplier)
-- Animation: "skill-animations/strong-attack"
-- QTE: TIMING with 0.4-0.6 difficulty
-- Camera: Set enemy overview
-- Screen: Damage flash
-
-### Heal Card
-- Target: SINGLE_ALLY or ALL_ALLIES
-- Effect: HEAL
-- Animation: "ranged_cast_1" (canonical cast gesture)
-- No QTE typically
-- VFX: Healing aura on target
-- Audio: Heal sound
-
-### Buff Card
-- Target: SINGLE_ALLY or ALL_ALLIES
-- Effect: BUFF with stat modifiers
-- Animation: "ranged_cast_1" or "ranged_cast_2"
-- No QTE typically
-- VFX: Buff glow on target
-- Duration: 2-3 turns
-
-### Debuff Card
-- Target: SINGLE_ENEMY or ALL_ENEMIES
-- Effect: DEBUFF + State application
-- Animation: "melee_combo_1" or "ranged_cast_1" (canonical slots only)
-- QTE: Optional timing QTE
-- States: Apply poison/slow/etc.
-- State chance: 0.5-0.75
-
-## Canonical Animation Slot Reference
-
-### Offensive slots (`combat_actions` sub-machine)
-Use these for every damaging/skill card:
-- `"melee_combo_1"` - Basic melee attack
-- `"melee_combo_2"` - Second melee combo hit
-- `"melee_combo_3"` - Finishing melee hit
-- `"ranged_cast_1"` - Generic cast/skill gesture (heal, buff, debuff, spells)
-- `"ranged_cast_2"` - Alternate/second skill cast (heavy spells)
-
-### Root slots
-- `"walk"` - Locomotion · `"dodge"` - Dodge dash · `"parry"` - Block/parry
-- `"jump"` / `"jump_land"` - Jump evade · `"hit"` - Being hit reaction
-- `"death"` - Defeat animation
-
-> ⚠️ Legacy names (`"attack"`, `"kick"`, `"heal"`, `"magic_cast"`, `"cast"`,
-> `"defend"`, `"heavy_attack"`, `"buff"`, `"debuff"`) are **not** valid anywhere —
-> replace them with the canonical slots above. Unknown names are rejected by
-> `_try_animation()` validation with a clear error instead of being played.
-
-### Character-Specific Mapping
-When creating a new character:
-1. Identify which generic animations they need
-2. Create or find character-specific animations
-3. Create AnimationMapping resource in `database/animation_mappings/`
-4. Map generic names to character-specific animations
-5. Assign the mapping to the character's Battler node
-
-### Testing Animation Mapping
-After setting up animation mapping:
-1. Test cards with different character types
-2. Verify each character plays their specific animations
-3. Test cards with characters that have no mapping (should use generic names)
-4. Check console output for animation resolution messages
-5. Validate that animation timing and effects work correctly
-
-## Validation and Testing
-
-After creating a card, AI agents should:
-
-1. **Check resource validation:**
-   - Call `validate()` method on each resource
-   - Fix any reported issues
-
-2. **Verify file paths:**
-   - Ensure all paths use `res://` format
-   - Check that referenced files exist
-
-3. **Test card integration:**
-   - Add card to deck configuration
-   - Verify card appears in UI
-   - Test targeting and execution
-
-4. **Check backward compatibility:**
-   - Ensure existing cards still work
-   - Test both CardConfig and metadata systems
-
-## Troubleshooting
-
-### Common Issues:
-
-1. **Card not appearing in deck:**
-   - Verify CardConfig resource loads correctly
-   - Ensure CardConfig is added to DeckResource.cards array
-   - Check ExtResource references are valid
-
-2. **Effects not triggering:**
-   - Check effect timing configuration
-   - Verify conditions are being met
-   - Ensure target selection is working
-
-3. **Animation not playing:**
-   - Verify animation name exists in battler
-   - Check fallback animation is set
-   - Ensure animation priority is appropriate
-
-4. **QTE not triggering:**
-   - Check qte_type is not NONE
-   - Verify QTE timing configuration
-   - Ensure QTE difficulty is valid (0.0-1.0)
-
-5. **VFX not appearing:**
-   - Check VFX scene path is correct
-   - Verify spawn point configuration
-   - Ensure VFX duration is > 0
-
-## Advanced Features
-
-### Conditional Effects
-Use EffectCondition resources to create cards that only work under specific circumstances:
-- Low health targets
-- Specific states present
-- Random chance execution
-- Custom conditions
-
-### Multi-Effect Cards
-Use secondary_effects array to create cards with multiple effects:
-- Primary damage + secondary heal
-- Main effect + conditional bonus
-- Complex effect chains
-
-### Animation Events
-Use AnimationEvent resources for precise timing:
-- Damage on specific frame
-- Sound effects synchronized with animation
-- VFX triggered at animation milestones
-- Camera effects timed to animation beats
-
-### Animation Mapping
-Use AnimationMapping resources for character-specific animations:
-- Map generic card animations to character-specific ones
-- Create different animation styles for different character types
-- Maintain backward compatibility with characters without mapping
-- Easy to update character animations without modifying cards
-
-### State Combinations
-Apply multiple states for complex debuffs:
-- Poison + damage reduction
-- Stun + vulnerability
-- DoT + spread mechanics
-
-## File Organization Best Practices
-
-#### Directory Structure:
-```
-database/
-├── card_configs/
-├── card_effects/
-├── vfx_configs/
-├── audio_configs/
-├── animation_mappings/  # Character-specific animation remapping
-├── camera_effects/ (optional - can be embedded in CardConfig)
-├── screen_effects/ (optional - can be embedded in CardConfig)
-└── state_configs/ (optional - can be embedded in CardConfig)
-```
-
-**Note:** Some directories (camera_effects, screen_effects, state_configs) are optional as these resources can be embedded directly in CardConfig rather than stored as separate files. Use separate files only when the same resource is shared across multiple cards.
-
-**Current Database State:**
-- `database/card_configs/` - Contains 12 card config resources
-- `database/card_effects/` - Contains 9 effect resources
-- `database/animation_mappings/` - Empty (create as needed for characters)
-- `database/vfx_configs/` - Empty (create as needed)
-- `database/audio_configs/` - Empty (create as needed)
-- `database/items/` - Contains item resources (preserve)
-- `database/states/` - Contains state resources (preserve)
-- `database/troops/` - Contains troop resources (preserve)
-
-AI agents should create directories as needed when adding new cards.
-
-### Naming Conventions:
-- Config files: `[card_name]_config.tres`
-- Effect files: `[effect_name].tres`
-- VFX files: `[vfx_name]_vfx.tres`
-- Audio files: `[audio_name]_audio.tres`
-- State files: `[state_name]_state.tres`
-
-### Resource IDs:
-- Use snake_case for all IDs
-- Keep IDs descriptive but concise
-- Avoid special characters and spaces
-- Maintain consistency across related resources
-
-## Performance Considerations
-
-1. **Resource Loading:**
-   - Resources are loaded at runtime
-   - Heavy VFX/audio should be used sparingly
-   - Consider LOD for complex effects
-
-2. **Effect Complexity:**
-   - Limit secondary effects array size
-   - Avoid deep condition nesting
-   - Use simple conditions when possible
-
-3. **Memory Management:**
-   - VFX instances are auto-destroyed
-   - Audio players are cleaned up after playback
-   - Large resource chains may impact load times
-
-## Extension Points
-
-The system is designed for extensibility:
-
-### Custom Effect Types:
-- Add new enum values to EffectType
-- Implement custom effect logic in CardEffect
-- Update execute_effect_phase as needed
-
-### Custom QTE Types:
-- Add new enum values to QTEType
-- Implement QTE logic in QTEManager
-- Update execute_qte_phase as needed
-
-### Custom Targeting Modes:
-- Add new enum values to SelectionMode
-- Implement targeting logic in CardConfig
-- Update get_targets_for_card as needed
-
-### Custom Animation Events:
-- Add new enum values to AnimationEventType
-- Implement event logic in AnimationEvent
-- Update process_animation_events as needed
-
-## Maintenance Notes
-
-### When updating the core system:
-1. Update this documentation
-2. Maintain backward compatibility
-3. Add migration tools if needed
-4. Test existing cards
-5. Update example resources
-
-### When adding new features:
-1. Document feature in this guide
-2. Provide example configurations
-3. Update validation methods
-4. Add AI agent support
-5. Test with various card types
-
-## Implementation Notes for AI Agents
-
-### Resource Script Architecture
-
-The resource scripts in `battle-manager/card_combat/resources/` have been designed with the following considerations:
-
-**AudioConfig:**
-- Uses generic Node return type for audio players to handle both 2D and 3D audio
-- Doppler tracking uses numeric values (0=DISABLED, 1=ENABLED) for Godot compatibility
-- Audio players are auto-cleanup with optional fade effects
-- Supports delayed playback via Timer nodes
-- Type checking used for method availability across AudioStreamPlayer variants
-
-**CameraEffectConfig:**
-- Camera effects require a Camera3D node parameter for SceneTree access
-- Uses fixed 60 FPS assumption for shake/tracking loops (avoiding get_process_delta_time())
-- Async effects use `await camera.get_tree().process_frame` instead of `await get_tree().process_frame`
-- Tween-based animations for smooth camera movements
-- Resource classes cannot call Node methods directly - camera node must be passed as parameter
-
-**CardIntegration:**
-- No CardDatabase class - cards are passed as CardConfig arrays
-- Deck initialization: `initialize_for_player(player_battler, deck_resources: Array[CardConfig])`
-- Uses SimplifiedDeck for deck management (draw_pile, hand, graveyard)
-- Removed `deck_card_ids` array - no longer uses ID-based lookup
-
-**General Principles:**
-- Resource classes cannot call Node methods directly - always pass Node as parameter
-- Avoid circular references by setting resource properties to null in .tres files
-- Use type checking (`is` operator) when working with base classes
-- Test Godot parser/compilation after resource script changes
-- Use Godot ternary syntax: `value_if_true if condition else value_if_false`
-
-### Recent System Changes (for reference)
-
-The following major changes were made to the card system:
-
-1. **CardData Removal:** Deprecated the addon CardData wrapper - cards now use CardConfig directly
-2. **CombatDeck Replacement:** Replaced addon CombatDeck with SimplifiedDeck (uses Array[CardConfig])
-3. **CardConfig Cleanup:** Removed redundant damage/stats fields (base_damage, damage_scaling, heal_amount, shield_amount, damage_type, card_element, stat_modifiers)
-4. **CardConfig Additions:** Added display fields (card_name, ap_cost, background_sprite, main_image, attack_icon, effect_icon, card_frame_texture, name_banner_texture, cost_badge_texture, type_icon)
-5. **CardEffect as Source of Truth:** Numeric values (value, scaling, damage_type, element) are now in CardEffect, not CardConfig
-6. **AudioConfig Type Errors:** Fixed invalid casts between AudioStreamPlayer base class and 2D/3D subclasses by using separate branches and generic Node return type
-7. **AudioConfig Doppler Tracking:** Fixed invalid enum members by using numeric values (0/1) instead of DISABLED/ENABLED constants
-8. **CameraEffectConfig SceneTree Access:** Fixed "Function not found in base self" errors by calling `camera.get_tree()` instead of `get_tree()` in resource methods
-9. **CameraEffectConfig Delta Time:** Fixed by using fixed 1.0/60.0 per-frame increment instead of `get_process_delta_time()`
-10. **CardIntegration CardDatabase:** Removed references to non-existent CardDatabase class; changed to direct CardConfig array passing
-
-When creating new resource scripts, follow these patterns to avoid similar issues.
-
-This guide should be updated whenever the card system is modified to ensure AI agents can always create cards using the most current and accurate information.

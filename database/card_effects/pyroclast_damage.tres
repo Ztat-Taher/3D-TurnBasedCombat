@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CardEffect" format=3 uid="uid://cx82k6qaq1m2a"]
+
+[ext_resource type="Script" uid="uid://by6qea4gp8ecb" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+value = 12
+scaling = {
+"magic": 0.5
+}
+crit_multiplier = 1.5
+damage_type = "magical"
+element = "fire"

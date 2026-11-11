@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="CardConfig" format=3 uid="uid://cx62v8k4n7nab"]
+
+[ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
+[ext_resource type="Resource" uid="uid://baacy0p1e1gci" path="res://database/card_effects/card_salvo_damage.tres" id="2"]
+
+[sub_resource type="Curve" id="Curve_arc"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.5, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_speed"]
+_data = [Vector2(0, 0.2), 0.0, 0.0, 0, 0, Vector2(0.3, 0.4), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+script = ExtResource("1")
+animation_name = "ranged_cast_1"
+primary_effect = ExtResource("2")
+effect_timing = 0
+projectile_enabled = true
+projectile_scene = "res://assets/effects/attacks/projectiles/vfx_projectile_variant_1.tscn"
+projectile_speed = 20.0
+projectile_speed_curve = SubResource("Curve_speed")
+projectile_lifetime = 2.0
+projectile_arc = 0.3
+projectile_arc_curve = SubResource("Curve_arc")
+projectile_curve_influence = 0.6
+projectile_fire_simultaneously = true
+projectile_spawn_spread = 5.0
+projectile_trajectory_spread = 1.0
+qte_type_string = "timing"
+qte_window_duration = 0.5
+qte_success_multiplier = 1.4
+qte_failure_multiplier = 0.8
+qte_mash_count = 0
+qte_mash_window = 0.0
+state_chance = 0.0
+state_duration = 0
+card_name = "Card Salvo"
+card_rarity = 3
+card_tags = Array[String](["attack", "ranged", "magic", "special"])
+card_description = "Discards all other cards in hand to throw a projectile for each card discarded, dealing damage for each."
+ap_cost = 2

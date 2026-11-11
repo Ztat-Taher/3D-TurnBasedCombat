@@ -3945,24 +3945,8 @@ shader_parameter/gradient = SubResource("GradientTexture1D_iwlgl")
 [sub_resource type="QuadMesh" id="QuadMesh_tj8tv"]
 material = SubResource("ShaderMaterial_vvm3r")
 
-[sub_resource type="Animation" id="Anim_vfx_close"]
-resource_name = "close"
-length = 0.4
-tracks/0/type = "value"
-tracks/0/imported = false
-tracks/0/enabled = true
-tracks/0/path = NodePath(".:scale")
-tracks/0/interp = 1
-tracks/0/loop_wrap = true
-tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.4),
-"transitions": PackedFloat32Array(1, 1),
-"update": 0,
-"values": [Vector3(1, 1, 1), Vector3(0.001, 0.001, 0.001)]
-}
-
 [sub_resource type="Animation" id="Anim_vfx_impact"]
-resource_name = "impact"
+resource_name = "close"
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
@@ -4066,8 +4050,7 @@ tracks/0/keys = {
 
 [sub_resource type="AnimationLibrary" id="AnimLib_vfx"]
 _data = {
-&"close": SubResource("Anim_vfx_close"),
-&"impact": SubResource("Anim_vfx_impact"),
+&"close": SubResource("Anim_vfx_impact"),
 &"open": SubResource("Anim_vfx_open")
 }
 

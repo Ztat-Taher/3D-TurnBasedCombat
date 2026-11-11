@@ -126,10 +126,20 @@ enum Element {
 @export_group("Projectile")
 @export var projectile_enabled: bool = false           ## Whether card uses a projectile
 @export var projectile_scene: String = ""              ## Path to projectile scene
-@export var projectile_speed: float = 10.0            ## Travel speed of projectile
+@export var projectile_speed: float = 10.0            ## Base travel speed of projectile
+@export var projectile_speed_curve: Curve = null     ## Speed over time (slow start, fast travel)
 @export var projectile_lifetime: float = 5.0           ## Maximum projectile lifetime
 @export var projectile_arc: float = 0.0                ## Arc height for projectile trajectory
+@export var projectile_arc_curve: Curve = null        ## Arc height over time for dynamic curvature
 @export var projectile_spawn_point: String = "actor"  ## Where projectile spawns
+@export var projectile_curve_influence: float = 0.5     ## How much the curve affects path (0=straight, 1=full curve)
+@export var projectile_fire_simultaneously: bool = false  ## Fire all projectiles at once (multi-projectile cards)
+@export var projectile_spawn_spread: float = 0.5        ## Random spread radius in world units (meters) for spawn position (ring facing forward from actor)
+@export var projectile_trajectory_spread: float = 0.2    ## Random variance in arc height for trajectory variety (projectiles always reach target but take different curved paths)
+@export var projectile_wait_for_impact: bool = true     ## Multi-strike: wait for projectile impact before next strike
+@export var projectile_strike_delay: float = 0.3        ## Multi-strike: delay between strikes if not waiting for impact
+@export var projectile_scale: Vector3 = Vector3(1, 1, 1)  ## Scale of the projectile VFX
+@export var projectile_aoe: bool = false               ## Single projectile damages all targets (instead of one projectile per target)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Audio Configuration

@@ -72,7 +72,7 @@ tracks/3/keys = {
 }
 
 [sub_resource type="Animation" id="Animation_u8ypt"]
-resource_name = "main"
+resource_name = "open"
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
@@ -123,7 +123,7 @@ tracks/3/keys = {
 }
 
 [sub_resource type="Animation" id="Animation_0wdjh"]
-resource_name = "oneshot"
+resource_name = "close"
 step = 0.05
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -177,8 +177,8 @@ tracks/3/keys = {
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_0wdjh"]
 _data = {
 &"RESET": SubResource("Animation_8xrmt"),
-&"main": SubResource("Animation_u8ypt"),
-&"oneshot": SubResource("Animation_0wdjh")
+&"open": SubResource("Animation_u8ypt"),
+&"close": SubResource("Animation_0wdjh")
 }
 
 [node name="MProjectileJavelinVFX_03" type="Node3D" unique_id=710306667]

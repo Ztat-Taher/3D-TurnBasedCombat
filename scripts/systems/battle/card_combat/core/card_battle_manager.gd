@@ -18,8 +18,20 @@ var current_player_battler: Battler
 var card_battle_config: CardBattleConfig
 var qte_manager: QTEManager
 
+## Execution context for AOE projectiles (keyed by CardConfig)
+var _aoe_execution_context: Dictionary = {}
+
 # Cards played this turn (to be executed when turn ends)
 var queued_cards: Array = []
+
+# Projectile scene cache to avoid repeated load() calls
+var _projectile_cache: Dictionary = {}  # scene_path -> PackedScene
+# Background preload task for projectile scenes
+var _preload_task: Dictionary = {}  # scene_path -> bool (loading status)
+# Projectile object pool to avoid repeated node instantiation
+var _projectile_pool: Array[BattleProjectile] = []
+const _POOL_SIZE = 20
+const _GRID_CELL_SIZE = 0.5  # Spatial grid cell size for spread calculation
 
 func _ready():
 	# Add to group for easy access
@@ -44,6 +56,9 @@ func _ready():
 	if card_battle_config:
 		ap_system.setup(card_battle_config.ap_per_turn, card_battle_config.max_ap)
 		ap_system.ap_changed.connect(_on_ap_changed)
+	
+	# Initialize projectile pool
+	_initialize_projectile_pool()
 
 func load_card_config() -> CardBattleConfig:
 	# Try to load from project settings or create default
@@ -72,6 +87,9 @@ func setup_card_combat(player_battler: Battler, card_configs: Array[CardConfig])
 	# Connect deck signals
 	if not deck.card_drawn.is_connected(_on_card_drawn):
 		deck.card_drawn.connect(_on_card_drawn)
+	
+	# Preload all projectile scenes for performance
+	preload_all_projectile_scenes()
 
 ## Returns the current player's active deck. Null if not set up.
 func _get_current_deck() -> SimplifiedDeck:
@@ -88,14 +106,80 @@ func get_hand() -> Array[CardConfig]:
 func can_play_card(card: CardConfig) -> bool:
 	if not _get_current_deck():
 		return false
-	
+
 	# Check AP on active player battler first, fallback to ap_system
 	if current_player_battler:
 		return current_player_battler.can_spend_ap(card.ap_cost)
 	elif ap_system:
 		return ap_system.can_spend_ap(card.ap_cost)
-	
+
+	# Preload projectile scene in background if this is a projectile card
+	if card.projectile_enabled and not card.projectile_scene.is_empty():
+		_preload_projectile_scene(card.projectile_scene)
+
 	return true
+
+## Preload projectile scene in background to avoid lag spike
+func _preload_projectile_scene(scene_path: String) -> void:
+	if scene_path in _projectile_cache:
+		return  # Already loaded
+	if scene_path in _preload_task:
+		return  # Already loading
+
+	_preload_task[scene_path] = true
+	ResourceLoader.load_threaded_request(scene_path)
+
+## Check and complete background preload
+func _complete_preload(scene_path: String) -> PackedScene:
+	if scene_path in _projectile_cache:
+		return _projectile_cache[scene_path]
+
+	if scene_path in _preload_task:
+		var status = ResourceLoader.load_threaded_get_status(scene_path)
+		if status == ResourceLoader.THREAD_LOAD_LOADED:
+			var res = ResourceLoader.load_threaded_get(scene_path)
+			if res is PackedScene:
+				_projectile_cache[scene_path] = res
+				_preload_task.erase(scene_path)
+				return res
+		elif status == ResourceLoader.THREAD_LOAD_FAILED:
+			_preload_task.erase(scene_path)
+
+	return null
+
+## Initialize projectile object pool
+func _initialize_projectile_pool() -> void:
+	for i in _POOL_SIZE:
+		var proj = BattleProjectile.new()
+		proj.process_mode = Node.PROCESS_MODE_INHERIT
+		_projectile_pool.append(proj)
+
+## Get a projectile from pool (creates new if pool exhausted)
+func _get_pooled_projectile() -> BattleProjectile:
+	if _projectile_pool.size() > 0:
+		return _projectile_pool.pop_back()
+	# Fallback: create new if pool exhausted
+	return BattleProjectile.new()
+
+## Return projectile to pool for reuse
+func _return_projectile_to_pool(proj: BattleProjectile) -> void:
+	# Remove from scene tree first (before accessing transform properties)
+	if proj.get_parent():
+		proj.get_parent().remove_child(proj)
+	
+	# Reset projectile state (only if still valid)
+	if is_instance_valid(proj):
+		proj._traveling = false
+		proj.position = Vector3.ZERO  # Use position instead of global_position
+		proj.rotation = Vector3.ZERO
+		proj.scale = Vector3.ONE
+		proj.damage_data.clear()
+		
+		# Add back to pool if not full
+		if _projectile_pool.size() < _POOL_SIZE:
+			_projectile_pool.append(proj)
+		else:
+			proj.queue_free()
 
 var is_executing_card: bool = false
 
@@ -203,10 +287,11 @@ func execute_card_with_config(card: CardConfig, target: Battler) -> void:
 	# Determine if this is an AOE effect
 	var is_aoe = card_cfg.target_type in [CardConfig.TargetScope.ALL_ENEMIES, CardConfig.TargetScope.ALL_ALLIES, CardConfig.TargetScope.ALL_UNITS, CardConfig.TargetScope.ALL_ALLIES_SELF]
 	
-	# Phase 0: Movement Phase (for non-AOE enemy targeting)
+	# Phase 0: Movement Phase (for non-AOE enemy melee targeting)
 	var movement_time := 0.0
 	var should_return_to_position = false
-	if not is_aoe and card_cfg.target_type == CardConfig.TargetScope.SINGLE_ENEMY and target:
+	var is_ranged = card_cfg.projectile_enabled or "ranged" in card_cfg.card_tags
+	if not is_aoe and not is_ranged and card_cfg.target_type == CardConfig.TargetScope.SINGLE_ENEMY and target:
 		# Store original position before movement so we can return later
 		var original_pos_before_move = current_player_battler.global_position
 		should_return_to_position = true  # Store decision before target might die
@@ -285,8 +370,13 @@ func execute_animation_phase_with_hit_timing(card_cfg: CardConfig, context: Dict
 		# Start the animation
 		if actor.has_method("_try_animation"):
 			actor._try_animation(animation_name)
-		
-		# Wait for hit moment signal to apply damage
+
+		# Wait a few frames for the state machine to process the transition
+		await get_tree().process_frame
+		await get_tree().process_frame
+
+		# For projectile cards, launch projectile at hit moment (damage applied on impact)
+		# For non-projectile cards, apply damage at hit moment
 		if actor.has_signal("hit_moment"):
 			var hit_time = Time.get_ticks_msec() / 1000.0
 			await actor.hit_moment
@@ -302,7 +392,10 @@ func execute_animation_phase_with_hit_timing(card_cfg: CardConfig, context: Dict
 				context["qte_success"] = qte_result
 				context["qte_success_set"] = true
 
-			await execute_effect_phase(card_cfg, context, true)
+			if card_cfg.projectile_enabled:
+				await launch_projectile_and_await_impact(card_cfg, context)
+			else:
+				await execute_effect_phase(card_cfg, context, true)
 			context["damage_applied_at_hit"] = true
 
 			# Stop animation if target died
@@ -735,13 +828,14 @@ func execute_single_strike_inline(context: Dictionary) -> void:
 		
 		# Apply damage for this strike with strike-specific multiplier
 		var strike_multiplier = 1.2 if context.get("qte_success", false) else 0.8
-		
-		# All strikes fire damage WITHOUT await so the target's hit-reaction plays in
-		# parallel. The clip_remainder timer below is the sole timing mechanism for all
-		# strikes — awaiting damage here (even on the last hit) blocked for the full
-		# hit-animation duration before allow_combat_to_idle could be set, causing the
-		# freeze before walk_back / idle. Defeat handling runs as a background coroutine.
-		apply_strike_damage_inline(context, damage_multiplier, strike_multiplier)
+
+		var _strike_card_cfg: CardConfig = context.get("card_config")
+		if _strike_card_cfg and _strike_card_cfg.projectile_enabled:
+			# Projectile handles its own damage on impact
+			var wait_for_impact: bool = _strike_card_cfg.projectile_wait_for_impact if "projectile_wait_for_impact" in _strike_card_cfg else true
+			await _travel_projectile(_strike_card_cfg, actor, context["target"], damage_multiplier * strike_multiplier, [], [], wait_for_impact)
+		else:
+			apply_strike_damage_inline(context, damage_multiplier, strike_multiplier)
 		context["damage_applied_at_hit"] = true
 	
 	# Wait out the remainder of this strike's clip before the next strike (or the
@@ -1160,7 +1254,11 @@ func get_ap_info() -> Dictionary:
 			"max_ap": ap_system.get_max_ap(),
 			"ap_percentage": ap_system.get_ap_percentage()
 		}
-	return {}
+	return {
+		"current_ap": 0,
+		"max_ap": 0,
+		"ap_percentage": 0.0
+	}
 
 func await_qte_completion() -> bool:
 	# Helper function to wait for QTE completion with robust safety mechanisms
@@ -1192,5 +1290,368 @@ func await_qte_completion() -> bool:
 		
 		if qte_manager.qte_completed.is_connected(completion_handler):
 			qte_manager.qte_completed.disconnect(completion_handler)
+
+		return state["success"]
+	else:
+		return false
+
+## Travel a single projectile scene from [param actor] to [param target] and await arrival.
+## Applies damage on impact. Handles multi-strike and multi-projectile correctly.
+## [param used_spawn_positions] tracks already-used spawn positions to prevent overlap
+## [param used_target_positions] tracks already-used target positions to prevent path overlap
+## [param wait_for_impact] if true, waits for projectile to hit; if false, returns after launch
+func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float = 1.0, used_spawn_positions: Array[Vector3] = [], used_target_positions: Array[Vector3] = [], wait_for_impact: bool = true) -> void:
+	if card_cfg.projectile_scene.is_empty() or not ResourceLoader.exists(card_cfg.projectile_scene):
+		push_error("BattleProjectile: projectile_scene not found — " + card_cfg.projectile_scene)
+		return
+
+	# Check background preload first
+	var proj_res: PackedScene = _complete_preload(card_cfg.projectile_scene)
+
+	# Fallback to synchronous load if preload didn't complete
+	if not proj_res:
+		proj_res = load(card_cfg.projectile_scene)
+		if proj_res is PackedScene:
+			_projectile_cache[card_cfg.projectile_scene] = proj_res
+
+	if not proj_res is PackedScene:
+		return
+
+	# Spawn projectile in front of the actor (using their forward direction)
+	var actor_forward = -actor.global_transform.basis.z.normalized()  # -Z is forward in Godot
+	var base_spawn_pos = actor.global_position + (actor_forward * 0.5) + Vector3(0, 1.2, 0)
 	
-	return state["success"]
+	# Add random spread to spawn position for variety (ring facing forward from actor)
+	var spawn_spread: float = card_cfg.projectile_spawn_spread if "projectile_spawn_spread" in card_cfg else 0.0
+	var spawn_pos = base_spawn_pos
+	if spawn_spread > 0.0:
+		# Create local grid for sequential mode (each projectile fired separately)
+		var occupied_cells: Dictionary = {}
+		# Pass actor_forward to create ring facing outward from actor
+		spawn_pos = _calculate_spread_position(base_spawn_pos, spawn_spread, occupied_cells, used_spawn_positions, 10, actor_forward)
+	
+	# Determine target position - use center for AOE projectiles
+	var base_hit_pos: Vector3
+	var is_aoe_projectile = card_cfg.get("projectile_aoe") if "projectile_aoe" in card_cfg else false
+	if is_aoe_projectile and _aoe_execution_context.has(card_cfg):
+		base_hit_pos = _aoe_execution_context[card_cfg].center_position
+	else:
+		base_hit_pos = target.global_position + Vector3(0, 1.0, 0)
+	
+	# Trajectory spread randomizes the PATH, not the target position
+	# Projectiles always reach the target but take slightly different curved paths
+	var trajectory_spread: float = card_cfg.projectile_trajectory_spread if "projectile_trajectory_spread" in card_cfg else 0.0
+	var hit_pos = base_hit_pos
+
+	# Create BattleProjectile container (from pool for performance)
+	var battle_proj := _get_pooled_projectile()
+	get_tree().current_scene.add_child(battle_proj)
+	battle_proj.global_position = spawn_pos
+
+	# Instantiate projectile VFX as child of container
+	var proj_vfx: Node3D = proj_res.instantiate()
+	battle_proj.add_child(proj_vfx)
+	proj_vfx.position = Vector3.ZERO  # Relative to container
+	proj_vfx.scale = card_cfg.projectile_scale if "projectile_scale" in card_cfg else Vector3.ONE
+
+	# Set damage data for this projectile
+	var damage_data = {
+		"actor": actor,
+		"target": target,
+		"card_cfg": card_cfg,
+		"damage_multiplier": damage_multiplier,
+		"battle_manager": battle_manager
+	}
+	
+	# Check if this is an AOE projectile (single projectile hitting multiple targets)
+	if is_aoe_projectile:
+		# Check execution context
+		var aoe_targets = []
+		if _aoe_execution_context.has(card_cfg):
+			aoe_targets = _aoe_execution_context[card_cfg].targets
+		
+		if not aoe_targets.is_empty():
+			damage_data["aoe_targets"] = aoe_targets
+	
+	battle_proj.damage_data = damage_data
+
+	# Connect to arrived signal to apply damage on impact and cleanup
+	# Only connect callback if we're NOT waiting for impact (otherwise we handle it synchronously)
+	if not wait_for_impact:
+		var aoe_targets = damage_data.get("aoe_targets", [])
+		# Store callback data in damage_data instead of binding arguments
+		damage_data["callback_data"] = {
+			"proj_vfx": proj_vfx,
+			"card_cfg": card_cfg,
+			"target": target,
+			"actor": actor,
+			"damage_multiplier": damage_multiplier,
+			"aoe_targets": aoe_targets
+		}
+		# Also store a direct reference to card_cfg at top level for safety
+		damage_data["card_cfg"] = card_cfg
+		damage_data["target"] = target
+		damage_data["actor"] = actor
+		damage_data["damage_multiplier"] = damage_multiplier
+		damage_data["aoe_targets"] = aoe_targets
+		# Disconnect any existing connection first to prevent errors from pooled projectiles
+		if battle_proj.arrived.get_connections().size() > 0:
+			for connection in battle_proj.arrived.get_connections():
+				battle_proj.arrived.disconnect(connection.callable)
+		battle_proj.arrived.connect(_on_projectile_arrived_with_data.bind(battle_proj))
+	
+	# Apply trajectory spread: randomize the arc height for path variety
+	# Projectiles always reach the target but take different curved paths
+	if trajectory_spread > 0.0:
+		# Randomize arc height by ±trajectory_spread
+		var arc_variance = (randf() - 0.5) * 2.0 * trajectory_spread  # -spread to +spread
+		battle_proj.arc_height = max(0.0, card_cfg.projectile_arc + arc_variance)
+	else:
+		battle_proj.arc_height = card_cfg.projectile_arc
+
+	# Launch using BattleProjectile component with curve parameters
+	battle_proj.speed = card_cfg.projectile_speed
+	battle_proj.speed_curve = card_cfg.projectile_speed_curve
+	battle_proj.arc_curve = card_cfg.projectile_arc_curve
+	battle_proj.curve_influence = card_cfg.projectile_curve_influence
+	battle_proj.launch(spawn_pos, hit_pos)
+
+	# If VFX child has play method, play open animation on spawn
+	if proj_vfx.has_method("play"):
+		proj_vfx.play()
+
+	# Wait for arrival if configured
+	if wait_for_impact:
+		await battle_proj.arrived
+		
+		# Play close animation on impact
+		if is_instance_valid(proj_vfx) and proj_vfx.has_method("stop"):
+			proj_vfx.stop()
+
+		# Clean up VFX child
+		if is_instance_valid(proj_vfx):
+			proj_vfx.queue_free()
+		
+		# Apply damage for projectiles BEFORE returning to pool
+		var aoe_targets = battle_proj.damage_data.get("aoe_targets", []) if battle_proj.damage_data else []
+		await _apply_projectile_damage(card_cfg, actor, target, damage_multiplier, aoe_targets)
+		
+		# Return container to pool AFTER damage is applied
+		if is_instance_valid(battle_proj):
+			_return_projectile_to_pool(battle_proj)
+	else:
+		# Apply strike delay if not waiting for impact
+		var strike_delay: float = card_cfg.projectile_strike_delay if "projectile_strike_delay" in card_cfg else 0.3
+		if strike_delay > 0:
+			await get_tree().create_timer(strike_delay).timeout
+		
+		# Projectile will handle its own damage and cleanup via arrived signal callback
+		# Don't apply damage here since projectile callback will handle it on impact
+
+	# Spawn impact VFX at target if configured
+	if card_cfg.vfx_on_target and is_instance_valid(target):
+		var vfx = card_cfg.vfx_on_target.spawn_vfx(target.global_position, target)
+		if vfx:
+			get_tree().current_scene.add_child(vfx)
+
+## Called when a projectile with BattleProjectile component arrives at target
+## Only used when NOT waiting for impact (cleanup is handled synchronously when waiting)
+## Reads callback data from damage_data to avoid bind() type issues
+func _on_projectile_arrived_with_data(battle_proj: BattleProjectile) -> void:
+	if not battle_proj or not battle_proj.damage_data:
+		return
+	
+	# Read from top-level damage_data first (more reliable), fallback to callback_data
+	var proj_vfx = battle_proj.damage_data.get("callback_data", {}).get("proj_vfx")
+	var card_cfg = battle_proj.damage_data.get("card_cfg")
+	var target = battle_proj.damage_data.get("target")
+	var actor = battle_proj.damage_data.get("actor")
+	var damage_multiplier = battle_proj.damage_data.get("damage_multiplier", 1.0)
+	var aoe_targets = battle_proj.damage_data.get("aoe_targets", [])
+	
+	# Apply damage on impact
+	await _apply_projectile_damage(card_cfg, actor, target, damage_multiplier, aoe_targets)
+	
+	# Play close animation
+	if is_instance_valid(proj_vfx) and proj_vfx.has_method("stop"):
+		proj_vfx.stop()
+	
+	# Clean up VFX child
+	if is_instance_valid(proj_vfx):
+		proj_vfx.queue_free()
+	
+	# Return container to pool
+	if is_instance_valid(battle_proj):
+		_return_projectile_to_pool(battle_proj)
+
+## Apply damage from projectile impact
+func _apply_projectile_damage(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float, aoe_targets: Array = []) -> void:
+	if not battle_manager or not card_cfg.primary_effect:
+		return
+	
+	# Check if this is an AOE projectile (from aoe_targets parameter)
+	var projectile_aoe = card_cfg.get("projectile_aoe") if card_cfg.has_method("get") else false
+	var targets_to_damage: Array[Node3D] = []
+	
+	if projectile_aoe and not aoe_targets.is_empty():
+		for t in aoe_targets:
+			if t is Node3D and is_instance_valid(t):
+				targets_to_damage.append(t)
+	
+	# If no AOE targets or not AOE, use the single target
+	if targets_to_damage.is_empty():
+		if is_instance_valid(target):
+			targets_to_damage.append(target)
+	
+	# Apply damage to all targets simultaneously (no await)
+	for t in targets_to_damage:
+		if not is_instance_valid(t):
+			continue
+		
+		var base_val = card_cfg.primary_effect._calculate_value(actor, 1)
+		var final_val := int(base_val * damage_multiplier)
+		var dmg_type: String = card_cfg.primary_effect.damage_type \
+			if "damage_type" in card_cfg.primary_effect else "physical"
+		var elem: String = card_cfg.primary_effect.element \
+			if "element" in card_cfg.primary_effect else "none"
+		battle_manager.damage_calculation(actor, t, final_val, null, dmg_type, elem)
+
+## Calculate a spread position with collision detection
+## [param base_pos] Center position to spread around
+## [param spread_radius] Maximum spread distance in world units (meters)
+## [param occupied_cells] Dictionary tracking used grid cells for collision avoidance
+## [param used_positions] Array tracking all used positions for this volley
+## [param max_attempts] Maximum retry attempts before fallback
+## [param forward_direction] Optional forward direction for oriented ring spread (if provided, creates ring facing this direction)
+## Returns a valid spread position
+func _calculate_spread_position(base_pos: Vector3, spread_radius: float, occupied_cells: Dictionary, used_positions: Array[Vector3], max_attempts: int = 10, forward_direction: Vector3 = Vector3.ZERO) -> Vector3:
+	if spread_radius <= 0.0:
+		return base_pos
+	
+	var attempt = 0
+	var found_unique = false
+	var candidate_pos = base_pos
+	
+	while attempt < max_attempts and not found_unique:
+		# Use sqrt(randf()) for uniform area distribution (prevents center bias)
+		var angle = randf() * TAU
+		var radius = sqrt(randf()) * spread_radius
+		
+		var spread_offset: Vector3
+		if forward_direction.length_squared() > 0.01:
+			# Create ring facing forward direction (perpendicular to forward)
+			# Ring is in the plane perpendicular to forward direction
+			var right = forward_direction.cross(Vector3.UP).normalized()
+			var up = right.cross(forward_direction).normalized()
+			spread_offset = (right * cos(angle) + up * sin(angle)) * radius
+		else:
+			# Circular spread on horizontal plane (default behavior)
+			spread_offset = Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+		
+		candidate_pos = base_pos + spread_offset
+		
+		# Check collision using spatial grid
+		var grid_x = floor(candidate_pos.x / _GRID_CELL_SIZE)
+		var grid_z = floor(candidate_pos.z / _GRID_CELL_SIZE)
+		var grid_key = Vector2i(grid_x, grid_z)
+		
+		var too_close = false
+		if grid_key in occupied_cells:
+			too_close = true
+		else:
+			# Check adjacent cells for minimum distance
+			for dx in range(-1, 2):
+				for dz in range(-1, 2):
+					var neighbor_key = Vector2i(grid_x + dx, grid_z + dz)
+					if neighbor_key in occupied_cells:
+						too_close = true
+						break
+				if too_close:
+					break
+		
+		if not too_close:
+			used_positions.append(candidate_pos)
+			occupied_cells[grid_key] = 1
+			found_unique = true
+		
+		attempt += 1
+	
+	# If we couldn't find a unique position after max attempts, just use the last candidate
+	# This ensures the projectile still fires even if slightly overlapping
+	return candidate_pos
+
+## Pre-calculate spread positions for simultaneous fire
+## Uses random distribution matching sequential mode for consistency
+func _precalculate_spread_positions(card_cfg: CardConfig, actor: Node3D, target: Node3D, count: int, out_spawn_positions: Array[Vector3], out_target_positions: Array[Vector3]) -> void:
+	var actor_forward = -actor.global_transform.basis.z.normalized()
+	var base_spawn_pos = actor.global_position + (actor_forward * 0.5) + Vector3(0, 1.2, 0)
+	var base_hit_pos = target.global_position + Vector3(0, 1.0, 0)
+	
+	var spawn_spread: float = card_cfg.projectile_spawn_spread if "projectile_spawn_spread" in card_cfg else 0.0
+	
+	# Use global spatial grid for the entire volley to prevent overlap
+	var occupied_spawn_cells: Dictionary = {}
+	var used_spawn_positions: Array[Vector3] = []
+	
+	for i in count:
+		# Calculate spawn position with collision detection (ring facing forward from actor)
+		var spawn_pos = _calculate_spread_position(base_spawn_pos, spawn_spread, occupied_spawn_cells, used_spawn_positions, 10, actor_forward)
+		
+		# Target position is always the actual target (no spread)
+		# Trajectory spread will be applied to arc height, not target position
+		out_spawn_positions.append(spawn_pos)
+		out_target_positions.append(base_hit_pos)
+
+## Preload all projectile scenes at combat start
+func preload_all_projectile_scenes() -> void:
+	# Collect all card configs from decks
+	for deck in decks_by_battler.values():
+		if deck:
+			# Preload from draw pile
+			for card_cfg in deck.draw_pile:
+				if card_cfg and card_cfg.projectile_enabled and not card_cfg.projectile_scene.is_empty():
+					_preload_projectile_scene(card_cfg.projectile_scene)
+
+## Launch projectile(s) toward the target. Each projectile handles its own damage on impact.
+## Handles [code]consume_hand_cards[/code] multi-projectile stagger internally.
+func launch_projectile_and_await_impact(card_cfg: CardConfig, context: Dictionary) -> void:
+	var actor: Node3D  = context["actor"]
+	var target: Node3D = context["target"]
+	var qte_multiplier := context.get("qte_multiplier", 1.0) as float
+
+	# --- Determine projectile count and discard hand cards if needed -------
+	var hand_multiplier := 1
+	if card_cfg.primary_effect and card_cfg.primary_effect.consume_hand_cards:
+		var deck := _get_current_deck()
+		if deck:
+			var other_cards: Array[CardConfig] = []
+			for c in deck.get_hand():
+				# Exclude the playing card by object identity to handle multiple Card Salvo cards
+				if c != card_cfg:
+					other_cards.append(c)
+			hand_multiplier = max(1, other_cards.size())
+			for c in other_cards:
+				deck.discard_card(c)
+
+	# --- Fire projectiles (configurable stagger or simultaneous) -------------
+	var fire_simultaneously: bool = card_cfg.projectile_fire_simultaneously if "projectile_fire_simultaneously" in card_cfg else false
+	
+	# Track used positions to prevent overlap
+	var used_spawn_positions: Array[Vector3] = []
+	var used_target_positions: Array[Vector3] = []
+	
+	if fire_simultaneously:
+		# Pre-calculate positions for simultaneous fire to eliminate retry loop
+		_precalculate_spread_positions(card_cfg, actor, target, hand_multiplier, used_spawn_positions, used_target_positions)
+		
+		# Fire all at once, no waiting between projectiles
+		for i in hand_multiplier:
+			_travel_projectile(card_cfg, actor, target, qte_multiplier, used_spawn_positions, used_target_positions)
+		# Wait for all to finish (short delay to ensure all launched)
+		await get_tree().create_timer(0.5).timeout
+	else:
+		# Fire with staggered delays
+		for i in hand_multiplier:
+			if i > 0:
+				await get_tree().create_timer(0.15).timeout
+			await _travel_projectile(card_cfg, actor, target, qte_multiplier, used_spawn_positions, used_target_positions)

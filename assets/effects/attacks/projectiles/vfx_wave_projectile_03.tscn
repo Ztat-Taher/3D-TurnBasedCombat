@@ -94,7 +94,7 @@ tracks/4/keys = {
 }
 
 [sub_resource type="Animation" id="Animation_2xbmx"]
-resource_name = "main"
+resource_name = "open"
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
@@ -145,7 +145,7 @@ tracks/3/keys = {
 }
 
 [sub_resource type="Animation" id="Animation_dtgg3"]
-resource_name = "oneshot"
+resource_name = "close"
 length = 0.6
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -211,8 +211,8 @@ tracks/4/keys = {
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_e2thh"]
 _data = {
 &"RESET": SubResource("Animation_e2thh"),
-&"main": SubResource("Animation_2xbmx"),
-&"oneshot": SubResource("Animation_dtgg3")
+&"open": SubResource("Animation_2xbmx"),
+&"close": SubResource("Animation_dtgg3")
 }
 
 [node name="MProjectileWaveVFX_03" type="Node3D" unique_id=1236345319]

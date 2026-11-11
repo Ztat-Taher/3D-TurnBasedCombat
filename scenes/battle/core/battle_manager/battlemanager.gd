@@ -16,6 +16,11 @@ extends Node3D
 
 enum BattleEndCondition { WIN, CUTSCENE, DEFEAT, ESCAPE }
 
+## Execution context for AOE projectiles
+class ProjectileExecutionContext:
+	var center_position: Vector3
+	var targets: Array[Battler]
+
 ## Emitted once the battle reaches an end condition (WIN, DEFEAT, ESCAPE, CUTSCENE).
 ## Level wrappers connect to this to continue the run flow (next battle / run over / replay).
 signal battle_ended(end_condition: BattleEndCondition)
@@ -374,11 +379,20 @@ func _input(event: InputEvent) -> void:
 		current_target = target
 		var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
 		if pending_card:
-			if battle_camera:
-				battle_camera.set_target_focus(current_target)
-			var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
-			if card_battle_manager:
-				_execute_card_async(card_battle_manager, pending_card, current_target)
+			# Check if this is an AOE projectile card
+			var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
+			var projectile_aoe = false
+			if is_aoe and pending_card and pending_card.has_method("get"):
+				projectile_aoe = pending_card.get("projectile_aoe") if "projectile_aoe" in pending_card else false
+			
+			if is_aoe and projectile_aoe:
+				await _execute_aoe_projectile_card(pending_card, valid_targets)
+			else:
+				if battle_camera:
+					battle_camera.set_target_focus(current_target)
+				var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+				if card_battle_manager:
+					_execute_card_async(card_battle_manager, pending_card, current_target)
 			set_meta("pending_card", null)
 			exit_targeting_mode()
 		elif queued_item:
@@ -491,8 +505,6 @@ func target_selected(target: Battler) -> void:
 	
 	# Check if this is AOE mode (no individual targeting)
 	var is_aoe_mode = get_meta("is_aoe_mode") if has_meta("is_aoe_mode") else false
-	if is_aoe_mode:
-		return
 	
 	if pending_card:
 		set_meta("pending_card", null)
@@ -518,7 +530,16 @@ func target_selected(target: Battler) -> void:
 		
 		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 		if card_battle_manager:
-			_execute_card_async(card_battle_manager, pending_card, target)
+			# Check if this is an AOE projectile card and handle it specially
+			var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
+			var projectile_aoe = false
+			if is_aoe and pending_card and pending_card.has_method("get"):
+				projectile_aoe = pending_card.get("projectile_aoe") if "projectile_aoe" in pending_card else false
+			
+			if is_aoe and projectile_aoe:
+				await _execute_aoe_projectile_card(pending_card, valid_targets)
+			else:
+				_execute_card_async(card_battle_manager, pending_card, target)
 		return
 		
 	# Clear ALL targets' selection states first - only ONE highlight allowed
@@ -978,11 +999,20 @@ func _handle_mouse_click_target_selection() -> void:
 					current_target = battler
 					var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
 					if pending_card:
-						if battle_camera:
-							battle_camera.set_target_focus(current_target)
-						var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
-						if card_battle_manager:
-							_execute_card_async(card_battle_manager, pending_card, current_target)
+						# Check if this is an AOE projectile card
+						var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
+						var projectile_aoe = false
+						if is_aoe and pending_card and pending_card.has_method("get"):
+							projectile_aoe = pending_card.get("projectile_aoe") if "projectile_aoe" in pending_card else false
+						
+						if is_aoe and projectile_aoe:
+							await _execute_aoe_projectile_card(pending_card, valid_targets)
+						else:
+							if battle_camera:
+								battle_camera.set_target_focus(current_target)
+							var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+							if card_battle_manager:
+								_execute_card_async(card_battle_manager, pending_card, current_target)
 						set_meta("pending_card", null)
 						exit_targeting_mode()
 					else:
@@ -1029,6 +1059,14 @@ func _find_and_exclude_collision_bodies(node: Node, exclude_list: Array[RID]) ->
 		_find_and_exclude_collision_bodies(child, exclude_list)
 
 func _cycle_controller_target(direction: int) -> void:
+	# Check if we're in AOE mode - if so, don't cycle targets
+	var is_aoe = false
+	if has_meta("is_aoe_mode"):
+		is_aoe = get_meta("is_aoe_mode")
+	
+	if is_aoe:
+		return  # Skip cycling in AOE mode
+	
 	# Clear ALL targets' selection states first - only ONE highlight allowed
 	for battler in valid_targets:
 		if battler is Battler:
@@ -1100,6 +1138,38 @@ func _cycle_controller_target(direction: int) -> void:
 		# Move camera to show the newly highlighted target
 		if battle_camera:
 			battle_camera.set_target_focus(current_controller_target)
+
+## Execute AOE projectile card - calculates center position and passes targets via context
+func _execute_aoe_projectile_card(pending_card: CardConfig, valid_targets: Array) -> void:
+	# Calculate center position of all valid targets
+	var center_pos = Vector3.ZERO
+	var target_count = 0
+	for t in valid_targets:
+		if t is Battler and not t.is_defeated():
+			center_pos += t.global_position
+			target_count += 1
+	
+	if target_count > 0:
+		center_pos = center_pos / target_count
+		center_pos.y = 1.0
+	
+	# Create execution context
+	var context = BattleManager.ProjectileExecutionContext.new()
+	context.center_position = center_pos
+	context.targets = valid_targets.duplicate()
+	
+	# Store context in card_battle_manager
+	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+	if card_battle_manager:
+		card_battle_manager._aoe_execution_context[pending_card] = context
+	
+	# Execute with first target but projectile will use center
+	if card_battle_manager:
+		await _execute_card_async(card_battle_manager, pending_card, valid_targets[0])
+	
+	# Cleanup context after card execution completes
+	if card_battle_manager:
+		card_battle_manager._aoe_execution_context.erase(pending_card)
 
 func _cancel_action_target_selection() -> void:
 	exit_targeting_mode()

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CardEffect" format=3 uid="uid://baacy0p1e1gci"]
+
+[ext_resource type="Script" uid="uid://by6qea4gp8ecb" path="res://scenes/battle/card_combat/resources/cards/card_effect.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+value = 14
+scaling = {
+"attack": 0.4,
+"magic": 0.4
+}
+crit_multiplier = 1.5
+damage_type = "magical"
+element = "magic"
+consume_hand_cards = true

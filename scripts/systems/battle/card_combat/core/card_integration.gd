@@ -118,9 +118,9 @@ func _on_card_selected(card: CardConfig):
 				start_targeting_mode(card, "enemy", targets)
 		
 		CardConfig.TargetScope.ALL_ENEMIES:
-			# AOE on all enemies
+			# AOE on all enemies - use same targeting system but mark as AOE
 			if targets.size() > 0:
-				start_aoe_targeting_mode(card, targets, "enemy")
+				start_targeting_mode(card, "enemy", targets, true)
 		
 		CardConfig.TargetScope.SINGLE_ALLY:
 			# Single ally targeting
@@ -128,14 +128,14 @@ func _on_card_selected(card: CardConfig):
 				start_targeting_mode(card, "ally", targets)
 		
 		CardConfig.TargetScope.ALL_ALLIES:
-			# AOE on all allies
+			# AOE on all allies - use same targeting system but mark as AOE
 			if targets.size() > 0:
-				start_aoe_targeting_mode(card, targets, "ally")
+				start_targeting_mode(card, "ally", targets, true)
 		
 		CardConfig.TargetScope.ALL_ALLIES_SELF:
-			# AOE on all allies including self
+			# AOE on all allies including self - use same targeting system but mark as AOE
 			if targets.size() > 0:
-				start_aoe_targeting_mode(card, targets, "ally")
+				start_targeting_mode(card, "ally", targets, true)
 		
 		CardConfig.TargetScope.SINGLE_TARGET:
 			# Can target any single unit
@@ -143,9 +143,9 @@ func _on_card_selected(card: CardConfig):
 				start_targeting_mode(card, "any", targets)
 		
 		CardConfig.TargetScope.ALL_UNITS:
-			# AOE on all units
+			# AOE on all units - use same targeting system but mark as AOE
 			if targets.size() > 0:
-				start_aoe_targeting_mode(card, targets, "any")
+				start_targeting_mode(card, "any", targets, true)
 		
 		_:
 			# Fallback to existing behavior
@@ -162,7 +162,7 @@ func get_targets_for_card(card: CardConfig, target_scope: CardConfig.TargetScope
 	
 	return card.get_targets(actor, available_enemies, available_allies)
 
-func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provided_targets: Array = []):
+func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provided_targets: Array = [], is_aoe: bool = false):
 	if not battle_manager:
 		return
 	
@@ -191,6 +191,7 @@ func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provi
 	battle_manager.valid_targets = available_targets
 	battle_manager.set_meta("target_type", target_type)  # Track target type
 	battle_manager.current_target_type = target_type  # Sync target type to battle manager variable
+	battle_manager.set_meta("is_aoe_mode", is_aoe)  # Mark as AOE
 	
 	# Reset keyboard target index for cycling
 	battle_manager.keyboard_target_index = 0
@@ -212,6 +213,9 @@ func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provi
 		if target is Battler:
 			target.is_valid_target = true
 			target.is_selectable = true
+			# In AOE mode, highlight all targets immediately
+			if is_aoe:
+				target.is_targeted = true
 	
 	# Set the first target as the default selector ONLY for navigation purposes
 	# But don't call set_as_keyboard_target() which would trigger camera focus
@@ -225,31 +229,6 @@ func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provi
 	# Update HUD: hide cards & action buttons, show cancel target button
 	if battle_manager.hud and battle_manager.hud.has_method("set_targeting_mode"):
 		battle_manager.hud.set_targeting_mode(true)
-
-func start_aoe_targeting_mode(card: CardConfig, targets: Array[Battler], target_type: String = "enemy"):
-	if not battle_manager:
-		return
-	
-	if targets.size() == 0:
-		return
-	
-	# Set camera based on target type
-	if battle_manager.battle_camera:
-		if target_type == "enemy":
-			battle_manager.battle_camera.set_enemy_overview(targets)
-		else:
-			# For ally AOE, use default camera showing all entities
-			battle_manager.battle_camera.set_default_camera()
-	
-	# Store AOE targets for execution
-	battle_manager.set_meta("aoe_targets", targets)
-	battle_manager.set_meta("pending_card", card)
-	battle_manager.set_meta("target_type", target_type)
-	battle_manager.set_meta("is_aoe_mode", true)
-	
-	# Update HUD: show confirm button, hide individual targeting
-	if battle_manager.hud and battle_manager.hud.has_method("set_aoe_confirmation_mode"):
-		battle_manager.hud.set_aoe_confirmation_mode(true, card.card_name, targets.size())
 
 func _on_end_turn_pressed():
 	# Execute cards and then let battle manager handle turn advancement

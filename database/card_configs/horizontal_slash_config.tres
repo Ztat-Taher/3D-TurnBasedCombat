@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="CardConfig" format=3 uid="uid://dx8k2k4m5n7p4"]
+
+[ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
+[ext_resource type="Resource" uid="uid://u1e7kn5o2xed" path="res://database/card_effects/basic_attack_damage.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+animation_name = "melee_combo_1"
+target_type = 2
+primary_effect = ExtResource("2")
+effect_timing = 0
+projectile_enabled = true
+projectile_scene = "res://assets/effects/attacks/slash/vfx_blank_slash.tscn"
+projectile_speed = 15.0
+projectile_lifetime = 1.0
+projectile_scale = Vector3(2, 2, 2)
+projectile_aoe = true
+qte_type_string = "timing"
+qte_window_duration = 0.5
+qte_success_multiplier = 1.2
+qte_failure_multiplier = 0.8
+qte_mash_count = 0
+qte_mash_window = 0.0
+state_chance = 0.0
+state_duration = 0
+card_name = "Horizontal Slash"
+card_rarity = 2
+card_tags = Array[String](["attack", "aoe", "physical"])
+card_description = "A powerful horizontal slash that damages all enemies."
+ap_cost = 2

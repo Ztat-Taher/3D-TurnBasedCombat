@@ -1,14 +1,17 @@
 [gd_resource type="Resource" script_class="DeckResource" format=3 uid="uid://d4e5f6g7h8jaj"]
 
 [ext_resource type="Script" uid="uid://mwh0vw6ftl1r" path="res://scenes/battle/card_combat/resources/cards/deck_resource.gd" id="1"]
-[ext_resource type="Resource" uid="uid://dtckg3jdk81j7" path="res://database/card_configs/basic_attack_config.tres" id="2"]
-[ext_resource type="Resource" uid="uid://h1xh0y51w8uw" path="res://database/card_configs/bleed_strike_config.tres" id="3"]
-[ext_resource type="Resource" uid="uid://dtckg3jdk81j7" path="res://database/card_configs/minor_heal_config.tres" id="4"]
-[ext_resource type="Resource" uid="uid://bxl2j6xk3m9n" path="res://database/card_configs/electrocuted_card_config.tres" id="5"]
-[ext_resource type="Resource" uid="uid://x3m7n9p4q5r6" path="res://database/card_configs/single_shield_config.tres" id="6"]
-[ext_resource type="Resource" uid="uid://a4b8c2d3e4f5" path="res://database/card_configs/flurry_attack_config.tres" id="7"]
+[ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1_pn46r"]
+[ext_resource type="Resource" uid="uid://dtckg3jdk81j7" path="res://database/card_configs/basic_attack_config.tres" id="4"]
+[ext_resource type="Resource" uid="uid://buqu8mejciwfb" path="res://database/card_configs/electrocuted_card_config.tres" id="5"]
+[ext_resource type="Resource" uid="uid://drd4v5nn67ivf" path="res://database/card_configs/single_shield_config.tres" id="6"]
+[ext_resource type="Resource" uid="uid://cb0b0vrwu7rn5" path="res://database/card_configs/flurry_attack_config.tres" id="7"]
+[ext_resource type="Resource" uid="uid://dx8k2k4m5n7p4" path="res://database/card_configs/horizontal_slash_config.tres" id="7_kl4a8"]
+[ext_resource type="Resource" uid="uid://dp71v4b8k2oam" path="res://database/card_configs/pyroclast_barrage_config.tres" id="8"]
+[ext_resource type="Resource" uid="uid://cibk3xqlrmwpq" path="res://database/card_configs/javelin_volley_config.tres" id="9"]
+[ext_resource type="Resource" uid="uid://cx62v8k4n7nab" path="res://database/card_configs/card_salvo_config.tres" id="10"]
 
 [resource]
 script = ExtResource("1")
 deck_name = "Player Starter Deck"
-cards = Array[CardConfig]([ExtResource("3"), ExtResource("4"), ExtResource("6"), ExtResource("6"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("2"), ExtResource("5"), ExtResource("7"), ExtResource("7"), ExtResource("7")])
+cards = Array[ExtResource("1_pn46r")]([ExtResource("4"), ExtResource("6"), ExtResource("4"), ExtResource("4"), ExtResource("5"), ExtResource("7"), ExtResource("10"), ExtResource("8"), ExtResource("7_kl4a8"), ExtResource("9")])

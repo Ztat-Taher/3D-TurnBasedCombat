@@ -35,9 +35,9 @@ void fragment() {
 	wave = wave * circle_mask * max(UV.x * 2.0 - (2.0 - pulse_amount), 0.0);
 	slash += abs(wave);
 	
-	float noise_mask = max(circle_mask, step(UV.x, 0.5));
+	// FIXED: Restricted noise_mask to the circular boundary instead of the square left half
+	float noise_mask = circle_mask;
 	noise_mask = pow((noise_mask - pow(abs(UV.y * 2.0 - 1.0), 4.0)) * UV.x, 0.6);
-	
 	
 	vec2 noise_uv = UV * noise_scale + noise_scroll * TIME;
 	float noise = texture(noise_texture, noise_uv).r;
@@ -46,7 +46,8 @@ void fragment() {
 	float value = clamp(noise - (1.0 - noise_mask) + slash, 0.0, 1.0);
 	value = max(value - effect_decay - edge_position, 0.0);
 	
-	float gradient = clamp(circle_mask + step(UV.x, 0.5), 0.0, 1.0) * pow(UV.x, 4.0);
+	// FIXED: Restricted gradient to circle_mask
+	float gradient = circle_mask * pow(UV.x, 4.0);
 	gradient = max(gradient - effect_decay, 0.0);
 	
 	vec3 color = mix(secondary_color, primary_color, value);
@@ -58,5 +59,6 @@ void fragment() {
 	alpha = clamp(alpha / (1.0 - edge_hardness), 0.0, 1.0);
 	alpha = max(alpha - effect_decay, 0.0);
 	
-	ALPHA = alpha;
+	// FIXED: Multiply final alpha by circle_mask to clip square mesh edges
+	ALPHA = alpha * circle_mask;
 }

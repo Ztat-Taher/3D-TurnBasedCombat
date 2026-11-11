@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="CardConfig" format=3 uid="uid://dp71v4b8k2oam"]
+
+[ext_resource type="Script" uid="uid://d2ohucek24mf6" path="res://scenes/battle/card_combat/resources/cards/card_config.gd" id="1"]
+[ext_resource type="Resource" uid="uid://cx82k6qaq1m2a" path="res://database/card_effects/pyroclast_damage.tres" id="2"]
+
+[sub_resource type="Curve" id="Curve_arc"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.5, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_speed"]
+_data = [Vector2(0, 0.2), 0.0, 0.0, 0, 0, Vector2(0.3, 0.4), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+script = ExtResource("1")
+is_multi_strike = true
+strike_animations = Array[String](["melee_combo_1", "melee_combo_2", "melee_combo_3"])
+strike_multipliers = Array[float]([0.8, 1.0, 1.4])
+strike_qte_difficulties = Array[float]([0.35, 0.45, 0.6])
+strike_qte_windows = Array[float]([0.45, 0.45, 0.5])
+strike_timing = Array[float]([-0.1, -0.1, 0.0])
+primary_effect = ExtResource("2")
+effect_timing = 0
+projectile_enabled = true
+projectile_scene = "res://assets/effects/attacks/projectiles/vfx_fire_projectile_01.tscn"
+projectile_speed = 20.0
+projectile_speed_curve = SubResource("Curve_speed")
+projectile_lifetime = 2.0
+projectile_arc = 2.0
+projectile_arc_curve = SubResource("Curve_arc")
+projectile_curve_influence = 0.7
+projectile_spawn_spread = 1.0
+projectile_trajectory_spread = 5.0
+projectile_wait_for_impact = false
+projectile_strike_delay = 0.0
+projectile_scale = Vector3(0.3, 0.3, 0.3)
+qte_difficulty = 0.0
+qte_window_duration = 0.0
+qte_success_multiplier = 1.0
+qte_mash_count = 0
+qte_mash_window = 0.0
+state_chance = 0.0
+state_duration = 0
+card_name = "Pyroclast Barrage"
+card_rarity = 2
+card_tags = Array[String](["attack", "magic", "fire", "ranged", "multi-strike"])
+card_description = "Unleash a barrage of 3 fiery projectiles. Each strike features timed QTE precision."
+ap_cost = 2

@@ -42,6 +42,7 @@ enum EffectTargeting {
 
 @export var damage_type: String = "physical"        # physical, magical, true_damage
 @export var element: String = "none"                # fire, ice, lightning, earth, air, magic, none
+@export var consume_hand_cards: bool = false        ## If true, damage/value scales with cards consumed from hand
 
 ## Apply this effect to the given context
 func apply_effect(actor: Node, target: Node, all_enemies: Array, all_allies: Array) -> Dictionary:
@@ -106,11 +107,11 @@ func _get_targets(actor: Node, primary_target: Node, all_enemies: Array, all_all
 			return []
 
 ## Calculate final value with scaling
-func _calculate_value(actor: Node) -> int:
+func _calculate_value(actor: Node, multiplier_from_hand: int = 1) -> int:
 	var final_value = value
 	
 	if scaling.is_empty():
-		return final_value
+		return final_value * multiplier_from_hand
 	
 	# Apply stat scaling
 	for stat_name in scaling:
@@ -123,7 +124,7 @@ func _calculate_value(actor: Node) -> int:
 			var stat_value = actor.get(stat_name)
 			final_value += int(stat_value * scaling_value)
 	
-	return final_value
+	return final_value * multiplier_from_hand
 
 ## Apply effect to a single target
 func _apply_to_target(target: Node, calculated_value: int, is_critical: bool, actor: Node = null) -> Dictionary:
@@ -234,7 +235,10 @@ func get_description() -> String:
 	
 	match effect_type:
 		EffectType.DAMAGE:
-			description = "Deal %d damage" % value
+			if consume_hand_cards:
+				description = "Deal %d damage per card discarded" % value
+			else:
+				description = "Deal %d damage" % value
 		EffectType.HEAL:
 			description = "Heal for %d HP" % value
 		EffectType.SHIELD:

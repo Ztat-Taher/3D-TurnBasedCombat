@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dx6gyig48g23b"]
 
-[ext_resource type="Script" path="res://assets/effects/core/vfx_instance.gd" id="1_2abg5"]
+[ext_resource type="Script" uid="uid://dewd1wtm7wb4k" path="res://assets/effects/core/vfx_instance.gd" id="1_2abg5"]
 [ext_resource type="Shader" path="res://assets/effects/shaders/slash.gdshader" id="2_4n718"]
 [ext_resource type="Shader" path="res://assets/effects/shaders/attack_particles.gdshader" id="3_pvdul"]
 
@@ -201,12 +201,6 @@ _data = {
 
 [node name="VFXBlankSlash" type="Node3D" unique_id=650859355]
 script = ExtResource("1_2abg5")
-primary_color = Color(1, 1, 1, 1)
-secondary_color = Color(0.36862746, 0.36862746, 0.36862746, 1)
-tertiary_color = Color(0.078431375, 0.078431375, 0.078431375, 1)
-emission = 2.0
-noise_texture = SubResource("NoiseTexture2D_2abg5")
-edge_hardness = 0.8
 
 [node name="Slash" type="MeshInstance3D" parent="." unique_id=1395752984]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 0)
