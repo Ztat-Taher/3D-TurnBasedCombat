@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="Vestige" format=3 uid="uid://dmfhts51qmsm6"]
+
+[ext_resource type="Texture2D" uid="uid://2pod2rk60po1" path="res://assets/images/ui/vestiges/phoenix_feather.png" id="1_4wqu0"]
+[ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
+[ext_resource type="Script" uid="uid://b0tyiimb82sae" path="res://database/vestiges/trigger_hook.gd" id="3_hook"]
+
+[sub_resource type="Resource" id="TriggerHook_lizard"]
+script = ExtResource("3_hook")
+trigger_type = 6
+effect_script_path = "res://database/vestiges/effects/heal_on_death.gd"
+
+[resource]
+script = ExtResource("1_vest")
+vestige_id = "phoenix_feather"
+vestige_name = "Phoenix Feather"
+description = "When you would die, heal to 50% Max HP once per combat."
+icon = ExtResource("1_4wqu0")
+rarity = 2
+base_price = 250
+trigger_hooks = Array[Resource]([SubResource("TriggerHook_lizard")])

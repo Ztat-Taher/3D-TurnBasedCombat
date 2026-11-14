@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="Vestige" format=3 uid="uid://cet77eweo58o5"]
+
+[ext_resource type="Texture2D" uid="uid://0wq7lmd1xw8u" path="res://assets/images/ui/vestiges/war_banner.png" id="1_06y3c"]
+[ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
+[ext_resource type="Script" uid="uid://b0tyiimb82sae" path="res://database/vestiges/trigger_hook.gd" id="3_hook"]
+
+[sub_resource type="Resource" id="TriggerHook_stuvw"]
+script = ExtResource("3_hook")
+effect_script_path = "res://database/vestiges/effects/gain_stat_on_combat_start.gd"
+
+[resource]
+script = ExtResource("1_vest")
+vestige_id = "war_banner"
+vestige_name = "War Banner"
+description = "Start each combat with +2 Attack."
+icon = ExtResource("1_06y3c")
+rarity = 1
+base_price = 150
+trigger_hooks = Array[Resource]([SubResource("TriggerHook_stuvw")])

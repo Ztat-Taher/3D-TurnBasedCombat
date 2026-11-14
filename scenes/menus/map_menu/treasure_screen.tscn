@@ -1,0 +1,93 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/map/treasure_screen.gd" id="1_script"]
+
+[node name="TreasureScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0, 0, 0, 0.75)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(380, 280)
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+text = "Treasure Chest"
+horizontal_alignment = 1
+
+[node name="VestigeContainer" type="VBoxContainer" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="VestigeName" type="Label" parent="CenterContainer/Panel/VBox/VestigeContainer"]
+layout_mode = 2
+text = "Loading..."
+horizontal_alignment = 1
+
+[node name="VestigeDescription" type="Label" parent="CenterContainer/Panel/VBox/VestigeContainer"]
+layout_mode = 2
+text = "Opening chest..."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="RarityLabel" type="Label" parent="CenterContainer/Panel/VBox/VestigeContainer"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+
+[node name="PartySelectionContainer" type="HBoxContainer" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+visible = false
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="SelectionLabel" type="Label" parent="CenterContainer/Panel/VBox/PartySelectionContainer"]
+layout_mode = 2
+text = "Award to:"
+theme_override_font_sizes/font_size = 12
+
+[node name="Actions" type="HBoxContainer" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="TakeButton" type="Button" parent="CenterContainer/Panel/VBox/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Take Vestige"
+
+[node name="SkipButton" type="Button" parent="CenterContainer/Panel/VBox/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Skip"
+
+[connection signal="pressed" from="CenterContainer/Panel/VBox/Actions/TakeButton" to="." method="_on_take_button_pressed"]
+[connection signal="pressed" from="CenterContainer/Panel/VBox/Actions/SkipButton" to="." method="_on_skip_button_pressed"]

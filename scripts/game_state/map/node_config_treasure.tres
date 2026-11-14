@@ -8,3 +8,6 @@ script = ExtResource("1_node_config")
 node_type = "Treasure"
 icon_texture = ExtResource("2_icon")
 node_color = Color(1, 1, 1, 1)
+vestige_reward_rarity = 0
+vestige_reward_count = 1
+vestige_reward_source = "treasure"

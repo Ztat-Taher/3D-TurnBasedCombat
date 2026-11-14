@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="Vestige" format=3 uid="uid://b4xe7xd4rk45s"]
+
+[ext_resource type="Texture2D" uid="uid://cxvms8lj2g7fj" path="res://assets/images/ui/vestiges/bastion_emblem.png" id="1_qiimp"]
+[ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
+[ext_resource type="Script" uid="uid://b0tyiimb82sae" path="res://database/vestiges/trigger_hook.gd" id="3_hook"]
+
+[sub_resource type="Resource" id="TriggerHook_rhpnq"]
+script = ExtResource("3_hook")
+effect_script_path = "res://database/vestiges/effects/gain_block_on_trigger.gd"
+
+[resource]
+script = ExtResource("1_vest")
+vestige_id = "bastion_emblem"
+vestige_name = "Bastion Emblem"
+description = "Start each combat with 5 block."
+icon = ExtResource("1_qiimp")
+rarity = 1
+base_price = 150
+trigger_hooks = Array[Resource]([SubResource("TriggerHook_rhpnq")])

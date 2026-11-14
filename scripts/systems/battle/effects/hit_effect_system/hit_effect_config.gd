@@ -15,13 +15,21 @@ extends Resource
 ## Spacing radius for circle arrangement (in world units)
 @export var spacing_radius: float = 0.3
 
+## Randomization settings for visual variety
+@export var random_scale_min: float = 0.8  # Minimum random scale multiplier
+@export var random_scale_max: float = 1.2  # Maximum random scale multiplier
+@export var random_rotation_min: float = -45.0  # Minimum random rotation in degrees
+@export var random_rotation_max: float = 45.0  # Maximum random rotation in degrees
+@export var random_mirror: bool = true  # Whether to randomly flip horizontally
+
 ## Spawn this effect on a target battler
 ## target: The battler being hit
 ## center_position: The center position for effects (usually AABB center)
 ## spacing_index: Index of this effect in the sequence (0-based)
 ## total_effects: Total number of effects being spawned
+## battler_depth: The battler's AABB depth (Z size) for dynamic Z offset
 ## Returns the created HitEffect node
-func spawn(target: Battler, center_position: Vector3, spacing_index: int, total_effects: int) -> HitEffect:
+func spawn(target: Battler, center_position: Vector3, spacing_index: int, total_effects: int, battler_depth: float = 1.0) -> HitEffect:
 	if not spritesheet_texture:
 		push_error("HitEffectConfig: No spritesheet texture set")
 		return null
@@ -30,7 +38,10 @@ func spawn(target: Battler, center_position: Vector3, spacing_index: int, total_
 	var spawn_position = calculate_spacing_position(center_position, spacing_index, total_effects, spacing_radius)
 	
 	# Offset Z to appear in front of the target (closer to camera)
-	spawn_position.z += 0.5
+	# Dynamic offset: base 0.5 + small depth adjustment (10% of depth for local space)
+	var z_offset = 0.5 + (battler_depth * 0.1)
+	z_offset = max(z_offset, 0.5)  # Ensure minimum offset
+	spawn_position.z += z_offset
 	
 	# Instantiate the template scene
 	var hit_effect_scene = load("res://scenes/effects/hit_effect.tscn")

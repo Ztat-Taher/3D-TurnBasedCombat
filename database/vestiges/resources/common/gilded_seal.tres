@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Vestige" format=3 uid="uid://cvxun504d5ar6"]
+
+[ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_abc123"]
+[ext_resource type="Texture2D" uid="uid://c3wgbd7c8vn84" path="res://assets/images/ui/vestiges/gilded_seal.png" id="1_h2gpl"]
+
+[resource]
+script = ExtResource("1_abc123")
+vestige_id = "gilded_seal"
+vestige_name = "Gilded Seal"
+description = "Gold rewards increased by 10%."
+icon = ExtResource("1_h2gpl")
+scope = 0
+gold_multiplier = 1.1

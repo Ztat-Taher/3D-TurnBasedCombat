@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="Vestige" format=3 uid="uid://c4swneneqoiu"]
+
+[ext_resource type="Texture2D" uid="uid://bk2oi1lf2opbr" path="res://assets/images/ui/vestiges/flow_token.png" id="1_jyr7b"]
+[ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
+
+[resource]
+script = ExtResource("1_vest")
+vestige_id = "flow_token"
+vestige_name = "Flow Token"
+description = "Cards cost 1 less AP (minimum 0)."
+icon = ExtResource("1_jyr7b")
+rarity = 2
+base_price = 250
+ap_cost_reduction = 1

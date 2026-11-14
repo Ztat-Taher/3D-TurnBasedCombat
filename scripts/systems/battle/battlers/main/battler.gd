@@ -51,6 +51,7 @@ var _old_health: int = 0  # Track previous health for healing detection
 var _cached_effect_center: Vector3 = Vector3.ZERO  # Cached effect center position
 var _cached_effect_top: Vector3 = Vector3.ZERO  # Cached effect top position
 var _cached_effect_bottom: Vector3 = Vector3.ZERO  # Cached effect bottom position
+var _cached_effect_depth: float = 0.0  # Cached battler depth (Z size)
 var _effect_center_cached: bool = false  # Whether the cache is valid
 var _is_initialized: bool = false  # Prevent healing effect during initialization
 
@@ -70,6 +71,11 @@ var is_defending: bool = false
 var current_target = null
 var is_counter_stunned: bool = false  # Stunned by being hit with a counter attack
 var _is_despawning: bool = false
+
+# Vestiges system
+var active_vestiges: Array[Vestige] = []
+var vestige_stacks: Dictionary = {}  # vestige_id -> stack_count
+var _party_member_id: String = ""  # Link to AllyPartyMember for per-character vestiges
 
 # Walking animation system
 var is_advancing: bool = false
@@ -315,6 +321,10 @@ var attack_indicator: AttackIndicator3D = null
 func _ready():
 	_collect_meshes()
 	
+	# Set battler depth on number indicator if available
+	if number_indicator and number_indicator.has_method("set_battler_depth"):
+		number_indicator.set_battler_depth(get_effect_depth())
+	
 	# Disconnect any existing connections first
 	if SignalBus.select_target.is_connected(check_select_target):
 		SignalBus.select_target.disconnect(check_select_target)
@@ -375,6 +385,10 @@ func _ready():
 	
 	# Initialize attack indicator for enemies
 	_initialize_attack_indicator()
+	
+	# Initialize vestiges for allies
+	if team == TEAM.ALLY:
+		_initialize_vestiges()
 
 ## Animation callback methods called by AnimationPlayer method tracks
 ## These are the new reference point system replacing timer-based hit frames
@@ -521,10 +535,13 @@ func play_hit_effects(damage_type: String, element: String, attacker: Battler = 
 	# Get center position for spawning effects
 	var center_position = get_effect_position(EffectPosition.CENTER)
 	
+	# Get battler depth for dynamic Z offset
+	var battler_depth = get_effect_depth()
+	
 	# Spawn all effects with smart spacing
 	for i in range(effects.size()):
 		var effect = effects[i]
-		effect.spawn(self, center_position, i, effects.size())
+		effect.spawn(self, center_position, i, effects.size(), battler_depth)
 
 ## Get the hit effect library to use (global or per-battler override)
 func get_hit_effect_library() -> HitEffectLibrary:
@@ -541,6 +558,16 @@ func get_hit_effect_library() -> HitEffectLibrary:
 	return null
 
 func take_damage(amount: int, attacker: Battler = null, damage_type: String = "physical", element: String = "none") -> void:
+	# Get battle manager once for use throughout the function
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	
+	# Trigger vestige hooks for ON_DAMAGE_TAKEN (before damage is applied)
+	trigger_vestige_hooks(TriggerHook.TriggerType.ON_DAMAGE_TAKEN, {"attacker": attacker, "damage": amount, "damage_amount": amount, "damage_type": damage_type, "element": element, "battle_manager": battle_manager})
+	
+	# Apply vestige damage taken multiplier
+	var multiplier = get_vestige_damage_taken_multiplier()
+	amount = int(float(amount) * multiplier)
+	
 	# Play hit effects before damage calculation
 	play_hit_effects(damage_type, element, attacker)
 	
@@ -605,7 +632,6 @@ func take_damage(amount: int, attacker: Battler = null, damage_type: String = "p
 		if _is_despawning:
 			return
 		_is_despawning = true
-		var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 
 		# Unregister from impact frame system when defeated
 		if battle_manager and battle_manager.effect_manager:
@@ -655,6 +681,16 @@ func take_damage(amount: int, attacker: Battler = null, damage_type: String = "p
 			_is_despawning = false
 
 func take_healing(amount: int):
+	# Get battle manager for vestige hooks
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	
+	# Trigger vestige hooks for ON_HEAL
+	trigger_vestige_hooks(TriggerHook.TriggerType.ON_HEAL, {"heal_amount": amount, "battle_manager": battle_manager})
+	
+	# Apply vestige healing multiplier
+	var multiplier = get_vestige_healing_multiplier()
+	amount = int(float(amount) * multiplier)
+	
 	var healing = min(amount, max_health - current_health)
 
 	current_health += healing
@@ -735,6 +771,180 @@ func _initialize_attack_indicator() -> void:
 	attack_indicator.position = Vector3(0, top_pos.y + 0.8, 0)
 	add_child(attack_indicator)
 
+
+# ---------------------------------------------------------------------------
+# Vestiges System
+# ---------------------------------------------------------------------------
+
+## Initialize vestiges for this battler (ally only)
+func _initialize_vestiges() -> void:
+	if team != TEAM.ALLY:
+		return
+	
+	# Get party member ID from meta
+	_party_member_id = str(get_meta(AllyPartyMember.META_PARTY_MEMBER_ID, ""))
+	if _party_member_id.is_empty():
+		return
+	
+	# Load per-character vestiges from AllyPartyMember
+	var member = GameState.get_party_member(_party_member_id)
+	if member == null:
+		return
+	
+	# Copy per-character vestiges
+	for vestige in member.vestiges:
+		if vestige and vestige.scope == Vestige.Scope.PER_CHARACTER:
+			active_vestiges.append(vestige)
+			vestige_stacks[vestige.vestige_id] = member.get_vestige_stack_count(vestige.vestige_id)
+	
+	# Load global vestiges from GameState
+	var global_vestiges = GameState.get_global_vestiges()
+	for vestige in global_vestiges:
+		if vestige and vestige.scope == Vestige.Scope.GLOBAL:
+			# Check if not already added
+			var already_added = false
+			for existing in active_vestiges:
+				if existing and existing.vestige_id == vestige.vestige_id:
+					already_added = true
+					break
+			if not already_added:
+				active_vestiges.append(vestige)
+				vestige_stacks[vestige.vestige_id] = GameState.get_global_vestige_stack_count(vestige.vestige_id)
+	
+	# Apply stat modifiers from vestiges
+	apply_vestige_modifiers()
+	
+	# Trigger ON_COMBAT_START hooks
+	var combat_battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	trigger_vestige_hooks(TriggerHook.TriggerType.ON_COMBAT_START, {"battle_manager": combat_battle_manager})
+
+
+## Apply stat modifiers from all active vestiges
+func apply_vestige_modifiers() -> void:
+	for vestige in active_vestiges:
+		if vestige == null:
+			continue
+		
+		var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+		
+		# Apply flat stat bonuses (multiplied by stack count)
+		max_health += vestige.max_health_bonus * stack_count
+		attack += vestige.attack_bonus * stack_count
+		defense += vestige.defense_bonus * stack_count
+		agility += vestige.agility_bonus * stack_count
+		max_ap += vestige.max_ap_bonus * stack_count
+		ap_regen_per_turn += vestige.ap_regen_bonus * stack_count
+		
+		# Apply percentage stat bonuses (multiplied by stack count)
+		max_health += int(max_health * vestige.max_health_percent * stack_count)
+		attack += int(attack * vestige.attack_percent * stack_count)
+		defense += int(defense * vestige.defense_percent * stack_count)
+		agility += int(agility * vestige.agility_percent * stack_count)
+
+
+## Trigger all vestige hooks for a specific trigger type
+func trigger_vestige_hooks(trigger_type: TriggerHook.TriggerType, context: Dictionary = {}) -> void:
+	print("DEBUG: trigger_vestige_hooks called for ", character_name, " with trigger_type: ", trigger_type, " and ", active_vestiges.size(), " vestiges")
+	for vestige in active_vestiges:
+		if vestige == null:
+			continue
+		
+		print("DEBUG: Checking vestige: ", vestige.vestige_name, " with ", vestige.trigger_hooks.size(), " hooks")
+		for hook in vestige.trigger_hooks:
+			if hook == null or not (hook is TriggerHook):
+				print("DEBUG: Invalid hook in ", vestige.vestige_name)
+				continue
+			
+			print("DEBUG: Hook trigger_type: ", hook.trigger_type, " vs requested: ", trigger_type)
+			if hook.trigger_type == trigger_type:
+				print("DEBUG: Hook matches! Checking if should_trigger...")
+				if hook.should_trigger(vestige, self, context):
+					print("DEBUG: Should trigger! Executing effect...")
+					hook.execute(vestige, self, context)
+					print("DEBUG: Effect executed")
+				else:
+					print("DEBUG: Should_trigger returned false")
+
+
+## Get damage dealt multiplier from vestiges
+func get_vestige_damage_dealt_multiplier() -> float:
+	var multiplier: float = 1.0
+	for vestige in active_vestiges:
+		if vestige:
+			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+			multiplier *= vestige.damage_dealt_multiplier * stack_count
+	return multiplier
+
+
+## Get damage taken multiplier from vestiges
+func get_vestige_damage_taken_multiplier() -> float:
+	var multiplier: float = 1.0
+	for vestige in active_vestiges:
+		if vestige:
+			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+			multiplier *= vestige.damage_taken_multiplier * stack_count
+	return multiplier
+
+
+## Get healing multiplier from vestiges
+func get_vestige_healing_multiplier() -> float:
+	var multiplier: float = 1.0
+	for vestige in active_vestiges:
+		if vestige:
+			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+			multiplier *= vestige.healing_multiplier * stack_count
+	return multiplier
+
+
+## Get XP multiplier from vestiges
+func get_vestige_xp_multiplier() -> float:
+	var multiplier: float = 1.0
+	for vestige in active_vestiges:
+		if vestige:
+			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+			multiplier *= vestige.xp_multiplier * stack_count
+	return multiplier
+
+
+## Get gold multiplier from vestiges
+func get_vestige_gold_multiplier() -> float:
+	var multiplier: float = 1.0
+	for vestige in active_vestiges:
+		if vestige:
+			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+			multiplier *= vestige.gold_multiplier * stack_count
+	return multiplier
+
+
+## Get additional cards drawn per turn from vestiges
+func get_vestige_cards_drawn_bonus() -> int:
+	var bonus: int = 0
+	for vestige in active_vestiges:
+		if vestige:
+			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+			bonus += vestige.cards_drawn_per_turn * stack_count
+	return bonus
+
+
+## Get starting hand size bonus from vestiges
+func get_vestige_hand_size_bonus() -> int:
+	var bonus: int = 0
+	for vestige in active_vestiges:
+		if vestige:
+			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+			bonus += vestige.starting_hand_size * stack_count
+	return bonus
+
+
+## Get AP cost reduction from vestiges
+func get_vestige_ap_cost_reduction() -> int:
+	var reduction: int = 0
+	for vestige in active_vestiges:
+		if vestige:
+			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
+			reduction += vestige.ap_cost_reduction * stack_count
+	return reduction
+
 ## Determine indicator type from attack config
 func _get_indicator_type(attack_config: EnemyAttackConfig) -> AttackIndicator3D.AttackType:
 	if not attack_config:
@@ -773,7 +983,7 @@ func attack_anim(target, attack_config: EnemyAttackConfig = null) -> void:
 		var indicator_type = _get_indicator_type(attack_config)
 		attack_indicator.show_indicator(indicator_type)
 	
-	if advance_to_target(target):
+	if await advance_to_target(target):
 		_try_animation(AnimationMapping.WALK)
 		while is_advancing:
 			await get_tree().create_timer(0.016).timeout
@@ -784,8 +994,8 @@ func attack_anim(target, attack_config: EnemyAttackConfig = null) -> void:
 		chosen_anim = attack_config.animation_name
 	
 	var _attack_ended = false
-	var _on_attack_end = func(): _attack_ended = true
-	attack_end.connect(_on_attack_end, CONNECT_ONE_SHOT)
+	var _on_attack_end_callback = func(): _attack_ended = true
+	attack_end.connect(_on_attack_end_callback, CONNECT_ONE_SHOT)
 
 	if not _try_animation(chosen_anim):
 		_try_animation(AnimationMapping.MELEE_COMBO_1)
@@ -903,38 +1113,57 @@ func advance_to_target(target: Battler) -> bool:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if not battle_manager:
 		return false
-		
+
 	if not requires_walking:
 		return false
-	
+
 	# SAFETY: Prevent overlapping advances
 	if is_advancing:
 		return false
-	
+
 	# Calculate dynamic stop distance based on target's AABB
 	var movement_distance = get_target_stop_distance(target)
 	var movement_speed = custom_movement_speed
-	
+
 	# Apply speed multiplier from battle manager
 	movement_speed *= battle_manager.speed_multiplier
-	
+
 	var distance_to_target = global_position.distance_to(target.global_position)
 	if distance_to_target <= movement_distance:
 		return false
-	
+
 	var direction = (target.global_position - global_position).normalized()
 	advance_target_position = target.global_position - direction * movement_distance
-	
+
+	# Calculate movement duration based on speed
+	var movement_duration = global_position.distance_to(advance_target_position) / movement_speed
+
+	# Get animation duration for WALK
+	var anim_duration = _get_animation_duration(AnimationMapping.WALK)
+
+	# Calculate animation speed scale to sync animation with movement
+	var anim_speed_scale = anim_duration / movement_duration
+
 	set_advancing(true)
+	_try_animation(AnimationMapping.WALK)
+
+	# Wait for animation to start before beginning movement
+	await get_tree().process_frame
+
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
-	tween.tween_property(self, "global_position", advance_target_position, 
-		global_position.distance_to(advance_target_position) / movement_speed)
+	tween.tween_property(self, "global_position", advance_target_position, movement_duration)
 	tween.tween_callback(_on_advance_complete)
-	
+
+	# Adjust animation playback speed to match movement duration
+	if anim_tree:
+		var playback = anim_tree.get("parameters/BaseSM/playback") as AnimationNodeStateMachinePlayback
+		if playback:
+			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale * battle_manager.speed_multiplier)
+
 	# Start movement timeout timer
 	_start_movement_timeout()
-	
+
 	return true
 
 ## Attempts to travel to an animation state by name.
@@ -1153,6 +1382,9 @@ func get_resolved_animation(generic_name: String) -> String:
 
 func _on_advance_complete():
 	set_advancing(false)
+	# Reset animation time_scale to normal after synced movement
+	if anim_tree:
+		anim_tree.set("parameters/BaseSM/time_scale", 1.0)
 	# NOTE: Do NOT travel to idle1 here - it fights whatever the caller triggers next
 
 ## Start movement timeout to prevent stuck advancing state
@@ -1174,27 +1406,44 @@ func _start_movement_timeout() -> void:
 func return_to_original_position():
 	if is_advancing or global_position.distance_to(original_position) < 0.05:
 		return
-	
+
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if not battle_manager:
 		return
-	
+
 	var movement_speed = custom_movement_speed
 	movement_speed *= battle_manager.speed_multiplier
-	
+
 	# Set is_walking condition to trigger idle -> walk_back transition in animation tree
 	if anim_tree:
 		anim_tree.set("parameters/BaseSM/conditions/is_walking", true)
 		anim_tree.set("parameters/BaseSM/combat_actions/conditions/is_walking", true)
-	
+
 	set_advancing(true)
 	_try_animation(AnimationMapping.WALK_BACK)
-	
+
+	# Calculate movement duration based on speed
+	var movement_duration = global_position.distance_to(original_position) / movement_speed
+
+	# Get animation duration for WALK_BACK
+	var anim_duration = _get_animation_duration(AnimationMapping.WALK_BACK)
+
+	# Calculate animation speed scale to sync animation with movement
+	var anim_speed_scale = anim_duration / movement_duration
+
+	# Wait for animation to start before beginning movement
+	await get_tree().process_frame
+
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
-	tween.tween_property(self, "global_position", original_position,
-		global_position.distance_to(original_position) / movement_speed)
+	tween.tween_property(self, "global_position", original_position, movement_duration)
 	tween.tween_callback(_on_return_complete)
+
+	# Adjust animation playback speed to match movement duration
+	if anim_tree:
+		var playback = anim_tree.get("parameters/BaseSM/playback") as AnimationNodeStateMachinePlayback
+		if playback:
+			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale * battle_manager.speed_multiplier)
 
 ## Performs a backwards evasion dash with the dedicated dodge animation.
 ## Falls back to walk if no dodge state exists on this character's AnimationTree.
@@ -1216,9 +1465,9 @@ func perform_dodge_dash() -> void:
 	var dodge_distance = 2.0
 	var dodge_target_position = global_position + backward_direction * dodge_distance
 
-	# Move camera back to keep dodging battler in frame
+	# Move camera back to keep dodging battler in frame - smooth zoom out
 	if battle_manager.battle_camera:
-		battle_manager.battle_camera.adjust_camera_distance_for_evasion(2.0, 0.5)
+		battle_manager.battle_camera.adjust_camera_distance_for_evasion(1.0, 0.15)
 
 	set_advancing(true)
 	# Play the standardised dodge animation (falls back to walk if unavailable).
@@ -1229,13 +1478,34 @@ func perform_dodge_dash() -> void:
 	var movement_speed = custom_movement_speed
 	movement_speed *= battle_manager.speed_multiplier * 1.5  # Faster movement for dodge
 
+	# Calculate movement duration based on speed
+	var movement_duration = global_position.distance_to(dodge_target_position) / movement_speed
+
+	# Get animation duration for DODGE (or WALK as fallback)
+	var anim_name = AnimationMapping.DODGE if _try_animation(AnimationMapping.DODGE) else AnimationMapping.WALK
+	var anim_duration = _get_animation_duration(anim_name)
+
+	# Calculate animation speed scale to sync animation with movement
+	var anim_speed_scale = anim_duration / movement_duration
+
+	# Wait for animation to start before beginning movement
+	await get_tree().process_frame
+
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
-	tween.tween_property(self, "global_position", dodge_target_position,
-		global_position.distance_to(dodge_target_position) / movement_speed)
+	tween.tween_property(self, "global_position", dodge_target_position, movement_duration)
 	tween.tween_callback(_on_dodge_dash_complete.bind(dodge_start_position))
 
+	# Adjust animation playback speed to match movement duration
+	if anim_tree:
+		var playback = anim_tree.get("parameters/BaseSM/playback") as AnimationNodeStateMachinePlayback
+		if playback:
+			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale * battle_manager.speed_multiplier)
+
 func _on_dodge_dash_complete(p_original_position: Vector3):
+	# Reset animation time_scale to normal after dodge
+	if anim_tree:
+		anim_tree.set("parameters/BaseSM/time_scale", 1.0)
 
 	# Small pause at the end of dodge
 	await get_tree().create_timer(0.15).timeout
@@ -1264,25 +1534,27 @@ func _on_dodge_dash_complete(p_original_position: Vector3):
 func _on_return_complete():
 	set_advancing(false)
 
+	# Reset animation time_scale to normal after synced movement
+	if anim_tree:
+		anim_tree.set("parameters/BaseSM/time_scale", 1.0)
+		anim_tree.set("parameters/BaseSM/conditions/is_walking", false)
+		anim_tree.set("parameters/BaseSM/combat_actions/conditions/is_walking", false)
+
 	# Reset camera distance after dodge is complete
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and battle_manager.battle_camera:
 		battle_manager.battle_camera.reset_camera_distance()
 
-	# Clear is_walking condition to trigger walk_back -> idle transition in animation tree
-	if anim_tree:
-		anim_tree.set("parameters/BaseSM/conditions/is_walking", false)
-		anim_tree.set("parameters/BaseSM/combat_actions/conditions/is_walking", false)
 	# NOTE: Do NOT travel to idle1 here - it fights whatever the caller triggers next
 
 ## Performs a jump-dodge evasion: plays jump -> jump_land -> idle1.
 ## jump and jump_land are defensive maneuvers used to avoid ground-sweeping attacks.
 ## Falls back to a simple tween arc when neither animation state exists.
 func perform_jump_evade() -> void:
-	# Move camera back to keep jumping battler in frame
+	# Move camera back to keep jumping battler in frame - smooth zoom out
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and battle_manager.battle_camera:
-		battle_manager.battle_camera.adjust_camera_distance_for_evasion(2.5, 0.6)
+		battle_manager.battle_camera.adjust_camera_distance_for_evasion(0.8, 0.2)
 
 	var base_sm := anim_tree.tree_root.get_node("BaseSM") as AnimationNodeStateMachine if anim_tree else null
 	var has_jump := state_machine != null and base_sm != null and base_sm.has_node(AnimationMapping.JUMP)
@@ -1395,6 +1667,9 @@ func apply_state(state: State) -> void:
 	var key = state.state_name
 	var existing_state = active_states.get(key) as State
 	
+	# Get battle manager for vestige hooks
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	
 	if existing_state:
 		# State already exists - handle stacking/refreshing
 		if "stack_count" in state and existing_state.has_method("add_stacks"):
@@ -1444,6 +1719,9 @@ func apply_state(state: State) -> void:
 			shield_changed.emit(state_copy.get_remaining_shields())
 	
 	state_applied.emit(key)
+	
+	# Trigger vestige hooks for ON_STATE_APPLIED
+	trigger_vestige_hooks(TriggerHook.TriggerType.ON_STATE_APPLIED, {"state": state, "state_name": key, "target": self, "battle_manager": battle_manager})
 
 func remove_state(state_name: String) -> void:
 	if active_states.has(state_name):
@@ -1540,13 +1818,23 @@ func _calculate_effect_positions() -> void:
 		_cached_effect_center = Vector3(0, 0.75, 0)  # Default center for 1.5 height
 		_cached_effect_top = Vector3(0, 1.5, 0)
 		_cached_effect_bottom = Vector3(0, 0.0, 0)
+		_cached_effect_depth = 1.0  # Default depth
 	else:
 		# Calculate positions from combined AABB
 		_cached_effect_center = Vector3(0, combined_aabb.position.y + combined_aabb.size.y / 2.0, 0)
 		_cached_effect_top = Vector3(0, combined_aabb.position.y + combined_aabb.size.y, 0)
 		_cached_effect_bottom = Vector3(0, combined_aabb.position.y, 0)
+		_cached_effect_depth = combined_aabb.size.z  # Cache the depth (Z size)
 	
 	_effect_center_cached = true
+
+## Get the battler's depth (Z size) for effect positioning
+## Returns the combined AABB depth of all MeshInstance3D children
+func get_effect_depth() -> float:
+	# Calculate and cache if not already cached
+	if not _effect_center_cached:
+		_calculate_effect_positions()
+	return _cached_effect_depth
 
 ## Invalidate the cached effect positions
 ## Call this when meshes are added/removed from the battler

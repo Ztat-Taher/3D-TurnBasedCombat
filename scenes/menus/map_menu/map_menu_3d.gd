@@ -10,6 +10,13 @@ signal level_changed(next_level_path : String)
 @export var run_map : RunMap
 @export var clear_game_state_on_load : bool = false  # Debug option to reset progress
 
+## Procedural map generation parameters
+@export var use_procedural_map : bool = true  # Use procedural generation instead of hand-authored map
+@export var map_plane_size : int = 30  # Grid size for procedural generation
+@export var map_node_count : int = 90  # Number of nodes to generate (0 = auto-calculate)
+@export var map_path_count : int = 15  # Number of unique paths from start to end
+@export var map_min_node_distance : float = 3.0  # Minimum distance between nodes (prevents clustering)
+
 ## Scene references
 var _camera : Camera3D
 var _map_plane : MeshInstance3D
@@ -51,7 +58,10 @@ const PARTY_OFFSETS : Array[Vector2] = [
 
 func _ready() -> void:
 	if run_map == null:
-		run_map = RunMap.create_default()
+		if use_procedural_map:
+			run_map = GameState.get_or_create_procedural_map(map_plane_size, map_node_count, map_path_count, map_min_node_distance)
+		else:
+			run_map = RunMap.create_default()
 	
 	# Clear game state if debug flag is set
 	if clear_game_state_on_load:

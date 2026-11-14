@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://bvhah4cfn4txb" path="res://scenes/battle/core/battle_manager/BattleManager.tscn" id="1_mgr"]
 [ext_resource type="PackedScene" uid="uid://wxuxctidimwu" path="res://scenes/battle/core/allies/models/y_bot-ally.tscn" id="2_ally"]
 [ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="3_psx"]
-[ext_resource type="Resource" uid="uid://d0noky2jlhk4u" path="res://database/troops/test_troop.tres" id="4_troop"]
+[ext_resource type="Resource" uid="uid://dm488x27gurwq" path="res://database/troops/boss_troop.tres" id="4_troop"]
 [ext_resource type="PackedScene" path="res://scenes/battle/core/diorama/DioramaRig3D.tscn" id="5_rig"]
 [ext_resource type="Resource" uid="uid://bsileayt1svcm" path="res://resources/dioramas/arenas/haligtree_arena.tres" id="6_arena_res"]
 
@@ -69,7 +69,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 arena_resource = ExtResource("6_arena_res")
 
 [node name="Ally1" parent="SubViewportContainer/SubViewport" index="2" unique_id=306467406 instance=ExtResource("2_ally")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -1.006)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -1)
 
 [node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport" index="3" unique_id=1327336196 groups=["battle_camera"]]
 transform = Transform3D(-0.7305871, -0.22846128, 0.6434656, -0.03311281, 0.95311093, 0.3008042, -0.68201613, 0.19845672, -0.7038955, 2.48554, 3.00572, -3.08627)

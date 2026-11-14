@@ -11,6 +11,8 @@ extends Control
 @onready var portrait_background: TextureRect = $BackgroundContainer/PortraitBackground
 @onready var status_icons_container: StatusIconsContainer = $BackgroundContainer/StatusIconsContainer
 @onready var status_icon_template: TextureRect = $BackgroundContainer/StatusIconsContainer/StatusIconTemplate
+@onready var vestige_icons_container = $BackgroundContainer/VestigeIconsContainer
+@onready var vestige_icon_template: TextureRect = $BackgroundContainer/VestigeIconsContainer/VestigeIconTemplate
 
 @onready var hp_juice: ProgressBarJuice = $BackgroundContainer/HPContainer/HPJuice
 @onready var shield_container: HBoxContainer = $BackgroundContainer/HPContainer/HPBar/ShieldContainer
@@ -77,6 +79,10 @@ func setup(ally: Battler) -> void:
 	# Setup status icons container with the reusable component
 	if status_icons_container and status_icon_template:
 		status_icons_container.setup(ally, status_icon_template)
+	
+	# Setup vestige icons container
+	if vestige_icons_container and vestige_icon_template:
+		vestige_icons_container.setup(ally, vestige_icon_template)
 	
 	# Initial shield update
 	update_shields()

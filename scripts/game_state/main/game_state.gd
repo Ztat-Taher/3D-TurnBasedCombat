@@ -14,14 +14,24 @@ const FILE_PATH = "res://scripts/game_state/main/game_state.gd"
 # Run-map progress (Slay the Spire style path selection).
 @export var current_node_id : String = ""
 @export var completed_nodes : Array[String] = []
+@export var run_map_serialized : String = ""  # Serialized procedural map for persistence
 
 ## Path to the PartyData resource used to (re)build the starter party each run.
 const PARTY_TEMPLATE_PATH : String = "res://database/party/player_party.tres"
+## Path to the PartyData resource listing allies that can be recruited at
+## recruit nodes. Kept separate from the starter template so recruited types
+## don't join the party automatically at run start.
+const RECRUITABLES_PATH : String = "res://database/party/recruitables.tres"
 
 ## The run party roster. Each entry carries an ally's stats, deck and runtime HP
 ## between map nodes and battles. Persisted via GlobalState alongside the rest
 ## of the run state.
 @export var party : Array[AllyPartyMember] = []
+
+## Global vestiges (party-wide passive items). Affects entire party.
+@export var global_vestiges : Array[Vestige] = []
+## Stack counts for global vestiges (vestige_id -> stack_count)
+@export var global_vestige_stacks : Dictionary = {}
 
 static func get_level_state(level_state_key : String) -> LevelState:
 
@@ -150,15 +160,17 @@ static func ensure_starter_party() -> void:
 	GlobalState.save()
 
 
-## Recruit a new ally of the same type as the first template ally. Returns the
-## new member or null on failure. The party must already exist.
-static func recruit_ally() -> AllyPartyMember:
+## Recruit a new ally cloned from [param source] (one of the recruit
+## templates). Returns the new member or null on failure. The party must
+## already exist. When [param source] is null the first starter template ally
+## is used, preserving the original single-ally recruit behaviour.
+static func recruit_ally(source : AllyPartyMember = null) -> AllyPartyMember:
 	var game_state := get_or_create_state()
-	var template := load(PARTY_TEMPLATE_PATH) as PartyData
-	if template == null or template.allies.is_empty():
-		push_error("GameState: cannot recruit, starter party template missing.")
+	if source == null:
+		source = get_recruit_template()
+	if source == null:
+		push_error("GameState: cannot recruit, no recruit template available.")
 		return null
-	var source := template.allies[0] as AllyPartyMember
 	var new_id := "ally_%d" % (game_state.party.size() + 1)
 	var member : AllyPartyMember = source.duplicate(true) as AllyPartyMember
 	if member == null:
@@ -179,6 +191,21 @@ static func recruit_ally() -> AllyPartyMember:
 	return member
 
 
+## All ally types offered at recruit nodes: the starter template's first ally
+## (legacy behaviour) followed by every entry in the recruitables template.
+static func get_recruit_templates() -> Array[AllyPartyMember]:
+	var templates : Array[AllyPartyMember] = []
+	var starter := get_recruit_template()
+	if starter != null:
+		templates.append(starter)
+	var recruitables := load(RECRUITABLES_PATH) as PartyData
+	if recruitables != null:
+		for member in recruitables.allies:
+			if member is AllyPartyMember:
+				templates.append(member)
+	return templates
+
+
 ## Returns the template ally used for recruiting (first entry of the PartyData
 ## template), or null if no template is available. The recruit screen previews
 ## this ally before joining the roster.
@@ -188,6 +215,44 @@ static func get_recruit_template() -> AllyPartyMember:
 		return null
 	return template.allies[0] as AllyPartyMember
 
+
+## Get or save the procedural map to prevent regeneration mid-run
+static func get_or_create_procedural_map(plane_size: int = 30, node_count: int = 90, path_count: int = 15, min_node_distance: float = 3.0) -> RunMap:
+	var game_state := get_or_create_state()
+	
+	# If we have a serialized map, try to restore it
+	if not game_state.run_map_serialized.is_empty():
+		var map_string = game_state.run_map_serialized
+		var json = JSON.new()
+		var error = json.parse(map_string)
+		if error == OK and json.data is Dictionary:
+			var restored_map = RunMap.new()
+			# Simple restoration of basic properties with proper typing
+			if json.data.has("starting_node_ids"):
+				var ids: Array[String] = []
+				ids.assign(json.data.starting_node_ids)
+				restored_map.starting_node_ids = ids
+			if json.data.has("nodes"):
+				var node_array: Array = []
+				node_array.assign(json.data.nodes)
+				restored_map.nodes = node_array
+			return restored_map
+	
+	# Generate new map and serialize it
+	var new_map = RunMap.create_procedural(plane_size, node_count, path_count, min_node_distance)
+	var map_dict = {
+		"starting_node_ids": new_map.starting_node_ids,
+		"nodes": new_map.nodes
+	}
+	var json_string = JSON.stringify(map_dict)
+	game_state.run_map_serialized = json_string
+	GlobalState.save()
+	return new_map
+
+static func clear_procedural_map() -> void:
+	var game_state := get_or_create_state()
+	game_state.run_map_serialized = ""
+	GlobalState.save()
 
 ## Find a party member by its unique ally id.
 static func get_party_member(member_id : String) -> AllyPartyMember:
@@ -253,4 +318,69 @@ static func reset() -> void:
 	game_state.current_node_id = ""
 	game_state.completed_nodes = []
 	game_state.party = []
+	game_state.run_map_serialized = ""  # Clear cached map
+	game_state.global_vestiges = []
+	game_state.global_vestige_stacks = {}
 	GlobalState.save()
+
+
+# ---------------------------------------------------------------------------
+# Global Vestiges system (party-wide passive items)
+# ---------------------------------------------------------------------------
+
+## Get all global vestiges
+static func get_global_vestiges() -> Array[Vestige]:
+	var game_state := get_or_create_state()
+	return game_state.global_vestiges
+
+
+## Get stack count for a specific global vestige
+static func get_global_vestige_stack_count(vestige_id: String) -> int:
+	var game_state := get_or_create_state()
+	if vestige_id in game_state.global_vestige_stacks:
+		return game_state.global_vestige_stacks[vestige_id]
+	return 0
+
+
+## Check if a global vestige is owned
+static func has_global_vestige(vestige_id: String) -> bool:
+	var game_state := get_or_create_state()
+	for vestige in game_state.global_vestiges:
+		if vestige and vestige.vestige_id == vestige_id:
+			return true
+	return false
+
+
+## Add a global vestige (affects entire party)
+static func add_global_vestige(vestige: Vestige, stacks: int = 1) -> void:
+	if vestige == null:
+		return
+	
+	var game_state := get_or_create_state()
+	
+	# Check if already owned
+	for existing in game_state.global_vestiges:
+		if existing and existing.vestige_id == vestige.vestige_id:
+			# Update stack count if stacking is allowed
+			if vestige.can_stack_with(get_global_vestige_stack_count(vestige.vestige_id)):
+				game_state.global_vestige_stacks[vestige.vestige_id] = \
+					mini(get_global_vestige_stack_count(vestige.vestige_id) + stacks, vestige.max_stacks)
+				GlobalState.save()
+			return
+	
+	# Add new vestige
+	game_state.global_vestiges.append(vestige)
+	game_state.global_vestige_stacks[vestige.vestige_id] = stacks
+	GlobalState.save()
+
+
+## Remove a global vestige
+static func remove_global_vestige(vestige_id: String) -> void:
+	var game_state := get_or_create_state()
+	for i in range(game_state.global_vestiges.size() - 1, -1, -1):
+		var vestige = game_state.global_vestiges[i]
+		if vestige and vestige.vestige_id == vestige_id:
+			game_state.global_vestiges.remove_at(i)
+			game_state.global_vestige_stacks.erase(vestige_id)
+			GlobalState.save()
+			return

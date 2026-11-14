@@ -121,7 +121,7 @@ animation = &"sword_02/sword_hit_death_var001"
 animation = &"sword_02/sword_dodge_combat_backward_var001"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_idle"]
-animation = &"sword_02/sword_idle_combat_var001"
+animation = &"sword_02/Idle"
 
 [sub_resource type="AnimationNodeAnimation" id="anim_jump"]
 animation = &"sword_02/sword_jump_combat_start_var001"
@@ -222,7 +222,7 @@ states/walk/position = Vector2(240, 49.297882)
 states/walk_back/node = SubResource("anim_walk_back")
 states/walk_back/position = Vector2(240, 347.82397)
 transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "combat_actions", "idle1", SubResource("combat_to_idle"), "idle1", "dodge", SubResource("idle_to_dodge"), "dodge", "idle1", SubResource("dodge_to_idle"), "idle1", "parry", SubResource("idle_to_parry"), "parry", "idle1", SubResource("parry_to_idle"), "idle1", "jump", SubResource("idle_to_jump"), "jump", "jump_land", SubResource("jump_to_jump_land"), "jump_land", "idle1", SubResource("jump_land_to_idle"), "idle1", "death", SubResource("idle_to_death")]
-graph_offset = Vector2(-292.4016, -16.259884)
+graph_offset = Vector2(-316.4016, -16.259888)
 
 [sub_resource type="AnimationNodeAnimation" id="anim_hit"]
 animation = &"sword_02/sword_hit_forward_var001"
@@ -244,7 +244,7 @@ transitions = ["Start", "hit", SubResource("empty_to_hit"), "hit", "End", SubRes
 graph_offset = Vector2(-292.4016, -16.259884)
 
 [resource]
-graph_offset = Vector2(-479, 14)
+graph_offset = Vector2(-289, 125)
 nodes/output/position = Vector2(800, 120)
 nodes/Add2/node = SubResource("add2_layer")
 nodes/Add2/position = Vector2(520, 120)

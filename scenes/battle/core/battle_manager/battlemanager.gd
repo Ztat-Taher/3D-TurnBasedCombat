@@ -1,6 +1,10 @@
 class_name BattleManager
 extends Node3D
 
+# Preload vestige classes for reward system
+const Vestige = preload("res://database/vestiges/vestige_template.gd")
+const TriggerHook = preload("res://database/vestiges/trigger_hook.gd")
+
 ## BATTLE CONFIGURATION USAGE:
 ## Look for: assets/globals/battle-settings/battle_config.gd
 ## 
@@ -374,25 +378,33 @@ func _input(event: InputEvent) -> void:
 		elif in_menu_selection:
 			_cancel_menu_selection()
 	# Confirm is currently bound to Enter key
-	elif event.is_action_pressed("Confirm") and in_target_selection and (current_target or current_controller_target):
-		var target = current_target if current_target else current_controller_target
-		current_target = target
+	elif event.is_action_pressed("Confirm") and in_target_selection:
 		var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
 		if pending_card:
-			# Check if this is an AOE projectile card
+			# Check if this is an AOE card
 			var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
-			var projectile_aoe = false
-			if is_aoe and pending_card and pending_card.has_method("get"):
-				projectile_aoe = pending_card.get("projectile_aoe") if "projectile_aoe" in pending_card else false
-			
-			if is_aoe and projectile_aoe:
-				await _execute_aoe_projectile_card(pending_card, valid_targets)
-			else:
-				if battle_camera:
-					battle_camera.set_target_focus(current_target)
-				var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
-				if card_battle_manager:
-					_execute_card_async(card_battle_manager, pending_card, current_target)
+			if is_aoe:
+				# AOE mode: confirm on all targets at once, no single target selection needed
+				var projectile_aoe = false
+				if pending_card and pending_card.has_method("get"):
+					projectile_aoe = pending_card.get("projectile_aoe") if "projectile_aoe" in pending_card else false
+				if projectile_aoe:
+					await _execute_aoe_projectile_card(pending_card, valid_targets)
+				else:
+					confirm_aoe_execution()
+					set_meta("pending_card", null)
+					exit_targeting_mode()
+					return
+			# Non-AOE: requires a single target to be selected
+			if not current_target and not current_controller_target:
+				return
+			var target = current_target if current_target else current_controller_target
+			current_target = target
+			if battle_camera:
+				battle_camera.set_target_focus(current_target)
+			var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+			if card_battle_manager:
+				_execute_card_async(card_battle_manager, pending_card, current_target)
 			set_meta("pending_card", null)
 			exit_targeting_mode()
 		elif queued_item:
@@ -504,7 +516,7 @@ func target_selected(target: Battler) -> void:
 	var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
 	
 	# Check if this is AOE mode (no individual targeting)
-	var is_aoe_mode = get_meta("is_aoe_mode") if has_meta("is_aoe_mode") else false
+	var _is_aoe_mode = get_meta("is_aoe_mode") if has_meta("is_aoe_mode") else false
 	
 	if pending_card:
 		set_meta("pending_card", null)
@@ -614,6 +626,10 @@ func start_next_turn():
 	# Process states at the start of the turn (for Burning damage, etc.)
 	if current_battler and current_battler.has_method("process_states"):
 		current_battler.process_states()
+	
+	# Trigger vestige hooks for ON_TURN_START
+	if current_battler and current_battler.has_method("trigger_vestige_hooks"):
+		current_battler.trigger_vestige_hooks(TriggerHook.TriggerType.ON_TURN_START, {"battle_manager": self})
 	
 	# Check for Chilled state (skip turn)
 	if current_character.active_states.has("Chilled"):
@@ -900,7 +916,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif abs(axis_value) < 0.2:
 				target_joystick_active_direction = 0
 	elif event.is_action_pressed("ui_accept"):
-		if current_controller_target:
+		# Check if this is AOE mode - confirm on all targets at once
+		var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
+		if is_aoe:
+			var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
+			if pending_card:
+				confirm_aoe_execution()
+			set_meta("pending_card", null)
+			exit_targeting_mode()
+		elif current_controller_target:
 			current_target = current_controller_target
 			# Check pending card first (card combat system)
 			var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
@@ -910,10 +934,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 				if card_battle_manager:
 					_execute_card_async(card_battle_manager, pending_card, current_target)
-				set_meta("pending_card", null)
-				exit_targeting_mode()
-			else:
-				_use_action_on_target()
+			set_meta("pending_card", null)
+			exit_targeting_mode()
+		else:
+			_use_action_on_target()
 		handled = true
 	elif event.is_action_pressed("ui_cancel"):
 		_cancel_action_target_selection()
@@ -934,6 +958,9 @@ func _handle_mouse_click_target_selection() -> void:
 	var cam: Camera3D = battle_camera.get_camera()
 	if not cam:
 		return
+
+	# Check if this is AOE mode
+	var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
 
 	# Use the camera's own viewport for the mouse position so SubViewport
 	# offset/scale is already accounted for by BattleCamera.screen_to_viewport().
@@ -1000,7 +1027,6 @@ func _handle_mouse_click_target_selection() -> void:
 					var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
 					if pending_card:
 						# Check if this is an AOE projectile card
-						var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
 						var projectile_aoe = false
 						if is_aoe and pending_card and pending_card.has_method("get"):
 							projectile_aoe = pending_card.get("projectile_aoe") if "projectile_aoe" in pending_card else false
@@ -1140,11 +1166,11 @@ func _cycle_controller_target(direction: int) -> void:
 			battle_camera.set_target_focus(current_controller_target)
 
 ## Execute AOE projectile card - calculates center position and passes targets via context
-func _execute_aoe_projectile_card(pending_card: CardConfig, valid_targets: Array) -> void:
+func _execute_aoe_projectile_card(pending_card: CardConfig, aoe_targets: Array) -> void:
 	# Calculate center position of all valid targets
 	var center_pos = Vector3.ZERO
 	var target_count = 0
-	for t in valid_targets:
+	for t in aoe_targets:
 		if t is Battler and not t.is_defeated():
 			center_pos += t.global_position
 			target_count += 1
@@ -1156,16 +1182,16 @@ func _execute_aoe_projectile_card(pending_card: CardConfig, valid_targets: Array
 	# Create execution context
 	var context = BattleManager.ProjectileExecutionContext.new()
 	context.center_position = center_pos
-	context.targets = valid_targets.duplicate()
-	
+	context.targets = aoe_targets.duplicate()
+
 	# Store context in card_battle_manager
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 	if card_battle_manager:
 		card_battle_manager._aoe_execution_context[pending_card] = context
-	
+
 	# Execute with first target but projectile will use center
 	if card_battle_manager:
-		await _execute_card_async(card_battle_manager, pending_card, valid_targets[0])
+		await _execute_card_async(card_battle_manager, pending_card, aoe_targets[0])
 	
 	# Cleanup context after card execution completes
 	if card_battle_manager:
@@ -1368,8 +1394,8 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 		hud.update_health_bars()
 		update_hud()
 
-func heal_calculation(user, target, amount):
-	var healing = target.take_healing(amount)
+func heal_calculation(_user, target, amount):
+	var _healing = target.take_healing(amount)
 	hud.update_health_bars()
 
 func enemy_turn(character:Battler) -> void:
@@ -1420,6 +1446,9 @@ func end_turn():
 	is_turn_transitioning = true
 	battler_attacking = false  # RC-D: always clear — ai_manager sets this but never resets it
 
+	# Trigger vestige hooks for ON_TURN_END on current battler
+	if current_battler and current_battler.has_method("trigger_vestige_hooks"):
+		current_battler.trigger_vestige_hooks(TriggerHook.TriggerType.ON_TURN_END, {"battle_manager": self})
 	
 	if skip_turn:
 		skip_turn = false
@@ -1525,6 +1554,11 @@ func end_battle(state: BattleEndCondition = BattleEndCondition.WIN):
 	if battle_finished:
 		return
 	battle_finished = true
+	
+	# Trigger vestige hooks for ON_COMBAT_END on all battlers
+	for battler in players + enemies:
+		if battler and battler.has_method("trigger_vestige_hooks"):
+			battler.trigger_vestige_hooks(TriggerHook.TriggerType.ON_COMBAT_END, {"battle_manager": self})
 	# ESCAPE always ends the battle abruptly. WIN, Will end the battle and return to normal, DEFEAT will end the battle with game over.
 	match state:
 		BattleEndCondition.ESCAPE:
@@ -1573,6 +1607,148 @@ func _finish_battle(state: BattleEndCondition) -> void:
 		battle_ended.emit(state)
 		return
 
+
+# ---------------------------------------------------------------------------
+# Vestiges Reward System
+# ---------------------------------------------------------------------------
+
+## Get a random vestige reward based on battle outcome
+## Returns null if no vestige reward should be given
+func get_vestige_reward(is_elite: bool = false, is_boss: bool = false) -> Vestige:
+	# Load vestige library
+	var library_path = "res://database/vestiges/vestige_library.tres"
+	if not ResourceLoader.exists(library_path):
+		push_warning("Vestige library not found at: %s" % library_path)
+		return null
+	
+	var library = load(library_path)
+	if library == null:
+		return null
+	
+	# Get already owned vestiges to avoid duplicates
+	var owned_vestiges: Array = []
+	var global_vestiges = GameState.get_global_vestiges()
+	owned_vestiges.append_array(global_vestiges)
+	
+	for player in players:
+		var member_id = str(player.get_meta(AllyPartyMember.META_PARTY_MEMBER_ID, ""))
+		if not member_id.is_empty():
+			var member = GameState.get_party_member(member_id)
+			if member:
+				owned_vestiges.append_array(member.vestiges)
+	
+	# Determine rarity based on battle type
+	var rarity: int
+	if is_boss:
+		# Boss: get boss relic choices (will be handled separately for selection UI)
+		# For now, return one random boss vestige
+		if library.has_method("get_boss_vestige_choices"):
+			var boss_choices = library.get_boss_vestige_choices(owned_vestiges)
+			if boss_choices.is_empty():
+				return null
+			return boss_choices.pick_random()
+		else:
+			# Fallback: access boss_vestiges directly
+			var boss_pool = library.boss_vestiges if library.has_property("boss_vestiges") else []
+			var available = boss_pool.filter(func(v): return not v in owned_vestiges)
+			if available.is_empty():
+				return null
+			return available.pick_random()
+	elif is_elite:
+		# Elite: higher chance for rare
+		var roll = randf()
+		if roll < 0.25:
+			rarity = 2  # RARE
+		elif roll < 0.75:
+			rarity = 1  # UNCOMMON
+		else:
+			rarity = 0  # COMMON
+	else:
+		# Regular battle: mostly common, some uncommon
+		var roll = randf()
+		if roll < 0.10:
+			rarity = 1  # UNCOMMON
+		else:
+			rarity = 0  # COMMON
+	
+	# Get random vestige from pool, excluding owned ones
+	var pool: Array = []
+	match rarity:
+		0: pool = library.common_vestiges if library.has_property("common_vestiges") else []
+		1: pool = library.uncommon_vestiges if library.has_property("uncommon_vestiges") else []
+		2: pool = library.rare_vestiges if library.has_property("rare_vestiges") else []
+		3: pool = library.boss_vestiges if library.has_property("boss_vestiges") else []
+		4: pool = library.event_vestiges if library.has_property("event_vestiges") else []
+		5: pool = library.shop_vestiges if library.has_property("shop_vestiges") else []
+	
+	var available_vestiges = pool.filter(func(v): return not v in owned_vestiges)
+	
+	if available_vestiges.is_empty():
+		# Fallback to common if nothing available in selected rarity
+		if rarity != 0:
+			pool = library.common_vestiges if library.has_property("common_vestiges") else []
+			available_vestiges = pool.filter(func(v): return not v in owned_vestiges)
+	
+	if available_vestiges.is_empty():
+		return null
+	
+	return available_vestiges.pick_random()
+
+
+## Award a vestige to a specific party member (or global for scope=GLOBAL)
+func award_vestige(vestige: Vestige, member_id: String = "") -> void:
+	if vestige == null:
+		return
+	
+	if vestige.scope == Vestige.Scope.GLOBAL:
+		# Add to global vestiges
+		GameState.add_global_vestige(vestige, 1)
+	else:
+		# Add to specific party member
+		if member_id.is_empty():
+			# Default to first party member
+			var party = GameState.get_party()
+			if party.is_empty():
+				return
+			member_id = party[0].id
+		
+		var member = GameState.get_party_member(member_id)
+		if member:
+			member.add_vestige(vestige, 1)
+			GlobalState.save()
+
+
+## Get boss vestige choices (typically 3 for player selection)
+func get_boss_vestige_choices() -> Array:
+	var library_path = "res://database/vestiges/vestige_library.tres"
+	if not ResourceLoader.exists(library_path):
+		return []
+	
+	var library = load(library_path)
+	if library == null:
+		return []
+	
+	# Get already owned vestiges
+	var owned_vestiges: Array = []
+	var global_vestiges = GameState.get_global_vestiges()
+	owned_vestiges.append_array(global_vestiges)
+	
+	for player in players:
+		var member_id = str(player.get_meta(AllyPartyMember.META_PARTY_MEMBER_ID, ""))
+		if not member_id.is_empty():
+			var member = GameState.get_party_member(member_id)
+			if member:
+				owned_vestiges.append_array(member.vestiges)
+	
+	# Use method if available, otherwise access property directly
+	if library.has_method("get_boss_vestige_choices"):
+		return library.get_boss_vestige_choices(owned_vestiges)
+	else:
+		var boss_pool = library.boss_vestiges if library.has_property("boss_vestiges") else []
+		var available = boss_pool.filter(func(v): return not v in owned_vestiges)
+		available.shuffle()
+		return available.slice(0, mini(3, available.size()))
+
 ## Brief defeat moment: play the defeat sound, then hand control to the level flow.
 func _play_defeat_sequence() -> void:
 	var defeat_sound : AudioStream = load("res://assets/sounds/defeatsound1.wav")
@@ -1619,8 +1795,6 @@ func exit_targeting_mode():
 	# Clear AOE mode metadata
 	if has_meta("is_aoe_mode"):
 		set_meta("is_aoe_mode", false)
-	if has_meta("aoe_targets"):
-		set_meta("aoe_targets", null)
 	if has_meta("target_type"):
 		set_meta("target_type", null)
 	
@@ -1637,16 +1811,14 @@ func exit_targeting_mode():
 
 func confirm_aoe_execution():
 	var pending_card = get_meta("pending_card")
-	var aoe_targets = get_meta("aoe_targets")
 	var _target_type = get_meta("target_type")
-	
-	if not pending_card or aoe_targets.is_empty():
+
+	if not pending_card or valid_targets.is_empty():
 		exit_targeting_mode()
 		return
-	
+
 	# Clear AOE mode metadata
 	set_meta("is_aoe_mode", false)
-	set_meta("aoe_targets", null)
 	set_meta("pending_card", null)
 	
 	# Hide targeting UI
@@ -1658,7 +1830,7 @@ func confirm_aoe_execution():
 	# Execute AOE card on all targets
 	var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 	if card_battle_manager:
-		_execute_aoe_card_async(card_battle_manager, pending_card, aoe_targets)
+		_execute_aoe_card_async(card_battle_manager, pending_card, valid_targets)
 	else:
 		exit_targeting_mode()
 

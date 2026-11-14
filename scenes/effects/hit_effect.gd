@@ -22,6 +22,9 @@ func configure(config: HitEffectConfig) -> void:
 	sprite.modulate = config.color
 	sprite.scale = config.scale
 	
+	# Apply randomization for variety
+	_apply_randomization(config)
+	
 	# Start animation from frame 0
 	sprite.frame = 0
 	current_frame = 0
@@ -43,6 +46,22 @@ func configure(config: HitEffectConfig) -> void:
 		cleanup_timer.timeout.connect(queue_free)
 		add_child(cleanup_timer)
 		cleanup_timer.start()
+
+## Apply random scale, rotation, and mirroring for visual variety
+func _apply_randomization(config: HitEffectConfig) -> void:
+	# Random scale
+	if config.random_scale_max > config.random_scale_min:
+		var random_scale = randf_range(config.random_scale_min, config.random_scale_max)
+		sprite.scale *= random_scale
+	
+	# Random rotation
+	if config.random_rotation_max > config.random_rotation_min:
+		var random_rotation = randf_range(config.random_rotation_min, config.random_rotation_max)
+		sprite.rotation_degrees.z = random_rotation
+	
+	# Random mirroring (flip horizontally)
+	if config.random_mirror and randf() < 0.5:
+		sprite.scale.x *= -1
 
 func _on_animation_tick() -> void:
 	if not is_instance_valid(sprite):

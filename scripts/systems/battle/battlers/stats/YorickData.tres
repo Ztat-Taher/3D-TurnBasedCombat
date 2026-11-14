@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="BattlerStats" format=3]
+
+[ext_resource type="Script" uid="uid://d2mintfjxyqei" path="res://scripts/systems/battle/battlers/stats/BattlerStats.gd" id="1_stats"]
+[ext_resource type="Texture2D" uid="uid://d11c0wry1os6v" path="res://assets/models/player/yorick_Yorick_Body.png" id="2_thumb"]
+[ext_resource type="Resource" path="res://database/decks/yorick_deck.tres" id="3_deck"]
+
+[resource]
+script = ExtResource("1_stats")
+character_name = "Yorick"
+thumbnail = ExtResource("2_thumb")
+level = 1
+max_health = 90
+attack = 14
+defense = 3
+agility = 8
+max_ap = 3
+ap_regen_per_turn = 3
+health_multiplier = 12
+attack_multiplier = 3
+defense_multiplier = 1
+agility_multiplier = 1
+ap_multiplier = 0
+deck = ExtResource("3_deck")

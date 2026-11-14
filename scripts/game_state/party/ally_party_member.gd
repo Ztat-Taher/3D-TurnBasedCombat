@@ -58,6 +58,69 @@ func get_max_health() -> int:
 	return max_health if max_health > 0 else 1
 
 
+# ---------------------------------------------------------------------------
+# Per-Character Vestiges system (ally-specific passive items)
+# ---------------------------------------------------------------------------
+
+## Per-character vestiges (ally-specific passive items)
+@export var vestiges: Array[Vestige] = []
+## Stack counts for vestiges (vestige_id -> stack_count)
+@export var vestige_stacks: Dictionary = {}
+
+
+## Add a vestige to this ally
+func add_vestige(vestige: Vestige, stacks: int = 1) -> void:
+	if vestige == null:
+		return
+	
+	# Check if already owned
+	for existing in vestiges:
+		if existing and existing.vestige_id == vestige.vestige_id:
+			# Update stack count if stacking is allowed
+			if vestige.can_stack_with(get_vestige_stack_count(vestige.vestige_id)):
+				vestige_stacks[vestige.vestige_id] = \
+					mini(get_vestige_stack_count(vestige.vestige_id) + stacks, vestige.max_stacks)
+			return
+	
+	# Add new vestige
+	vestiges.append(vestige)
+	vestige_stacks[vestige.vestige_id] = stacks
+
+
+## Remove a vestige from this ally
+func remove_vestige(vestige_id: String) -> void:
+	for i in range(vestiges.size() - 1, -1, -1):
+		var vestige = vestiges[i]
+		if vestige and vestige.vestige_id == vestige_id:
+			vestiges.remove_at(i)
+			vestige_stacks.erase(vestige_id)
+			return
+
+
+## Check if this ally owns a specific vestige
+func has_vestige(vestige_id: String) -> bool:
+	for vestige in vestiges:
+		if vestige and vestige.vestige_id == vestige_id:
+			return true
+	return false
+
+
+## Get stack count for a specific vestige
+func get_vestige_stack_count(vestige_id: String) -> int:
+	if vestige_id in vestige_stacks:
+		return vestige_stacks[vestige_id]
+	return 0
+
+
+## Get all vestiges of a specific scope
+func get_vestiges_by_scope(scope: Vestige.Scope) -> Array[Vestige]:
+	var matching: Array[Vestige] = []
+	for vestige in vestiges:
+		if vestige and vestige.scope == scope:
+			matching.append(vestige)
+	return matching
+
+
 ## HP as a 0..1 ratio, for progress bars.
 func get_hp_ratio() -> float:
 	if max_health <= 0:

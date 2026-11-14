@@ -1,6 +1,9 @@
 class_name NodeConfig
 extends Resource
 
+# Preload vestige class for reward configuration
+const Vestige = preload("res://database/vestiges/vestige_template.gd")
+
 ## Configuration for different node types on the map
 ## Allows modular customization of appearance and behavior
 
@@ -20,3 +23,9 @@ extends Resource
 @export var hover_sound: AudioStream
 @export var select_sound: AudioStream
 @export var complete_sound: AudioStream
+
+## Vestige reward configuration
+@export var vestige_reward: Vestige = null  # Fixed vestige reward
+@export var vestige_reward_rarity: Vestige.Rarity = Vestige.Rarity.COMMON  # Or random by rarity
+@export var vestige_reward_count: int = 1
+@export var vestige_reward_source: String = "combat"  # combat, treasure, event, shop, rest

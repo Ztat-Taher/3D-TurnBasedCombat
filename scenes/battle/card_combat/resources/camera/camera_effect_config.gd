@@ -19,10 +19,10 @@ enum ShakeStyle {
 }
 
 @export var camera_shake_enabled: bool = false
-@export var shake_intensity: float = 0.5              ## Shake intensity
-@export var shake_duration: float = 0.3               ## Shake duration
+@export var shake_intensity: float = 0.3              ## Shake intensity
+@export var shake_duration: float = 0.2               ## Shake duration
 @export var shake_style: ShakeStyle = ShakeStyle.RANDOM
-@export var shake_frequency: float = 20.0              ## Shake frequency
+@export var shake_frequency: float = 15.0              ## Shake frequency
 @export var shake_decay: float = 1.0                  ## Shake decay rate
 
 @export var camera_zoom_enabled: bool = false

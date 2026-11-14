@@ -1,0 +1,256 @@
+[gd_resource type="AnimationNodeBlendTree" format=3 uid="uid://dqa8sq54y1bl7"]
+
+[sub_resource type="AnimationNodeAdd2" id="add2_layer"]
+filter_enabled = true
+filters = ["%Alpha_Surface:Chest", "%Alpha_Surface:Head", "%Alpha_Surface:LeftHand", "%Alpha_Surface:LeftIndexDistal", "%Alpha_Surface:LeftIndexIntermediate", "%Alpha_Surface:LeftIndexProximal", "%Alpha_Surface:LeftLittleDistal", "%Alpha_Surface:LeftLittleIntermediate", "%Alpha_Surface:LeftLittleProximal", "%Alpha_Surface:LeftLowerArm", "%Alpha_Surface:LeftMiddleDistal", "%Alpha_Surface:LeftMiddleIntermediate", "%Alpha_Surface:LeftMiddleProximal", "%Alpha_Surface:LeftRingDistal", "%Alpha_Surface:LeftRingIntermediate", "%Alpha_Surface:LeftRingProximal", "%Alpha_Surface:LeftShoulder", "%Alpha_Surface:LeftThumbDistal", "%Alpha_Surface:LeftThumbMetacarpal", "%Alpha_Surface:LeftThumbProximal", "%Alpha_Surface:LeftUpperArm", "%Alpha_Surface:Neck", "%Alpha_Surface:RightHand", "%Alpha_Surface:RightIndexDistal", "%Alpha_Surface:RightIndexIntermediate", "%Alpha_Surface:RightIndexProximal", "%Alpha_Surface:RightLittleDistal", "%Alpha_Surface:RightLittleIntermediate", "%Alpha_Surface:RightLittleProximal", "%Alpha_Surface:RightLowerArm", "%Alpha_Surface:RightMiddleDistal", "%Alpha_Surface:RightMiddleIntermediate", "%Alpha_Surface:RightMiddleProximal", "%Alpha_Surface:RightRingDistal", "%Alpha_Surface:RightRingIntermediate", "%Alpha_Surface:RightRingProximal", "%Alpha_Surface:RightShoulder", "%Alpha_Surface:RightThumbDistal", "%Alpha_Surface:RightThumbMetacarpal", "%Alpha_Surface:RightThumbProximal", "%Alpha_Surface:RightUpperArm", "%Alpha_Surface:Spine", "%Alpha_Surface:UpperChest", "%Alpha_Surface:skeleton", "%GeneralSkeleton:Chest", "%GeneralSkeleton:Head", "%GeneralSkeleton:LeftHand", "%GeneralSkeleton:LeftIndexDistal", "%GeneralSkeleton:LeftIndexIntermediate", "%GeneralSkeleton:LeftIndexProximal", "%GeneralSkeleton:LeftLowerArm", "%GeneralSkeleton:LeftMiddleDistal", "%GeneralSkeleton:LeftMiddleIntermediate", "%GeneralSkeleton:LeftMiddleProximal", "%GeneralSkeleton:LeftShoulder", "%GeneralSkeleton:LeftThumbDistal", "%GeneralSkeleton:LeftThumbMetacarpal", "%GeneralSkeleton:LeftThumbProximal", "%GeneralSkeleton:LeftUpperArm", "%GeneralSkeleton:Neck", "%GeneralSkeleton:RightHand", "%GeneralSkeleton:RightIndexDistal", "%GeneralSkeleton:RightIndexIntermediate", "%GeneralSkeleton:RightIndexProximal", "%GeneralSkeleton:RightLowerArm", "%GeneralSkeleton:RightMiddleDistal", "%GeneralSkeleton:RightMiddleIntermediate", "%GeneralSkeleton:RightMiddleProximal", "%GeneralSkeleton:RightShoulder", "%GeneralSkeleton:RightThumbDistal", "%GeneralSkeleton:RightThumbMetacarpal", "%GeneralSkeleton:RightThumbProximal", "%GeneralSkeleton:RightUpperArm", "%GeneralSkeleton:Spine", "%GeneralSkeleton:UpperChest"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_1"]
+animation = &"fighting_02/Frank_FS2_Punch_Left_Jab"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_2"]
+animation = &"fighting_02/Frank_FS2_Punch_Right_Straight"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee_combo_3"]
+animation = &"fighting_02/Frank_FS2_Punch_PowerSmash"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_1"]
+animation = &"fighting_02/Frank_FS2_Kick_Double_RoundHouse"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_ranged_cast_2"]
+animation = &"fighting_02/Frank_FS2_Kick_Right_Spin_Heel"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee1"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee2"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_melee3"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged1"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="ca_start_to_ranged2"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_4vh7f"]
+switch_mode = 2
+advance_mode = 2
+advance_condition = &"allow_combat_to_idle"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_m5yw2"]
+switch_mode = 2
+advance_mode = 2
+advance_condition = &"allow_combat_to_idle"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_thekq"]
+switch_mode = 2
+advance_mode = 2
+advance_condition = &"allow_combat_to_idle"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_csrss"]
+switch_mode = 2
+advance_mode = 2
+advance_condition = &"allow_combat_to_idle"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_jex2m"]
+switch_mode = 2
+advance_mode = 2
+advance_condition = &"allow_combat_to_idle"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_wick6"]
+xfade_time = 0.05
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_gygem"]
+xfade_time = 0.05
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_hot7n"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_ek4d2"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_11pyw"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_jja4k"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_5one5"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_s71dg"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_rfho8"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_hvoum"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_xaigk"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_3fn0c"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_j40mk"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_c40r5"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachine" id="combat_actions_sm"]
+states/End/position = Vector2(612, 174.23999)
+states/Start/position = Vector2(16, 174.4)
+states/melee_combo_1/node = SubResource("anim_melee_combo_1")
+states/melee_combo_1/position = Vector2(300.32556, 2.2000008)
+states/melee_combo_2/node = SubResource("anim_melee_combo_2")
+states/melee_combo_2/position = Vector2(300.2482, 100)
+states/melee_combo_3/node = SubResource("anim_melee_combo_3")
+states/melee_combo_3/position = Vector2(301.26062, 180)
+states/ranged_cast_1/node = SubResource("anim_ranged_cast_1")
+states/ranged_cast_1/position = Vector2(300.45416, 274.4)
+states/ranged_cast_2/node = SubResource("anim_ranged_cast_2")
+states/ranged_cast_2/position = Vector2(299.87582, 360)
+transitions = ["Start", "melee_combo_1", SubResource("ca_start_to_melee1"), "Start", "melee_combo_2", SubResource("ca_start_to_melee2"), "Start", "melee_combo_3", SubResource("ca_start_to_melee3"), "Start", "ranged_cast_1", SubResource("ca_start_to_ranged1"), "Start", "ranged_cast_2", SubResource("ca_start_to_ranged2"), "melee_combo_1", "End", SubResource("AnimationNodeStateMachineTransition_4vh7f"), "melee_combo_2", "End", SubResource("AnimationNodeStateMachineTransition_m5yw2"), "melee_combo_3", "End", SubResource("AnimationNodeStateMachineTransition_thekq"), "ranged_cast_1", "End", SubResource("AnimationNodeStateMachineTransition_csrss"), "ranged_cast_2", "End", SubResource("AnimationNodeStateMachineTransition_jex2m"), "melee_combo_1", "melee_combo_2", SubResource("AnimationNodeStateMachineTransition_wick6"), "melee_combo_2", "melee_combo_3", SubResource("AnimationNodeStateMachineTransition_gygem"), "melee_combo_3", "ranged_cast_1", SubResource("AnimationNodeStateMachineTransition_hot7n"), "ranged_cast_1", "ranged_cast_2", SubResource("AnimationNodeStateMachineTransition_ek4d2"), "melee_combo_2", "melee_combo_1", SubResource("AnimationNodeStateMachineTransition_11pyw"), "melee_combo_3", "melee_combo_1", SubResource("AnimationNodeStateMachineTransition_jja4k"), "ranged_cast_1", "melee_combo_1", SubResource("AnimationNodeStateMachineTransition_5one5"), "ranged_cast_2", "melee_combo_1", SubResource("AnimationNodeStateMachineTransition_s71dg"), "melee_combo_3", "melee_combo_2", SubResource("AnimationNodeStateMachineTransition_rfho8"), "ranged_cast_1", "melee_combo_2", SubResource("AnimationNodeStateMachineTransition_hvoum"), "ranged_cast_2", "melee_combo_2", SubResource("AnimationNodeStateMachineTransition_xaigk"), "ranged_cast_1", "melee_combo_3", SubResource("AnimationNodeStateMachineTransition_3fn0c"), "ranged_cast_2", "melee_combo_3", SubResource("AnimationNodeStateMachineTransition_j40mk"), "ranged_cast_2", "ranged_cast_1", SubResource("AnimationNodeStateMachineTransition_c40r5")]
+graph_offset = Vector2(-142.92773, -19.661423)
+
+[sub_resource type="AnimationNodeAnimation" id="anim_death"]
+animation = &"fighting_02/Frank_FS2_Hit_KnockDown"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_dodge"]
+animation = &"fighting_02/Frank_FS2_Moves_Step_Backward"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_idle"]
+animation = &"fighting_02/Frank_FS2_Moves_Idle"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_jump"]
+animation = &"fighting_02/Frank_FS2_Moves_Jump"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_jump_land"]
+animation = &"fighting_02/Frank_FS2_Moves_Getup"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_parry"]
+animation = &"fighting_02/Frank_FS2_Moves_Guard"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_walk"]
+animation = &"fighting_02/Frank_FS2_Moves_Dash"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_walk_back"]
+animation = &"fighting_02/Frank_FS2_Moves_Dash"
+play_mode = 1
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="start_to_idle"]
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_walk"]
+xfade_time = 0.2
+advance_condition = &"is_walking"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="walk_to_idle"]
+xfade_time = 0.2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_walk_back"]
+xfade_time = 0.2
+advance_condition = &"is_walking"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="walk_back_to_idle"]
+xfade_time = 0.2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_combat"]
+xfade_time = 0.05
+advance_condition = &"is_attacking"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="walk_to_combat"]
+xfade_time = 0.05
+advance_condition = &"is_attacking"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="combat_to_idle"]
+xfade_time = 0.1
+switch_mode = 2
+advance_mode = 2
+advance_condition = &"allow_combat_to_idle"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_dodge"]
+advance_condition = &"is_dodging"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="dodge_to_idle"]
+xfade_time = 0.15
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_parry"]
+xfade_time = 0.15
+advance_condition = &"is_parrying"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="parry_to_idle"]
+xfade_time = 0.15
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_jump"]
+advance_condition = &"is_jumping"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="jump_to_jump_land"]
+advance_condition = &"is_landing"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="jump_land_to_idle"]
+xfade_time = 0.15
+switch_mode = 2
+advance_condition = &"allow_jump_to_idle"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_death"]
+advance_condition = &"is_dead"
+
+[sub_resource type="AnimationNodeStateMachine" id="base_sm"]
+states/End/position = Vector2(1300, 200)
+states/Start/position = Vector2(38, 200)
+states/combat_actions/node = SubResource("combat_actions_sm")
+states/combat_actions/position = Vector2(620.7361, 200)
+states/death/node = SubResource("anim_death")
+states/death/position = Vector2(37.426594, 49.578342)
+states/dodge/node = SubResource("anim_dodge")
+states/dodge/position = Vector2(617.5989, 49.578342)
+states/idle1/node = SubResource("anim_idle")
+states/idle1/position = Vector2(240, 200)
+states/jump/node = SubResource("anim_jump")
+states/jump/position = Vector2(423.2, 347.82397)
+states/jump_land/node = SubResource("anim_jump_land")
+states/jump_land/position = Vector2(617.5989, 347.9558)
+states/parry/node = SubResource("anim_parry")
+states/parry/position = Vector2(36.34611, 343.83453)
+states/walk/node = SubResource("anim_walk")
+states/walk/position = Vector2(240, 49.297882)
+states/walk_back/node = SubResource("anim_walk_back")
+states/walk_back/position = Vector2(240, 347.82397)
+transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "combat_actions", "idle1", SubResource("combat_to_idle"), "idle1", "dodge", SubResource("idle_to_dodge"), "dodge", "idle1", SubResource("dodge_to_idle"), "idle1", "parry", SubResource("idle_to_parry"), "parry", "idle1", SubResource("parry_to_idle"), "idle1", "jump", SubResource("idle_to_jump"), "jump", "jump_land", SubResource("jump_to_jump_land"), "jump_land", "idle1", SubResource("jump_land_to_idle"), "idle1", "death", SubResource("idle_to_death")]
+graph_offset = Vector2(-294.4016, 133.0835)
+
+[sub_resource type="AnimationNodeAnimation" id="anim_hit"]
+animation = &"fighting_02/Frank_FS2_Hit_Middle"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="empty_to_hit"]
+advance_mode = 2
+advance_condition = &"is_hit"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="hit_to_empty"]
+switch_mode = 2
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachine" id="hit_sm"]
+states/End/position = Vector2(859, 200)
+states/Start/position = Vector2(38, 200)
+states/hit/node = SubResource("anim_hit")
+states/hit/position = Vector2(577, 200)
+transitions = ["Start", "hit", SubResource("empty_to_hit"), "hit", "End", SubResource("hit_to_empty")]
+graph_offset = Vector2(-292.4016, -16.259884)
+
+[resource]
+graph_offset = Vector2(-487.56726, -46.939896)
+nodes/output/position = Vector2(800, 120)
+nodes/Add2/node = SubResource("add2_layer")
+nodes/Add2/position = Vector2(520, 120)
+nodes/BaseSM/node = SubResource("base_sm")
+nodes/BaseSM/position = Vector2(-40, 40)
+nodes/HitSM/node = SubResource("hit_sm")
+nodes/HitSM/position = Vector2(200, 220)
+node_connections = [&"output", 0, &"Add2", &"Add2", 0, &"BaseSM", &"Add2", 1, &"HitSM"]

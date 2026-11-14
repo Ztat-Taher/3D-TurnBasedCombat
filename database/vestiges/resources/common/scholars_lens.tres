@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Vestige" format=3 uid="uid://b26eglph0nv1i"]
+
+[ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_abc123"]
+[ext_resource type="Texture2D" uid="uid://y78dt7ug1h5l" path="res://assets/images/ui/vestiges/scholars_lens.png" id="1_l8fsd"]
+
+[resource]
+script = ExtResource("1_abc123")
+vestige_id = "scholars_lens"
+vestige_name = "Scholar's Lens"
+description = "XP rewards increased by 15%."
+icon = ExtResource("1_l8fsd")
+scope = 0
+xp_multiplier = 1.15

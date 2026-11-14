@@ -37,6 +37,25 @@ func get_available_node_ids(completed_nodes : Array) -> Array[String]:
 				available.append(next_id)
 	return available
 
+## Procedurally generates a map using the Slay the Spire-style algorithm
+## plane_size: Size of the grid for generation (default 30)
+## node_count: Number of nodes to generate (default 75, approximately plane_size^2 / 12)
+## path_count: Number of unique paths from start to end (default 12)
+## min_node_distance: Minimum distance between any two nodes (default 3.0)
+static func create_procedural(plane_size: int = 30, node_count: int = 75, path_count: int = 12, min_node_distance: float = 3.0) -> RunMap:
+	# Calculate default node count if not provided
+	if node_count <= 0:
+		node_count = int(float(plane_size * plane_size) / 12.0)
+	
+	# Generate the map data
+	var generator = ProceduralMapGenerator.new()
+	var map_data = generator.generate(plane_size, node_count, path_count, min_node_distance)
+	
+	# Convert to RunMap format
+	var run_map = MapConverter.convert_to_run_map(map_data, plane_size)
+	
+	return run_map
+
 ## The built-in default map: Complex, intertwining paths that all lead to boss
 ## Starting from bottom center, with varied branching, no dead ends
 static func create_default() -> RunMap:
@@ -45,6 +64,7 @@ static func create_default() -> RunMap:
 	# Load NodeConfig resources
 	var combat_config = load("res://scripts/game_state/map/node_config_combat.tres") as NodeConfig
 	var boss_config = load("res://scripts/game_state/map/node_config_boss.tres") as NodeConfig
+	var treasure_config = load("res://scripts/game_state/map/node_config_treasure.tres") as NodeConfig
 
 	# Starting node at bottom center
 	var start_node := RunMapNode.new()
@@ -52,7 +72,7 @@ static func create_default() -> RunMap:
 	start_node.display_name = "Start"
 	start_node.node_config = combat_config
 	start_node.level_path = ""
-	start_node.next_node_ids.assign(["rest_stop", "ancient_bridge", "recruit_stop"])
+	start_node.next_node_ids.assign(["rest_stop", "ancient_bridge", "recruit_stop", "treasure_start"])
 	start_node.map_position = Vector2(0.5, 0.92)
 
 	# Rest & Recruit are stops ON the two flanking routes out of the start node
@@ -79,6 +99,14 @@ static func create_default() -> RunMap:
 	recruit_stop.next_node_ids.assign(["foggy_road"])
 	recruit_stop.map_position = Vector2(0.66, 0.84)
 	
+	var treasure_start := RunMapNode.new()
+	treasure_start.id = "treasure_start"
+	treasure_start.display_name = "Treasure"
+	treasure_start.node_config = treasure_config
+	treasure_start.level_path = ""  # Treasure disabled for now
+	treasure_start.next_node_ids.assign(["ancient_bridge"])
+	treasure_start.map_position = Vector2(0.78, 0.84)
+	
 	# Bottom layer - diverse branching
 	var river_path := RunMapNode.new()
 	river_path.id = "river_path"
@@ -101,15 +129,23 @@ static func create_default() -> RunMap:
 	foggy_road.display_name = "Combat"
 	foggy_road.node_config = combat_config
 	foggy_road.level_path = "res://scenes/game/levels/battle_level_1.tscn"
-	foggy_road.next_node_ids.assign(["stone_gate", "mountain_pass"])
+	foggy_road.next_node_ids.assign(["stone_gate", "mountain_pass", "treasure_stop"])
 	foggy_road.map_position = Vector2(0.78, 0.73)
+	
+	var treasure_stop := RunMapNode.new()
+	treasure_stop.id = "treasure_stop"
+	treasure_stop.display_name = "Treasure"
+	treasure_stop.node_config = treasure_config
+	treasure_stop.level_path = ""  # Treasure disabled for now
+	treasure_stop.next_node_ids.assign(["mountain_pass"])
+	treasure_stop.map_position = Vector2(0.85, 0.68)
 	
 	# Middle layer - intertwining paths
 	var marsh_lands := RunMapNode.new()
 	marsh_lands.id = "marsh_lands"
 	marsh_lands.display_name = "Combat"
 	marsh_lands.node_config = combat_config
-	marsh_lands.level_path = "res://scenes/game/levels/battle_level_2.tscn"
+	marsh_lands.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	marsh_lands.next_node_ids.assign(["crystal_cave", "sunken_ruins"])
 	marsh_lands.map_position = Vector2(0.18, 0.54)
 	
@@ -117,7 +153,7 @@ static func create_default() -> RunMap:
 	twisted_forest.id = "twisted_forest"
 	twisted_forest.display_name = "Combat"
 	twisted_forest.node_config = combat_config
-	twisted_forest.level_path = "res://scenes/game/levels/battle_level_2.tscn"
+	twisted_forest.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	twisted_forest.next_node_ids.assign(["sunken_ruins", "windy_cliff"])
 	twisted_forest.map_position = Vector2(0.42, 0.48)
 	
@@ -125,7 +161,7 @@ static func create_default() -> RunMap:
 	stone_gate.id = "stone_gate"
 	stone_gate.display_name = "Combat"
 	stone_gate.node_config = combat_config
-	stone_gate.level_path = "res://scenes/game/levels/battle_level_2.tscn"
+	stone_gate.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	stone_gate.next_node_ids.assign(["windy_cliff", "summit_path"])
 	stone_gate.map_position = Vector2(0.62, 0.52)
 	
@@ -133,7 +169,7 @@ static func create_default() -> RunMap:
 	mountain_pass.id = "mountain_pass"
 	mountain_pass.display_name = "Combat"
 	mountain_pass.node_config = combat_config
-	mountain_pass.level_path = "res://scenes/game/levels/battle_level_2.tscn"
+	mountain_pass.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	mountain_pass.next_node_ids.assign(["summit_path", "hidden_valley"])
 	mountain_pass.map_position = Vector2(0.85, 0.55)
 	
@@ -142,7 +178,7 @@ static func create_default() -> RunMap:
 	crystal_cave.id = "crystal_cave"
 	crystal_cave.display_name = "Combat"
 	crystal_cave.node_config = combat_config
-	crystal_cave.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	crystal_cave.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	crystal_cave.next_node_ids.assign(["final_gate"])  # No dead end
 	crystal_cave.map_position = Vector2(0.25, 0.35)
 	
@@ -150,7 +186,7 @@ static func create_default() -> RunMap:
 	sunken_ruins.id = "sunken_ruins"
 	sunken_ruins.display_name = "Combat"
 	sunken_ruins.node_config = combat_config
-	sunken_ruins.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	sunken_ruins.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	sunken_ruins.next_node_ids.assign(["final_gate", "summit_alt"])  # Converges to boss
 	sunken_ruins.map_position = Vector2(0.38, 0.32)
 	
@@ -158,7 +194,7 @@ static func create_default() -> RunMap:
 	windy_cliff.id = "windy_cliff"
 	windy_cliff.display_name = "Combat"
 	windy_cliff.node_config = combat_config
-	windy_cliff.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	windy_cliff.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	windy_cliff.next_node_ids.assign(["summit_alt", "final_gate"])  # Converges to boss
 	windy_cliff.map_position = Vector2(0.55, 0.28)
 	
@@ -166,7 +202,7 @@ static func create_default() -> RunMap:
 	summit_path.id = "summit_path"
 	summit_path.display_name = "Combat"
 	summit_path.node_config = combat_config
-	summit_path.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	summit_path.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	summit_path.next_node_ids.assign(["final_gate", "hidden_valley"])  # Converges to boss
 	summit_path.map_position = Vector2(0.72, 0.36)
 	
@@ -174,7 +210,7 @@ static func create_default() -> RunMap:
 	hidden_valley.id = "hidden_valley"
 	hidden_valley.display_name = "Combat"
 	hidden_valley.node_config = combat_config
-	hidden_valley.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	hidden_valley.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	hidden_valley.next_node_ids.assign(["final_gate"])  # Converges to boss
 	hidden_valley.map_position = Vector2(0.88, 0.32)
 	
@@ -183,7 +219,7 @@ static func create_default() -> RunMap:
 	summit_alt.id = "summit_alt"
 	summit_alt.display_name = "Combat"
 	summit_alt.node_config = combat_config
-	summit_alt.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	summit_alt.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	summit_alt.next_node_ids.assign(["final_gate"])  # Converges to boss
 	summit_alt.map_position = Vector2(0.48, 0.15)
 	
@@ -192,7 +228,7 @@ static func create_default() -> RunMap:
 	final_gate.id = "final_gate"
 	final_gate.display_name = "Combat"
 	final_gate.node_config = combat_config
-	final_gate.level_path = "res://scenes/game/levels/battle_level_3.tscn"
+	final_gate.level_path = "res://scenes/game/levels/battle_level_1.tscn"
 	final_gate.next_node_ids.assign(["boss"])
 	final_gate.map_position = Vector2(0.65, 0.18)
 	
@@ -207,5 +243,5 @@ static func create_default() -> RunMap:
 	
 	# Set starting node and add all nodes
 	map.starting_node_ids.assign(["start"])
-	map.nodes = [start_node, river_path, ancient_bridge, foggy_road, rest_stop, recruit_stop, marsh_lands, twisted_forest, stone_gate, mountain_pass, crystal_cave, sunken_ruins, windy_cliff, summit_path, hidden_valley, summit_alt, final_gate, boss]
+	map.nodes = [start_node, river_path, ancient_bridge, foggy_road, rest_stop, recruit_stop, treasure_start, treasure_stop, marsh_lands, twisted_forest, stone_gate, mountain_pass, crystal_cave, sunken_ruins, windy_cliff, summit_path, hidden_valley, summit_alt, final_gate, boss]
 	return map

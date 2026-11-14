@@ -187,6 +187,10 @@ func play_card(card: CardConfig, target: Battler = null) -> bool:
 	if is_executing_card or not can_play_card(card):
 		return false
 	
+	# Trigger vestige hooks for ON_CARD_PLAY on the active battler
+	if current_player_battler and current_player_battler.has_method("trigger_vestige_hooks"):
+		current_player_battler.trigger_vestige_hooks(TriggerHook.TriggerType.ON_CARD_PLAY, {"card": card, "target": target, "battle_manager": battle_manager})
+	
 	is_executing_card = true
 	if battle_manager:
 		battle_manager.is_animating = true
@@ -295,7 +299,7 @@ func execute_card_with_config(card: CardConfig, target: Battler) -> void:
 		# Store original position before movement so we can return later
 		var original_pos_before_move = current_player_battler.global_position
 		should_return_to_position = true  # Store decision before target might die
-		if current_player_battler.advance_to_target(target):
+		if await current_player_battler.advance_to_target(target):
 			current_player_battler._try_animation("walk")
 			var movement_start = Time.get_ticks_msec() / 1000.0
 			while current_player_battler.is_advancing:
@@ -1068,7 +1072,7 @@ func execute_attack_card(card: CardConfig, target: Battler, is_aoe: bool = false
 	# For AOE, skip movement animation - just play attack animation from current position
 	if not is_aoe:
 		# Move to target and attack
-		if current_player_battler.advance_to_target(target):
+		if await current_player_battler.advance_to_target(target):
 			current_player_battler._try_animation("walk")
 			while current_player_battler.is_advancing:
 				await get_tree().create_timer(0.016).timeout

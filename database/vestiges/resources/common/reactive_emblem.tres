@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="Vestige" format=3 uid="uid://c455sik34jcha"]
+
+[ext_resource type="Texture2D" uid="uid://yt8lqjvbflk1" path="res://assets/images/ui/vestiges/reactive_emblem.png" id="1_62svk"]
+[ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
+[ext_resource type="Script" uid="uid://b0tyiimb82sae" path="res://database/vestiges/trigger_hook.gd" id="3_hook"]
+
+[sub_resource type="Resource" id="TriggerHook_crystal"]
+script = ExtResource("3_hook")
+trigger_type = 8
+effect_script_path = "res://database/vestiges/effects/deal_damage_on_trigger.gd"
+damage_amount = 3
+target_type = "random_enemy"
+
+[resource]
+script = ExtResource("1_vest")
+vestige_id = "reactive_emblem"
+vestige_name = "Reactive Emblem"
+description = "When you apply a state, deal 3 damage to a random enemy."
+icon = ExtResource("1_62svk")
+trigger_hooks = Array[Resource]([SubResource("TriggerHook_crystal")])

@@ -380,9 +380,9 @@ func adjust_camera_distance_for_evasion(distance_offset: float, duration: float)
 
 	_evasion_distance_offset = distance_offset
 
-	# Move camera back along its current look direction
+	# Move camera BACK (opposite to look direction) to zoom out and fit more in frame
 	var camera_forward = -camera.global_transform.basis.z.normalized()
-	var target_position = camera.global_position + camera_forward * distance_offset
+	var target_position = camera.global_position - camera_forward * distance_offset
 
 	_distance_tween = camera.create_tween()
 	_distance_tween.set_ease(Tween.EaseType.EASE_OUT)
@@ -401,13 +401,13 @@ func reset_camera_distance() -> void:
 	if _distance_tween and _distance_tween.is_valid():
 		_distance_tween.kill()
 
-	# Move camera back to original position (reverse of evasion)
+	# Tween back to original position for smooth reset
 	var camera_forward = -camera.global_transform.basis.z.normalized()
-	var target_position = camera.global_position - camera_forward * _evasion_distance_offset
+	var target_position = camera.global_position + camera_forward * _evasion_distance_offset
 
 	_distance_tween = camera.create_tween()
 	_distance_tween.set_ease(Tween.EaseType.EASE_OUT)
 	_distance_tween.set_trans(Tween.TransitionType.TRANS_CUBIC)
-	_distance_tween.tween_property(camera, "global_position", target_position, 0.3)
+	_distance_tween.tween_property(camera, "global_position", target_position, 0.15)
 
 	_evasion_distance_offset = 0.0
