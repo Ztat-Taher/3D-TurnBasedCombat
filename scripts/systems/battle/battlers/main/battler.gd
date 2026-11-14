@@ -81,6 +81,7 @@ var _party_member_id: String = ""  # Link to AllyPartyMember for per-character v
 var is_advancing: bool = false
 var advance_target_position: Vector3
 var original_position: Vector3
+var original_rotation: Vector3
 var _counter_handled_return: bool = false
 var _original_position_saved_this_turn: bool = false
 
@@ -1121,6 +1122,9 @@ func advance_to_target(target: Battler) -> bool:
 	if is_advancing:
 		return false
 
+	# Ensure original transform is saved prior to movement
+	save_original_position()
+
 	# Calculate dynamic stop distance based on target's AABB
 	var movement_distance = get_target_stop_distance(target)
 	var movement_speed = custom_movement_speed
@@ -1147,13 +1151,31 @@ func advance_to_target(target: Battler) -> bool:
 	set_advancing(true)
 	_try_animation(AnimationMapping.WALK)
 
+	# Rotate to face target horizontally (+Z forward convention)
+	var flat_look_dir := target.global_position - global_position
+	flat_look_dir.y = 0.0
+	var target_yaw := rotation.y
+	if flat_look_dir.length_squared() > 0.0001:
+		target_yaw = atan2(flat_look_dir.x, flat_look_dir.z)
+		# Shortest-angle interpolation
+		target_yaw = rotation.y + wrapf(target_yaw - rotation.y, -PI, PI)
+
 	# Wait for animation to start before beginning movement
 	await get_tree().process_frame
 
+	var return_yaw := original_rotation.y
+	return_yaw = target_yaw + wrapf(return_yaw - target_yaw, -PI, PI)
+
 	var tween = create_tween()
 	tween.set_speed_scale(battle_manager.speed_multiplier)
-	tween.tween_property(self, "global_position", advance_target_position, movement_duration)
-	tween.tween_callback(_on_advance_complete)
+	# Turn to face approach path and move toward target simultaneously
+	var move_tween = tween.parallel()
+	move_tween.tween_property(self, "global_position", advance_target_position, movement_duration)
+	move_tween.tween_property(self, "rotation:y", target_yaw, minf(movement_duration * 0.4, 0.2))
+	# Smoothly realign to original rest orientation upon arrival
+	var align_duration = minf(0.2, maxf(0.08, movement_duration * 0.25))
+	tween.chain().tween_property(self, "rotation:y", return_yaw, align_duration)
+	tween.chain().tween_callback(_on_advance_complete)
 
 	# Adjust animation playback speed to match movement duration
 	if anim_tree:
@@ -1382,6 +1404,7 @@ func get_resolved_animation(generic_name: String) -> String:
 
 func _on_advance_complete():
 	set_advancing(false)
+	rotation = original_rotation
 	# Reset animation time_scale to normal after synced movement
 	if anim_tree:
 		anim_tree.set("parameters/BaseSM/time_scale", 1.0)
@@ -1434,10 +1457,14 @@ func return_to_original_position():
 	# Wait for animation to start before beginning movement
 	await get_tree().process_frame
 
-	var tween = create_tween()
+	var return_yaw := original_rotation.y
+	return_yaw = rotation.y + wrapf(return_yaw - rotation.y, -PI, PI)
+
+	var tween = create_tween().set_parallel(true)
 	tween.set_speed_scale(battle_manager.speed_multiplier)
 	tween.tween_property(self, "global_position", original_position, movement_duration)
-	tween.tween_callback(_on_return_complete)
+	tween.tween_property(self, "rotation:y", return_yaw, movement_duration)
+	tween.chain().tween_callback(_on_return_complete)
 
 	# Adjust animation playback speed to match movement duration
 	if anim_tree:
@@ -1533,6 +1560,7 @@ func _on_dodge_dash_complete(p_original_position: Vector3):
 
 func _on_return_complete():
 	set_advancing(false)
+	rotation = original_rotation
 
 	# Reset animation time_scale to normal after synced movement
 	if anim_tree:
@@ -1909,6 +1937,7 @@ func save_original_position() -> void:
 		return
 	
 	original_position = global_position
+	original_rotation = rotation
 	_original_position_saved_this_turn = true
 
 ## Reset the original position saved flag at the start of a new turn

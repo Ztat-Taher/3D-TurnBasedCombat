@@ -103,7 +103,7 @@ static func create_default() -> RunMap:
 	treasure_start.id = "treasure_start"
 	treasure_start.display_name = "Treasure"
 	treasure_start.node_config = treasure_config
-	treasure_start.level_path = ""  # Treasure disabled for now
+	treasure_start.level_path = "res://scenes/menus/map_menu/treasure_screen.tscn"
 	treasure_start.next_node_ids.assign(["ancient_bridge"])
 	treasure_start.map_position = Vector2(0.78, 0.84)
 	
@@ -136,7 +136,7 @@ static func create_default() -> RunMap:
 	treasure_stop.id = "treasure_stop"
 	treasure_stop.display_name = "Treasure"
 	treasure_stop.node_config = treasure_config
-	treasure_stop.level_path = ""  # Treasure disabled for now
+	treasure_stop.level_path = "res://scenes/menus/map_menu/treasure_screen.tscn"
 	treasure_stop.next_node_ids.assign(["mountain_pass"])
 	treasure_stop.map_position = Vector2(0.85, 0.68)
 	
