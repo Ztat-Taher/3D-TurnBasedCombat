@@ -1163,18 +1163,10 @@ func advance_to_target(target: Battler) -> bool:
 	# Wait for animation to start before beginning movement
 	await get_tree().process_frame
 
-	var return_yaw := original_rotation.y
-	return_yaw = target_yaw + wrapf(return_yaw - target_yaw, -PI, PI)
-
-	var tween = create_tween()
+	var tween = create_tween().set_parallel(true)
 	tween.set_speed_scale(battle_manager.speed_multiplier)
-	# Turn to face approach path and move toward target simultaneously
-	var move_tween = tween.parallel()
-	move_tween.tween_property(self, "global_position", advance_target_position, movement_duration)
-	move_tween.tween_property(self, "rotation:y", target_yaw, minf(movement_duration * 0.4, 0.2))
-	# Smoothly realign to original rest orientation upon arrival
-	var align_duration = minf(0.2, maxf(0.08, movement_duration * 0.25))
-	tween.chain().tween_property(self, "rotation:y", return_yaw, align_duration)
+	tween.tween_property(self, "global_position", advance_target_position, movement_duration)
+	tween.tween_property(self, "rotation:y", target_yaw, minf(movement_duration, 0.2))
 	tween.chain().tween_callback(_on_advance_complete)
 
 	# Adjust animation playback speed to match movement duration
