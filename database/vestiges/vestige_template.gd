@@ -108,6 +108,33 @@ func get_rarity_name() -> String:
 	return Rarity.keys()[rarity]
 
 
+## Display color for each rarity (UI tags, chest VFX, glows)
+const RARITY_COLORS := {
+	Rarity.COMMON: Color(0.85, 0.85, 0.85),
+	Rarity.UNCOMMON: Color(0.35, 0.85, 1.0),
+	Rarity.RARE: Color(1.0, 0.78, 0.25),
+	Rarity.BOSS: Color(1.0, 0.32, 0.28),
+	Rarity.EVENT: Color(0.85, 0.45, 1.0),
+	Rarity.SHOP: Color(0.45, 1.0, 0.5),
+}
+
+## How flashy a reveal should be for each rarity: 0 = modest .. 3 = huge
+const RARITY_TIERS := {
+	Rarity.COMMON: 0,
+	Rarity.UNCOMMON: 1,
+	Rarity.RARE: 2,
+	Rarity.BOSS: 3,
+	Rarity.EVENT: 2,
+	Rarity.SHOP: 1,
+}
+
+static func get_rarity_color(for_rarity: Rarity) -> Color:
+	return RARITY_COLORS.get(for_rarity, Color.WHITE)
+
+static func get_rarity_tier(for_rarity: Rarity) -> int:
+	return RARITY_TIERS.get(for_rarity, 0)
+
+
 ## Get the scope name as a string
 func get_scope_name() -> String:
 	return Scope.keys()[scope]

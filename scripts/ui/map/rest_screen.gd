@@ -21,10 +21,25 @@ const PARTY_ROW_SCENE : PackedScene = preload("res://scenes/menus/map_menu/party
 @export var heal_amount : int = 999
 
 @onready var party_rows : VBoxContainer = $CenterContainer/Panel/VBox/PartyRows
+@onready var panel : Control = $CenterContainer/Panel
+@onready var heal_all_button : Button = $CenterContainer/Panel/VBox/Actions/HealAllButton
+## Bottom-right Cancel / Confirm (authored in the scene; Cancel is connected to Done)
+@onready var contextual_bar : ContextualButtonBar = $ContextualButtons
 
 
 func _ready() -> void:
 	_populate_party_rows()
+	_setup_navigation()
+
+
+## Keyboard / gamepad: start on Heal All; hovering a button highlights it too.
+## Confirm is shown while a button is highlighted and presses it.
+func _setup_navigation() -> void:
+	for button in panel.find_children("*", "BaseButton", true, false):
+		button.focus_mode = Control.FOCUS_ALL
+		button.mouse_entered.connect(button.grab_focus)
+	contextual_bar.follow_focus(panel, &"Confirm")
+	heal_all_button.grab_focus.call_deferred()
 
 
 func _ensure_party() -> Array[AllyPartyMember]:

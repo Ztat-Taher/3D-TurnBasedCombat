@@ -1,13 +1,10 @@
-[gd_resource type="Resource" load_steps=2 format=3 uid="uid://node_config_treasure"]
+[gd_resource type="Resource" script_class="NodeConfig" format=3 uid="uid://du62x86pqvr7p"]
 
-[ext_resource type="Script" path="res://scripts/game_state/map/node_config.gd" id="1_node_config"]
-[ext_resource type="Texture2D" path="res://assets/images/map/icon_treasure.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://ecpur4dqothb" path="res://scripts/game_state/map/node_config.gd" id="1_node_config"]
+[ext_resource type="Texture2D" uid="uid://c43mlfb308ac0" path="res://assets/images/map/icon_treasure.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1_node_config")
 node_type = "Treasure"
 icon_texture = ExtResource("2_icon")
-node_color = Color(1, 1, 1, 1)
-vestige_reward_rarity = 0
-vestige_reward_count = 1
 vestige_reward_source = "treasure"

@@ -292,35 +292,23 @@ static func get_recruit_template() -> AllyPartyMember:
 
 
 ## Get or save the procedural map to prevent regeneration mid-run
-static func get_or_create_procedural_map(plane_size: int = 30, node_count: int = 90, path_count: int = 15, min_node_distance: float = 3.0) -> RunMap:
+static func get_or_create_procedural_map(plane_size: int = 30, node_count: int = 90, path_count: int = 15, min_node_distance: float = 3.0, connection_distance: float = -1.0) -> RunMap:
 	var game_state := get_or_create_state()
 	
 	# If we have a serialized map, try to restore it
 	if not game_state.run_map_serialized.is_empty():
-		var map_string = game_state.run_map_serialized
-		var json = JSON.new()
-		var error = json.parse(map_string)
-		if error == OK and json.data is Dictionary:
-			var restored_map = RunMap.new()
-			# Simple restoration of basic properties with proper typing
-			if json.data.has("starting_node_ids"):
-				var ids: Array[String] = []
-				ids.assign(json.data.starting_node_ids)
-				restored_map.starting_node_ids = ids
-			if json.data.has("nodes"):
-				var node_array: Array = []
-				node_array.assign(json.data.nodes)
-				restored_map.nodes = node_array
-			return restored_map
+		var restored := RunMap.from_dict(JSON.parse_string(game_state.run_map_serialized))
+		if restored != null:
+			return restored
+		# Unreadable save (older builds stored nodes as "<Resource#...>" text):
+		# its progress points at a map that no longer exists, so start the map over
+		push_warning("GameState: saved run map was unreadable; generating a new map.")
+		game_state.completed_nodes.clear()
+		game_state.current_node_id = ""
 	
-	# Generate new map and serialize it
-	var new_map = RunMap.create_procedural(plane_size, node_count, path_count, min_node_distance)
-	var map_dict = {
-		"starting_node_ids": new_map.starting_node_ids,
-		"nodes": new_map.nodes
-	}
-	var json_string = JSON.stringify(map_dict)
-	game_state.run_map_serialized = json_string
+	# Generate new map and serialize it (nodes as plain data, see RunMap.to_dict)
+	var new_map = RunMap.create_procedural(plane_size, node_count, path_count, min_node_distance, connection_distance)
+	game_state.run_map_serialized = JSON.stringify(new_map.to_dict())
 	GlobalState.save()
 	return new_map
 

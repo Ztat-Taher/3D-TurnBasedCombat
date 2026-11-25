@@ -6,28 +6,38 @@
 [ext_resource type="PackedScene" path="res://scenes/windows/party_screen.tscn" id="5_party"]
 [ext_resource type="PackedScene" uid="uid://cwt4p3bufkke5" path="res://addons/maaacks_game_template/base/nodes/windows/confirmation_popup_window_panel.tscn" id="4_6lma4"]
 [ext_resource type="Script" uid="uid://1nf36h0gms3q" path="res://addons/maaacks_game_template/base/nodes/utilities/capture_focus.gd" id="4_mdvg7"]
+[ext_resource type="PackedScene" uid="uid://ctjy3pwceb03d" path="res://scenes/battle/hud/contextual_buttons/contextual_button_bar.tscn" id="cb_bar"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/contextual_buttons/contextual_button.tscn" id="cb_button"]
+[ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://resources/themes/theme_test.tres" id="cb_theme"]
+[ext_resource type="PackedScene" uid="uid://b870384gvy6qt" path="res://scenes/menus/options_menu/input/input_icon_mapper.tscn" id="cb_mapper"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_root"]
 
 [node name="PauseMenu" type="PanelContainer" unique_id=156357199]
 process_mode = 3
-custom_minimum_size = Vector2(256, 312)
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -128.0
-offset_top = -155.0
-offset_right = 128.0
-offset_bottom = 157.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_root")
 script = ExtResource("2_00o4m")
 options_menu_scene = ExtResource("3_mdvg7")
 party_screen_scene = ExtResource("5_party")
 pauses_game = true
 parent_scene = ExtResource("3_00o4m")
 
-[node name="ContentContainer" type="MarginContainer" parent="." unique_id=1755486830]
+[node name="InputIconMapper" parent="." groups=["input_icon_mapper"] instance=ExtResource("cb_mapper")]
+
+[node name="MenuCenter" type="CenterContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="MenuPanel" type="PanelContainer" parent="MenuCenter"]
+custom_minimum_size = Vector2(256, 312)
+layout_mode = 2
+
+[node name="ContentContainer" type="MarginContainer" parent="MenuCenter/MenuPanel" unique_id=1755486830]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/margin_left = 16
@@ -35,11 +45,11 @@ theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="BoxContainer" type="BoxContainer" parent="ContentContainer" unique_id=394030069]
+[node name="BoxContainer" type="BoxContainer" parent="MenuCenter/MenuPanel/ContentContainer" unique_id=394030069]
 layout_mode = 2
 vertical = true
 
-[node name="TitleMargin" type="MarginContainer" parent="ContentContainer/BoxContainer" unique_id=1262022916]
+[node name="TitleMargin" type="MarginContainer" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer" unique_id=1262022916]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/margin_left = -14
@@ -47,27 +57,27 @@ theme_override_constants/margin_top = -14
 theme_override_constants/margin_right = -14
 theme_override_constants/margin_bottom = 8
 
-[node name="BoxContainer" type="BoxContainer" parent="ContentContainer/BoxContainer/TitleMargin" unique_id=1788474031]
+[node name="BoxContainer" type="BoxContainer" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/TitleMargin" unique_id=1788474031]
 layout_mode = 2
 theme_override_constants/separation = 0
 vertical = true
 
-[node name="TitleLabel" type="Label" parent="ContentContainer/BoxContainer/TitleMargin/BoxContainer" unique_id=1049966061]
+[node name="TitleLabel" type="Label" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/TitleMargin/BoxContainer" unique_id=1049966061]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Paused"
 horizontal_alignment = 1
 
-[node name="HSeparator" type="HSeparator" parent="ContentContainer/BoxContainer/TitleMargin/BoxContainer" unique_id=33373596]
+[node name="HSeparator" type="HSeparator" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/TitleMargin/BoxContainer" unique_id=33373596]
 layout_mode = 2
 
-[node name="BodyMargin" type="MarginContainer" parent="ContentContainer/BoxContainer" unique_id=590613964]
+[node name="BodyMargin" type="MarginContainer" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer" unique_id=590613964]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="DescriptionLabel" type="RichTextLabel" parent="ContentContainer/BoxContainer/BodyMargin" unique_id=617407155]
+[node name="DescriptionLabel" type="RichTextLabel" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/BodyMargin" unique_id=617407155]
 unique_name_in_owner = true
 layout_mode = 2
 bbcode_enabled = true
@@ -75,12 +85,12 @@ fit_content = true
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="MenuButtonsMargin" type="MarginContainer" parent="ContentContainer/BoxContainer" unique_id=1413292752]
+[node name="MenuButtonsMargin" type="MarginContainer" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer" unique_id=1413292752]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/margin_top = 8
 
-[node name="MenuButtons" type="BoxContainer" parent="ContentContainer/BoxContainer/MenuButtonsMargin" unique_id=1371114575]
+[node name="MenuButtons" type="BoxContainer" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin" unique_id=1371114575]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(128, 0)
 layout_mode = 2
@@ -90,43 +100,43 @@ alignment = 1
 vertical = true
 script = ExtResource("4_mdvg7")
 
-[node name="CloseButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=314526102]
+[node name="CloseButton" type="Button" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=314526102]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Resume"
 
-[node name="PartyButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1188334512]
+[node name="PartyButton" type="Button" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1188334512]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Party"
 
-[node name="RestartButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1371657172]
+[node name="RestartButton" type="Button" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1371657172]
 layout_mode = 2
 text = "Restart"
 
-[node name="OptionsButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1126383675]
+[node name="OptionsButton" type="Button" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1126383675]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Options"
 
-[node name="MainMenuButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=928043706]
+[node name="MainMenuButton" type="Button" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=928043706]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Main Menu"
 
-[node name="ExitButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1398257582]
+[node name="ExitButton" type="Button" parent="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1398257582]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Exit Game"
 
-[node name="RestartConfirmation" parent="." unique_id=1405814931 instance=ExtResource("4_6lma4")]
+[node name="RestartConfirmation" parent="MenuCenter/MenuPanel" unique_id=1405814931 instance=ExtResource("4_6lma4")]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 title = "Confirm Restart"
 text = "Restart the game?"
 
-[node name="MainMenuConfirmation" parent="." unique_id=1770307648 instance=ExtResource("4_6lma4")]
+[node name="MainMenuConfirmation" parent="MenuCenter/MenuPanel" unique_id=1770307648 instance=ExtResource("4_6lma4")]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(220, 0)
@@ -134,15 +144,47 @@ layout_mode = 2
 title = "Confirm Exit"
 text = "Exit to the main menu?"
 
-[node name="ExitConfirmation" parent="." unique_id=1587469343 instance=ExtResource("4_6lma4")]
+[node name="ExitConfirmation" parent="MenuCenter/MenuPanel" unique_id=1587469343 instance=ExtResource("4_6lma4")]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 title = "Confirm Exit"
 text = "Exit the game?"
 
-[connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/RestartButton" to="." method="_on_restart_button_pressed"]
-[connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/OptionsButton" to="." method="_on_options_button_pressed"]
-[connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/PartyButton" to="." method="_on_party_button_pressed"]
-[connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/MainMenuButton" to="." method="_on_main_menu_button_pressed"]
-[connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/ExitButton" to="." method="_on_exit_button_pressed"]
+[node name="ContextualRoot" type="Control" parent="."]
+layout_mode = 2
+mouse_filter = 2
+theme = ExtResource("cb_theme")
+
+[node name="ContextualButtons" parent="ContextualRoot" instance=ExtResource("cb_bar")]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -94.0
+offset_right = -24.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="Back" parent="ContextualRoot/ContextualButtons" instance=ExtResource("cb_button")]
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Back"
+prompt_action = &"ui_cancel"
+
+[node name="Confirm" parent="ContextualRoot/ContextualButtons" instance=ExtResource("cb_button")]
+visible = false
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Confirm"
+prompt_action = &"Confirm"
+
+[connection signal="pressed" from="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/RestartButton" to="." method="_on_restart_button_pressed"]
+[connection signal="pressed" from="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/OptionsButton" to="." method="_on_options_button_pressed"]
+[connection signal="pressed" from="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/PartyButton" to="." method="_on_party_button_pressed"]
+[connection signal="pressed" from="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/MainMenuButton" to="." method="_on_main_menu_button_pressed"]
+[connection signal="pressed" from="MenuCenter/MenuPanel/ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/ExitButton" to="." method="_on_exit_button_pressed"]
+[connection signal="confirmed" from="ContextualRoot/ContextualButtons/Back" to="." method="close"]

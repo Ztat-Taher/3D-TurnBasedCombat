@@ -6,6 +6,9 @@ extends Control
 
 signal card_selected(card: CardConfig)
 signal end_turn_pressed()
+## Emitted when the keyboard/controller-highlighted card changes.
+## True while a card is highlighted via keys/D-pad, false when cleared.
+signal controller_card_highlighted(highlighted: bool)
 
 ## Extra margin around the CardContainer that still counts as "in hand" for
 ## drag-release purposes (the play zone starts outside these bounds).
@@ -16,19 +19,25 @@ const HAND_ZONE_MARGIN_BOTTOM: float = 0.0
 
 ## Animation durations
 const DRAW_ANIM_DURATION: float = 0.35
+## Existing cards sliding to new fan slots when the hand changes
+const HAND_SLIDE_DURATION: float = 0.3
 const DRAW_ANIM_STAGGER: float = 0.08
 const DISCARD_ANIM_DURATION: float = 0.30
 const DISCARD_STAGGER: float = 0.06
 
 @onready var card_container: HBoxContainer = $CardContainer
 @onready var draw_pile: Control = $DrawPile
-@onready var draw_pile_count: Label = $DrawPile/DrawPileCountBadge/DrawPileCount
+@onready var draw_pile_count: Label = $DrawPile/DrawPileCount
 @onready var discard_anchor: Control = $DiscardAnchor
 
 # Card currently under the mouse (drives the same hover visuals as the
 # controller navigation). Hover detection follows each card's *highlighted*
 # visual form, not its resting fan slot.
 var mouse_hovered_card: CardButton = null
+# While true, physical mouse hover is ignored so keyboard/controller
+# navigation keeps its highlight until the mouse actually moves.
+var _suppress_mouse_hover: bool = false
+var _last_mouse_position: Vector2 = Vector2.ZERO
 
 var card_battle_manager: CardBattleManager
 var card_button_scene: PackedScene
@@ -49,12 +58,9 @@ var joystick_active_direction: int = 0  # Track which direction joystick is acti
 var _is_discarding_hand: bool = false
 # The card button currently being played — saved so we can animate it to the discard pile
 var _pending_discard_button: CardButton = null
-# True when cards are laid out but waiting for the UI to become visible before animating
-var _draw_anim_pending: bool = false
-# Track the previous hand size to detect newly added cards
-var previous_hand_size: int = 0
-# Track the starting index for new card animations
-var _new_card_start_index: int = 0
+# Newly created card buttons still waiting for their pile -> hand draw animation
+# (kept while CardUI is hidden, played the moment it becomes visible)
+var _pending_draw_buttons: Array[Control] = []
 
 func _ready():
 	if card_container:
@@ -67,10 +73,7 @@ func _ready():
 	# Connect draw pile button press handler
 	if draw_pile and draw_pile.has_signal("pressed"):
 		draw_pile.pressed.connect(_on_draw_pile_pressed)
-	
-	# Start the draw pile idle bob animation
-	_start_draw_pile_idle_anim()
-	
+
 	# Defer to ensure scene tree is ready
 	call_deferred("_deferred_ready")
 
@@ -78,9 +81,8 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_VISIBILITY_CHANGED and visible:
 		# CardUI just became visible (e.g. Attack button pressed in BattleHUD).
 		# If a draw animation was queued while we were hidden, play it now.
-		if _draw_anim_pending:
-			_draw_anim_pending = false
-			call_deferred("_start_draw_animations")
+		if not _pending_draw_buttons.is_empty():
+			call_deferred("_animate_hand_changes", {})
 
 func _deferred_ready():
 	# Find card battle manager
@@ -95,8 +97,6 @@ func _deferred_ready():
 	card_battle_manager.ap_changed.connect(_on_ap_changed)
 	card_battle_manager.card_played.connect(_on_card_played)
 	
-	# Reset hand size tracking for initial load
-	previous_hand_size = 0
 	
 	# Initial UI update
 	update_hand_display()
@@ -104,6 +104,15 @@ func _deferred_ready():
 	update_pile_counts()
 
 func _process(_delta: float) -> void:
+	# Open-hand cursor while a hand card is under the mouse (cards are hit-tested
+	# here, under the HUD, so the cursor can't see them). Re-stated every frame,
+	# so no hover-reset path can leave it stuck.
+	CursorManager.set_hover(self, visible and is_instance_valid(mouse_hovered_card))
+	var mouse_pos := get_viewport().get_mouse_position()
+	if _suppress_mouse_hover and mouse_pos != _last_mouse_position:
+		_suppress_mouse_hover = false
+	_last_mouse_position = mouse_pos
+	
 	if not visible:
 		_set_mouse_hovered_card(null)
 		return
@@ -120,6 +129,8 @@ func _is_any_card_dragging() -> bool:
 	return false
 
 func _update_mouse_hover() -> void:
+	if _suppress_mouse_hover:
+		return
 	var mouse_pos := get_viewport().get_mouse_position()
 	
 	var current: CardButton = mouse_hovered_card
@@ -142,11 +153,22 @@ func _update_mouse_hover() -> void:
 func _set_mouse_hovered_card(card_button: CardButton) -> void:
 	if mouse_hovered_card == card_button:
 		return
-	if is_instance_valid(mouse_hovered_card) and mouse_hovered_card.is_hovered:
-		mouse_hovered_card.set_controller_hover(false)
+	if is_instance_valid(mouse_hovered_card) and mouse_hovered_card.is_mouse_hovered:
+		mouse_hovered_card.set_mouse_hover(false)
+	# Mouse input takes over highlighting: drop any key-driven highlight so
+	# only one card is highlighted at a time.
+	if card_button:
+		_clear_controller_hovers()
 	mouse_hovered_card = card_button
 	if card_button:
-		card_button.set_controller_hover(true)
+		card_button.set_mouse_hover(true)
+
+func _clear_controller_hovers() -> void:
+	for card_button in card_buttons:
+		if is_instance_valid(card_button) and card_button is CardButton:
+			card_button.set_controller_hover(false)
+	selected_card_index = -1
+	controller_card_highlighted.emit(false)
 
 func get_hand_zone_rect() -> Rect2:
 	if not card_container:
@@ -201,26 +223,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("attack"):
 		_select_current_card()
 		handled = true
+	elif event.is_action_pressed("ui_accept"):
+		_select_current_card()
+		handled = true
+	elif event.is_action_pressed("draw_card"):
+		_on_draw_pile_pressed()
+		handled = true
 	elif event.is_action_pressed("ui_cancel"):
-		# Check if we're in targeting mode
-		if battle_manager and battle_manager.in_target_selection:
-			if battle_manager.has_method("exit_targeting_mode"):
-				battle_manager.exit_targeting_mode()
-			
-			if battle_manager.has_meta("pending_card"):
-				battle_manager.set_meta("pending_card", null)
-			
-			# Return the pending card to hand if targeting was cancelled
-			if is_instance_valid(_pending_discard_button):
-				return_card_to_hand(_pending_discard_button)
-				_pending_discard_button = null
-		else:
-			# Not in targeting mode, just close the card UI
-			if visible:
-				var battlehud = get_tree().get_first_node_in_group("BattleHud")
-				if battlehud and battlehud.has_method("_on_global_back_pressed"):
-					battlehud._on_global_back_pressed()
-		
+		# Same single Back handler as the HUD's Back button (this input is
+		# ignored while targeting, so it only ever closes the hand)
+		var battlehud = get_tree().get_first_node_in_group("BattleHud")
+		if battlehud and battlehud.has_method("_on_global_back_pressed"):
+			battlehud._on_global_back_pressed()
 		handled = true
 	
 	if handled:
@@ -229,6 +243,13 @@ func _unhandled_input(event: InputEvent) -> void:
 func _navigate_cards(direction: int) -> void:
 	if card_buttons.is_empty():
 		return
+	
+	# Key/controller input takes over highlighting: suppress mouse hover and
+	# drop the current mouse highlight so only one card is highlighted.
+	_suppress_mouse_hover = true
+	if is_instance_valid(mouse_hovered_card):
+		mouse_hovered_card.set_mouse_hover(false)
+	mouse_hovered_card = null
 	
 	if selected_card_index < 0:
 		if direction > 0:
@@ -248,6 +269,11 @@ func _select_current_card() -> void:
 		if card_button:
 			card_button.card_played.emit(card_button.card_config)
 
+## Plays the currently keyboard/controller-highlighted card.
+## Used by the contextual "Play" HUD button.
+func play_highlighted_card() -> void:
+	_select_current_card()
+
 func _update_card_selection() -> void:
 	for i in range(card_buttons.size()):
 		var card_button = card_buttons[i]
@@ -259,6 +285,8 @@ func _update_card_selection() -> void:
 				if card_button != mouse_hovered_card \
 						and card_button.has_method("set_controller_hover"):
 					card_button.set_controller_hover(false)
+	controller_card_highlighted.emit(
+		selected_card_index >= 0 and selected_card_index < card_buttons.size())
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PILE MANAGEMENT
@@ -279,17 +307,6 @@ func update_pile_counts() -> void:
 		draw_count = deck.draw_pile.size()
 	draw_pile_count.text = str(draw_count)
 	_pulse_draw_pile_badge()
-
-## Gentle continuous bob on the draw pile stack.
-func _start_draw_pile_idle_anim() -> void:
-	if not draw_pile:
-		return
-	var tween := create_tween()
-	tween.set_loops()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(draw_pile, "position:y", draw_pile.position.y - 4.0, 1.2)
-	tween.tween_property(draw_pile, "position:y", draw_pile.position.y, 1.2)
 
 ## Brief scale-pulse on the draw count badge to draw attention to count changes.
 func _pulse_draw_pile_badge() -> void:
@@ -338,9 +355,7 @@ func _on_draw_pile_pressed() -> void:
 	# Draw a card from the deck
 	var drawn_card = card_battle_manager.draw_card_for_deck(deck)
 	if drawn_card:
-		# Force a full rebuild to ensure the new card appears
-		previous_hand_size = 0
-		# Update the hand display to show the new card
+		# Only the drawn card is added; the rest of the hand slides to its new fan slots
 		update_hand_display()
 		update_pile_counts()
 		# Force card playability update
@@ -350,71 +365,80 @@ func _on_draw_pile_pressed() -> void:
 # DRAW ANIMATION  (pile → hand fan position)
 # ─────────────────────────────────────────────────────────────────────────────
 
-## Called deferred (or from _notification) after update_hand_display().
-## We MUST await one process frame before reading global_position: call_deferred
-## fires during the idle phase of the same frame that added children, before
-## the HBoxContainer's SORT_CHILDREN pass runs. Without the await every card
-## reports global_position == (0,0) and the pile offset is wrong.
-func _start_draw_animations() -> void:
-	# Let the HBoxContainer finish its layout pass so global positions are valid.
+## Runs one frame after update_hand_display() (the HBoxContainer needs a layout
+## pass before global positions are valid).
+##   - cards that were already in hand slide from where they were drawn to their
+##     new fan slot (`panels_before`: card -> {pos, rot} snapshot)
+##   - only the newly created cards fly in from the draw pile, staggered
+func _animate_hand_changes(panels_before: Dictionary) -> void:
 	await get_tree().process_frame
-	
-	if not draw_pile or not is_inside_tree():
+	if not is_inside_tree():
 		return
-	
+
+	# Existing cards: start each visual where it was, ease into the new slot
+	for card in panels_before:
+		if not is_instance_valid(card) or not card.card_3d_container:
+			continue
+		if card.is_dragging or card.is_returning or card.is_hovered or card.is_highlighted:
+			continue
+		var before: Dictionary = panels_before[card]
+		card.card_3d_container.position = before.pos - card.global_position
+		card.card_3d_container.rotation_degrees = before.rot
+		card.is_draw_animating = true
+		var slide := create_tween()
+		slide.set_parallel(true)
+		slide.set_ease(Tween.EASE_OUT)
+		slide.set_trans(Tween.TRANS_CUBIC)
+		slide.tween_property(card.card_3d_container, "position", Vector2(0.0, card.base_y_offset), HAND_SLIDE_DURATION)
+		slide.tween_property(card.card_3d_container, "rotation_degrees", card.base_rotation, HAND_SLIDE_DURATION)
+		slide.chain().tween_callback(func():
+			if is_instance_valid(card):
+				card.is_draw_animating = false
+		)
+
+	# New cards: pile -> fan slot
+	var to_draw := _pending_draw_buttons.duplicate()
+	_pending_draw_buttons.clear()
+	if to_draw.is_empty() or not draw_pile:
+		return
 	var pile_center := draw_pile.global_position + draw_pile.size * 0.5
-	
-	# Animate cards starting from _new_card_start_index
-	for i in range(_new_card_start_index, card_buttons.size()):
-		var cb = card_buttons[i]
-		if not is_instance_valid(cb):
+
+	for n in range(to_draw.size()):
+		var cb = to_draw[n]
+		if not is_instance_valid(cb) or cb.is_queued_for_deletion():
 			continue
-		
-		# ── non-CardButton fallback ──
-		if not cb is CardButton:
-			cb.scale = Vector2.ZERO
+		var delay: float = DRAW_ANIM_STAGGER * n
+
+		# ── non-CardButton / no SubViewportContainer fallbacks ──
+		if not cb is CardButton or not (cb as CardButton).card_3d_container:
 			cb.modulate.a = 1.0
+			cb.scale = Vector2.ZERO
 			var tw := create_tween()
 			tw.set_ease(Tween.EASE_OUT)
 			tw.set_trans(Tween.TRANS_BACK)
-			tw.tween_property(cb, "scale", Vector2.ONE, DRAW_ANIM_DURATION).set_delay(DRAW_ANIM_STAGGER * (i - _new_card_start_index))
+			tw.tween_property(cb, "scale", Vector2.ONE, DRAW_ANIM_DURATION).set_delay(delay)
 			continue
-		
-		var card_btn := cb as CardButton
-		
-		# ── no SubViewportContainer fallback ──
-		if not card_btn.card_3d_container:
-			card_btn.modulate.a = 1.0
-			var tw := create_tween()
-			tw.set_ease(Tween.EASE_OUT)
-			tw.set_trans(Tween.TRANS_BACK)
-			tw.tween_property(card_btn, "modulate:a", 1.0, DRAW_ANIM_DURATION * 0.5).set_delay(DRAW_ANIM_STAGGER * (i - _new_card_start_index))
-			continue
-		
+
 		# ── main path: slide from pile into fan slot ──
-		# card_btn sits in CardContainer at its final fan position.
-		# pile_offset (screen-space delta, valid in card_btn local space since
-		# CardUI and CardContainer have no rotation/scale) moves card_3d_container
-		# so it visually appears at the draw pile. The tween then brings it back
-		# to the resting fan position (0, base_y_offset).
+		# card_btn sits in CardContainer at its final fan position; pile_offset
+		# (screen-space delta, valid in card_btn local space since CardUI and
+		# CardContainer have no rotation/scale) puts its visual at the pile.
+		var card_btn := cb as CardButton
 		var card_center := card_btn.global_position + card_btn.size * 0.5
 		var pile_offset: Vector2 = pile_center - card_center
-		
-		# Position visual at pile; keep card invisible until its tween fires
-		# (prevents staggered cards from flashing at pile position during delay).
+
+		# Invisible until its own tween fires (no flash at the pile during the stagger)
 		card_btn.card_3d_container.position = pile_offset + Vector2(0.0, card_btn.base_y_offset)
 		card_btn.card_3d_container.scale    = Vector2(0.5, 0.5)
 		card_btn.card_3d_container.rotation_degrees = card_btn.base_rotation - 15.0
 		card_btn.modulate.a = 0.0
-		# Block _process from snapping back while the tween owns the transform.
+		# Block _process from snapping back while the tween owns the transform
 		card_btn.is_draw_animating = true
-		
-		var delay: float = DRAW_ANIM_STAGGER * (i - _new_card_start_index)
+
 		var tween := create_tween()
 		tween.set_parallel(true)
 		tween.set_ease(Tween.EASE_OUT)
 		tween.set_trans(Tween.TRANS_CUBIC)
-		# Fade in quickly the moment the tween starts (after per-card delay)
 		tween.tween_property(card_btn, "modulate:a", 1.0, 0.08).set_delay(delay)
 		tween.tween_property(card_btn.card_3d_container, "position",
 			Vector2(0.0, card_btn.base_y_offset), DRAW_ANIM_DURATION).set_delay(delay)
@@ -422,7 +446,6 @@ func _start_draw_animations() -> void:
 			Vector2.ONE, DRAW_ANIM_DURATION).set_delay(delay)
 		tween.tween_property(card_btn.card_3d_container, "rotation_degrees",
 			card_btn.base_rotation, DRAW_ANIM_DURATION * 0.8).set_delay(delay)
-		# Release the guard so hover/idle can resume after the animation.
 		tween.chain().tween_callback(func():
 			if is_instance_valid(card_btn):
 				card_btn.is_draw_animating = false
@@ -495,6 +518,7 @@ func discard_hand_to_pile() -> void:
 	card_buttons.clear()
 	mouse_hovered_card = null
 	selected_card_index = -1
+	controller_card_highlighted.emit(false)
 	
 	if to_discard.is_empty():
 		_is_discarding_hand = false
@@ -538,123 +562,81 @@ func discard_hand_to_pile() -> void:
 # HAND DISPLAY
 # ─────────────────────────────────────────────────────────────────────────────
 
+## Syncs the hand UI with the deck's hand IN PLACE: cards still in hand keep
+## their button (and just slide to their new fan slot), cards that left the hand
+## are removed, and only genuinely new cards are created and drawn from the pile.
+## After discard_hand_to_pile() (turn start) nothing is kept, so the whole new
+## hand is drawn.
 func update_hand_display():
 	if not card_battle_manager or not card_container:
 		return
-	
+
 	card_container.add_theme_constant_override("separation", -20)
-	
 	var hand = card_battle_manager.get_hand()
-	var current_hand_size = hand.size()
-	var is_adding_card = current_hand_size > previous_hand_size
-	
-	# If we're adding cards (not rebuilding the whole hand), preserve existing cards
-	if is_adding_card and previous_hand_size > 0:
-		# Store old positions of existing cards before fanning
-		var old_positions = []
-		for i in range(previous_hand_size):
-			if i < card_buttons.size() and card_buttons[i] is CardButton:
-				var cb = card_buttons[i] as CardButton
-				old_positions.append({
-					"position": cb.card_3d_container.position if cb.card_3d_container else Vector2.ZERO,
-					"rotation": cb.card_3d_container.rotation_degrees if cb.card_3d_container else 0.0
-				})
-			else:
-				old_positions.append({"position": Vector2.ZERO, "rotation": 0.0})
-		
-		# Only add the new cards
-		var new_cards = hand.slice(previous_hand_size)
-		for i in range(new_cards.size()):
-			var card = new_cards[i]
-			var card_button = create_card_button(card)
-			if card_button:
-				card_buttons.append(card_button)
-				
-				# Visual indication for unplayable cards
-				if card_battle_manager:
-					var ap_info = card_battle_manager.get_ap_info()
-					if ap_info.get("current_ap", 0) < card.ap_cost:
-						var card_content = card_button.get_node_or_null("Card3DContainer/CardViewport/CardContent")
-						if card_content:
-							card_content.modulate = Color(0.4, 0.4, 0.4, 0.8)
-						else:
-							card_button.modulate = Color(0.4, 0.4, 0.4, 0.8)
-					else:
-						var card_content = card_button.get_node_or_null("Card3DContainer/CardViewport/CardContent")
-						if card_content:
-							card_content.modulate = Color.WHITE
-						else:
-							card_button.modulate = Color.WHITE
-				
-				# Start invisible — _start_draw_animations will reveal + fly in from pile
-				card_button.modulate.a = 0.0
-				card_container.add_child(card_button)
-		
-		# Store the start index for animation before updating previous_hand_size
-		_new_card_start_index = previous_hand_size
-		
-		# Apply fanning to set new positions for all cards
-		apply_card_fanning()
-		
-		# Smoothly reposition existing cards from old to new positions
-		_smoothly_reposition_existing_cards(old_positions)
-	else:
-		# Full rebuild (turn start, card played, etc.)
-		# Remove any old card buttons still in the container
-		for child in card_container.get_children():
-			child.queue_free()
-		
-		card_buttons.clear()
+
+	# Where every current card is drawn right now (before layout changes)
+	var panels_before := {}
+	var unused: Array[Control] = []
+	for cb in card_buttons:
+		if not is_instance_valid(cb) or cb.is_queued_for_deletion():
+			continue
+		unused.append(cb)
+		if cb is CardButton and cb.card_3d_container:
+			panels_before[cb] = {"pos": cb.card_3d_container.global_position, "rot": cb.card_3d_container.rotation_degrees}
+
+	# Match hand entries to existing buttons (same CardConfig, first unused one),
+	# create buttons only for cards that are new to the hand
+	var ordered: Array[Control] = []
+	for card in hand:
+		var match_button: Control = null
+		for cb in unused:
+			if cb.get("card_config") == card:
+				match_button = cb
+				break
+		if match_button:
+			unused.erase(match_button)
+		else:
+			match_button = create_card_button(card)
+			if match_button == null:
+				continue
+			# Start invisible — _animate_hand_changes flies it in from the pile
+			match_button.modulate.a = 0.0
+			card_container.add_child(match_button)
+			_pending_draw_buttons.append(match_button)
+		ordered.append(match_button)
+
+	# Cards no longer in hand (not already animating to the discard pile)
+	for cb in unused:
+		panels_before.erase(cb)
+		_pending_draw_buttons.erase(cb)
+		if mouse_hovered_card == cb:
+			mouse_hovered_card = null
+		if cb.get_parent() == card_container:
+			card_container.remove_child(cb)
+		cb.queue_free()
+
+	# Container order = hand order
+	for i in range(ordered.size()):
+		if ordered[i].get_index() != i:
+			card_container.move_child(ordered[i], i)
+	card_buttons = ordered
+
+	if card_buttons.is_empty():
 		mouse_hovered_card = null
 		selected_card_index = -1
-		
-		for i in range(hand.size()):
-			var card = hand[i]
-			var card_button = create_card_button(card)
-			if card_button:
-				card_buttons.append(card_button)
-				
-				# Visual indication for unplayable cards
-				if card_battle_manager:
-					var ap_info = card_battle_manager.get_ap_info()
-					if ap_info.get("current_ap", 0) < card.ap_cost:
-						var card_content = card_button.get_node_or_null("Card3DContainer/CardViewport/CardContent")
-						if card_content:
-							card_content.modulate = Color(0.4, 0.4, 0.4, 0.8)
-						else:
-							card_button.modulate = Color(0.4, 0.4, 0.4, 0.8)
-					else:
-						var card_content = card_button.get_node_or_null("Card3DContainer/CardViewport/CardContent")
-						if card_content:
-							card_content.modulate = Color.WHITE
-						else:
-							card_button.modulate = Color.WHITE
-				
-				# Start invisible — _start_draw_animations will reveal + fly in from pile
-				card_button.modulate.a = 0.0
-				card_container.add_child(card_button)
-		
-		# For full rebuild, animate all cards
-		_new_card_start_index = 0
-		
-		# Apply fanning to set positions
-		apply_card_fanning()
-	
+		controller_card_highlighted.emit(false)
+	elif selected_card_index >= card_buttons.size():
+		selected_card_index = card_buttons.size() - 1
+
+	update_card_playability()
+	apply_card_fanning()
 	_update_card_selection()
 	update_pile_counts()
-	
-	# Update previous hand size
-	previous_hand_size = current_hand_size
-	
-	# Defer draw animations so the HBoxContainer finishes layout first,
-	# giving us accurate global positions to calculate the pile → hand offset.
-	# If the CardUI is currently hidden (e.g. player hasn't opened the card
-	# menu yet this turn), mark the animation as pending so _notification()
-	# fires it the moment the node becomes visible.
+
+	# Layout settles next frame; animate then. While hidden (card menu not open)
+	# new cards just wait in _pending_draw_buttons and are drawn when it opens.
 	if visible:
-		call_deferred("_start_draw_animations")
-	else:
-		_draw_anim_pending = true
+		call_deferred("_animate_hand_changes", panels_before)
 
 func apply_card_fanning() -> void:
 	if not card_container:
@@ -684,41 +666,10 @@ func apply_card_fanning() -> void:
 		if child.has_method("set_fan_parameters"):
 			child.set_fan_parameters(rotation_deg, y_offset, z_idx)
 
-func _smoothly_reposition_existing_cards(old_positions: Array = []) -> void:
-	# Smoothly animate existing cards to their new fan positions
-	if not card_container:
-		return
-	
-	# Get the number of existing cards (before new ones were added)
-	var existing_count = previous_hand_size
-	
-	# Reposition existing cards
-	for i in range(existing_count):
-		if i >= card_buttons.size():
-			break
-		
-		var card_button = card_buttons[i]
-		if is_instance_valid(card_button) and card_button is CardButton:
-			var tween = create_tween()
-			tween.set_parallel(true)
-			tween.set_ease(Tween.EASE_OUT)
-			tween.set_trans(Tween.TRANS_CUBIC)
-			
-			if card_button.card_3d_container:
-				# If old positions were provided, animate from old to new
-				if i < old_positions.size():
-					var old_pos = old_positions[i]
-					card_button.card_3d_container.position = old_pos.position
-					card_button.card_3d_container.rotation_degrees = old_pos.rotation
-				
-				tween.tween_property(card_button.card_3d_container, "position", 
-					Vector2(0.0, card_button.base_y_offset), 0.3)
-				tween.tween_property(card_button.card_3d_container, "rotation_degrees", 
-					card_button.base_rotation, 0.3)
-
 func create_card_button(card: CardConfig) -> Control:
 	if not card_button_scene:
 		var button = Button.new()
+		button.focus_mode = Control.FOCUS_NONE
 		button.text = card.card_name + " (Cost: " + str(card.ap_cost) + ")"
 		button.pressed.connect(func(): _on_card_button_pressed(card))
 		return button
@@ -728,7 +679,7 @@ func create_card_button(card: CardConfig) -> Control:
 		card_button.hand_bounds_provider = Callable(self, "get_hand_zone_rect")
 	if card_button.has_method("setup"):
 		card_button.setup(card)
-		card_button.card_played.connect(_on_card_button_pressed.bind(card))
+		card_button.card_played.connect(_on_card_button_pressed)
 		if card_button.has_signal("card_drag_started"):
 			card_button.card_drag_started.connect(_on_card_drag_started)
 		if card_button.has_signal("card_drag_ended"):
@@ -740,7 +691,7 @@ func _on_card_drag_started(card_button: CardButton) -> void:
 	card_button.z_index = 200
 	if mouse_hovered_card != card_button and is_instance_valid(mouse_hovered_card) \
 			and mouse_hovered_card.is_hovered:
-		mouse_hovered_card.set_controller_hover(false)
+		mouse_hovered_card.set_mouse_hover(false)
 	mouse_hovered_card = null
 
 func _on_card_drag_ended(card_button: CardButton, dropped_in_play_zone: bool) -> void:
@@ -861,10 +812,6 @@ func return_card_to_hand(card_button: CardButton, panel_global_before_reorder: V
 				card_button.	card_3d_container.position = Vector2(0.0, card_button.base_y_offset)
 				card_button.	card_3d_container.rotation_degrees = card_button.base_rotation
 				card_button.	card_3d_container.scale = Vector2.ONE
-			var cm = card_button._get_cursor_manager()
-			if cm:
-				cm.notify_hover_exited(card_button)
-				cm.force_cursor_state(CursorDisplay.CursorState.DEFAULT)
 	)
 
 func _compensate_returned_panel(card_button: CardButton, panel_global_before: Vector2) -> void:
@@ -955,9 +902,7 @@ func _on_card_played(_card = null, _target = null):
 		# animate_discard_card handles reparenting and removal from card_buttons
 		animate_discard_card(discard_btn)
 	
-	# ── 2. Rebuild the remaining hand (draw animations play for unchanged cards) ──
-	# Reset previous hand size since we're doing a full rebuild
-	previous_hand_size = 0
+	# ── 2. Close the gap: remaining cards slide to their new fan slots ──
 	update_hand_display()
 	update_pile_counts()
 

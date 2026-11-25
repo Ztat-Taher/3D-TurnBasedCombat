@@ -6,6 +6,11 @@
 [ext_resource type="PackedScene" uid="uid://bun0stwgmcp2k" path="res://scenes/windows/stats_section.tscn" id="4_stats"]
 [ext_resource type="PackedScene" uid="uid://c5ewnjph3mdnd" path="res://scenes/windows/vestiges_section.tscn" id="5_vestiges"]
 [ext_resource type="PackedScene" uid="uid://b374vs4dc4g28" path="res://scenes/windows/weapon_info_section.tscn" id="6_weapon_info"]
+[ext_resource type="PackedScene" uid="uid://ctjy3pwceb03d" path="res://scenes/battle/hud/contextual_buttons/contextual_button_bar.tscn" id="cb_bar"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/contextual_buttons/contextual_button.tscn" id="cb_button"]
+[ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://resources/themes/theme_test.tres" id="cb_theme"]
+[ext_resource type="PackedScene" uid="uid://b870384gvy6qt" path="res://scenes/menus/options_menu/input/input_icon_mapper.tscn" id="cb_mapper"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/action_system/input/input_prompt.tscn" id="7_prompt"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_background"]
 bg_color = Color(0.26324546, 0.26324546, 0.26324546, 1)
@@ -22,6 +27,8 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_background")
 script = ExtResource("1_script")
 update_content = true
 title = "Party"
+
+[node name="InputIconMapper" parent="." groups=["input_icon_mapper"] instance=ExtResource("cb_mapper")]
 
 [node name="ContentContainer" type="MarginContainer" parent="." unique_id=1750238449]
 unique_name_in_owner = true
@@ -84,16 +91,35 @@ theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 12
 
-[node name="PartyMembersScroll" type="ScrollContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin" unique_id=1014959904]
+[node name="PartyMembersRow" type="HBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin"]
 layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PreviousMemberPrompt" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin/PartyMembersRow" instance=ExtResource("7_prompt")]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Previous member"
+action_name = &"cycle_party_previous"
+
+[node name="PartyMembersScroll" type="ScrollContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin/PartyMembersRow" unique_id=1014959904]
+layout_mode = 2
+size_flags_horizontal = 3
 follow_focus = true
 vertical_scroll_mode = 0
 
-[node name="PartyMembersList" type="HBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin/PartyMembersScroll" unique_id=36675174]
+[node name="PartyMembersList" type="HBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin/PartyMembersRow/PartyMembersScroll" unique_id=36675174]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 12
+
+[node name="NextMemberPrompt" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin/PartyMembersRow" instance=ExtResource("7_prompt")]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Next member"
+action_name = &"cycle_party_next"
 
 [node name="DeckPanel" type="PanelContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn" unique_id=144301999]
 layout_mode = 2
@@ -250,6 +276,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="MenuButtonsMargin" type="MarginContainer" parent="ContentContainer/BoxContainer" unique_id=1158919605]
+visible = false
 layout_mode = 2
 
 [node name="MenuButtons" type="BoxContainer" parent="ContentContainer/BoxContainer/MenuButtonsMargin" unique_id=30953493]
@@ -262,3 +289,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(104, 32)
 layout_mode = 2
 text = "Close"
+
+[node name="ContextualButtons" parent="ContentContainer/BoxContainer" instance=ExtResource("cb_bar")]
+layout_mode = 2
+theme = ExtResource("cb_theme")
+
+[node name="Back" parent="ContentContainer/BoxContainer/ContextualButtons" instance=ExtResource("cb_button")]
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Back"
+prompt_action = &"ui_cancel"
+[connection signal="confirmed" from="ContentContainer/BoxContainer/ContextualButtons/Back" to="." method="close"]

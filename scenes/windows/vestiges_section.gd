@@ -1,6 +1,9 @@
 extends VBoxContainer
 class_name VestigesSection
-## Lists the selected member's own vestiges and the party-wide ones.
+## Lists the selected member's own vestiges and the party-wide ones, each as a
+## [VestigeRow] (icon, name, description).
+
+const VESTIGE_ROW_SCENE : PackedScene = preload("res://scenes/windows/vestige_row.tscn")
 
 @onready var character_vestiges : VBoxContainer = $CharacterVestiges
 @onready var party_vestiges : VBoxContainer = $PartyVestiges
@@ -21,9 +24,9 @@ func _fill(container : VBoxContainer, vestiges : Array[Vestige], stack_count : C
 	for vestige in vestiges:
 		if vestige == null:
 			continue
-		var stacks : int = stack_count.call(vestige.vestige_id)
-		var stack_text := " ×%d" % stacks if stacks > 1 else ""
-		container.add_child(_make_label("%s%s — %s" % [vestige.vestige_name, stack_text, vestige.description]))
+		var row := VESTIGE_ROW_SCENE.instantiate() as VestigeRow
+		container.add_child(row)
+		row.setup(vestige, stack_count.call(vestige.vestige_id))
 	if container.get_child_count() == 0:
 		container.add_child(_make_label("None"))
 

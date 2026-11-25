@@ -6,10 +6,18 @@ extends WindowPanel
 ## Opened by the pause menu (instanced per open, freed when closed). Close
 ## button / ui_cancel handling comes from [WindowPanel].
 ##
-## Navigation: member tiles, deck cards and the preview are all focusable, so
-## the screen works with keyboard/controller. Deck cards are wrapped in
-## focusable "slots"; mouse hover simply focuses the slot, so mouse and
-## keyboard share one hover path.
+## Deck navigation doesn't use GUI focus (a mouse click anywhere can't break
+## it): ui_left/right/up/down (WASD / ZQSD, d-pad, left stick) move a deck
+## cursor wherever focus is, read in _input before the GUI. The arrow keys never
+## navigate the deck - Left/Right rotate the preview, Up/Down do nothing here.
+## Mouse hover moves the same cursor, so mouse and keys share one hover path.
+##
+## cycle_party_previous / cycle_party_next (Q/E, shown as A/E on AZERTY; LB/RB)
+## switch members from anywhere on the screen.
+##
+## Deck scrolling: moving the cursor with keys/d-pad scrolls only when the focused
+## row isn't fully visible, and leaves a peek of the next row in the direction
+## of travel (unless it's the first/last row), tweened so it reads as motion.
 
 const PARTY_MEMBER_BUTTON_SCENE : PackedScene = preload("res://scenes/windows/party_member_button.tscn")
 const WEAPON_LIST_ITEM_SCENE : PackedScene = preload("res://scenes/windows/weapon_list_item.tscn")
@@ -20,6 +28,9 @@ const DECK_COLUMNS : int = 3
 const CARD_SLOT_SIZE : Vector2 = Vector2(120, 180)
 ## How long the hovered copy keeps playing its un-hover animation before it's freed.
 const UNHOVER_DURATION : float = 0.16
+## How much of the next row stays visible when the deck scrolls to a card.
+const DECK_SCROLL_PEEK : float = 48.0
+const DECK_SCROLL_DURATION : float = 0.18
 
 @onready var party_members_list : HBoxContainer = %PartyMembersList
 @onready var character_preview : CharacterPreview = %CharacterPreview
@@ -38,7 +49,10 @@ var _member_group := ButtonGroup.new()
 var _card_overlay : CanvasLayer = null
 var _hover_slot : Control = null
 var _hover_copy : CardButton = null
-var _focus_from_mouse : bool = false
+var _deck_scroll_tween : Tween = null
+## Deck cursor (index into the deck slots), -1 = none
+var _deck_index : int = -1
+var _deck_scroll_target : float = 0.0
 
 
 func _ready() -> void:
@@ -47,7 +61,10 @@ func _ready() -> void:
 	_card_overlay.layer = 100
 	add_child(_card_overlay)
 	visibility_changed.connect(_on_screen_visibility_changed)
-	deck_scroll.get_v_scroll_bar().value_changed.connect(func(_v : float) -> void: _hide_hover())
+	# Wheel / scrollbar scrolling hides the hover; key-driven scrolling moves it along.
+	deck_scroll.get_v_scroll_bar().value_changed.connect(func(_v : float) -> void:
+		if not _is_deck_key_scrolling():
+			_hide_hover())
 	deck_grid.columns = DECK_COLUMNS
 
 	_party = GameState.get_party()
@@ -67,14 +84,112 @@ func _on_screen_visibility_changed() -> void:
 	if not shown:
 		_hide_hover()
 	else:
-		_focus_selected_member.call_deferred()
+		_select_deck_slot.call_deferred(maxi(_deck_index, 0))
 
 
-func _focus_selected_member() -> void:
+const ARROW_KEYS : Array[Key] = [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]
+const DECK_NAV := {
+	&"ui_left": Vector2i(-1, 0), &"ui_right": Vector2i(1, 0),
+	&"ui_up": Vector2i(0, -1), &"ui_down": Vector2i(0, 1),
+}
+
+
+## Deck navigation runs before the GUI so it works wherever focus is, and so the
+## GUI never moves focus on this screen.
+func _input(event : InputEvent) -> void:
+	if not is_visible_in_tree():
+		return
+	if event is InputEventKey and ((event as InputEventKey).physical_keycode in ARROW_KEYS 			or (event as InputEventKey).keycode in ARROW_KEYS):
+		# Arrows never navigate (Left/Right rotate the preview, which polls Input)
+		get_viewport().set_input_as_handled()
+		return
+	for action in DECK_NAV:
+		if event.is_action(action):
+			get_viewport().set_input_as_handled()
+			if event.is_action_pressed(action, true):
+				_move_deck_cursor(DECK_NAV[action])
+			return
+
+
+func _unhandled_input(event : InputEvent) -> void:
+	if is_visible_in_tree() and _party.size() > 1:
+		var step := 0
+		if event.is_action_pressed(&"cycle_party_previous"):
+			step = -1
+		elif event.is_action_pressed(&"cycle_party_next"):
+			step = 1
+		if step != 0:
+			get_viewport().set_input_as_handled()
+			_cycle_member(step)
+			return
+	super._unhandled_input(event)
+
+
+## Keeps the hovered copy glued to its slot while the deck scrolls under it.
+func _process(_delta : float) -> void:
+	if is_instance_valid(_hover_copy) and is_instance_valid(_hover_slot):
+		_hover_copy.global_position = _hover_slot.get_global_rect().position
+
+
+func _cycle_member(step : int) -> void:
+	var index := _party.find(_selected_member)
+	var deck_index := maxi(_deck_index, 0)
+	_select_member(_party[wrapi(index + step, 0, _party.size())])
+	_scroll_member_into_view.call_deferred()
+	# The old deck was freed; keep the cursor at the same spot in the new deck
+	_select_deck_slot.call_deferred(deck_index)
+
+
+func _scroll_member_into_view() -> void:
 	for button in party_members_list.get_children():
 		if button is PartyMemberButton and button.member == _selected_member:
-			button.grab_focus()
-			return
+			(party_members_list.get_parent() as ScrollContainer).ensure_control_visible(button)
+
+
+func _deck_slots() -> Array[Control]:
+	var slots : Array[Control] = []
+	for child in deck_grid.get_children():
+		if child.has_meta(&"deck_slot") and not child.is_queued_for_deletion():
+			slots.append(child as Control)
+	return slots
+
+
+## Moves the deck cursor by [param step] (columns, rows). No wrapping; going
+## down into a shorter last row lands on its last card.
+func _move_deck_cursor(step : Vector2i) -> void:
+	var slots := _deck_slots()
+	if slots.is_empty():
+		return
+	if _deck_index < 0 or _hover_slot == null:
+		# First press (or after the mouse left the deck) just shows the cursor
+		_select_deck_slot(clampi(_deck_index, 0, slots.size() - 1))
+		return
+	var col := _deck_index % DECK_COLUMNS
+	var index := _deck_index
+	if step.x != 0:
+		var new_col := clampi(col + step.x, 0, DECK_COLUMNS - 1)
+		index = mini(_deck_index - col + new_col, slots.size() - 1)
+	elif step.y > 0:
+		var row_start := _deck_index - col
+		if row_start + DECK_COLUMNS < slots.size():
+			index = mini(_deck_index + DECK_COLUMNS, slots.size() - 1)
+	elif step.y < 0:
+		index = maxi(_deck_index - DECK_COLUMNS, col if _deck_index >= DECK_COLUMNS else _deck_index)
+	_select_deck_slot(index)
+
+
+## Puts the deck cursor on slot [param index]: scrolls it into view (keys) and
+## shows its hovered copy.
+func _select_deck_slot(index : int, from_mouse : bool = false) -> void:
+	var slots := _deck_slots()
+	if slots.is_empty():
+		_deck_index = -1
+		return
+	_deck_index = clampi(index, 0, slots.size() - 1)
+	var slot := slots[_deck_index]
+	if not from_mouse:
+		_scroll_deck_to(slot)
+	_show_hover(slot)
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +254,8 @@ func _build_deck(member : AllyPartyMember) -> void:
 	for card in deck.cards:
 		var slot := Control.new()
 		slot.custom_minimum_size = CARD_SLOT_SIZE
-		slot.focus_mode = Control.FOCUS_ALL
+		slot.focus_mode = Control.FOCUS_NONE
+		slot.set_meta(&"deck_slot", true)
 		# PASS so wheel scrolling still reaches the ScrollContainer.
 		slot.mouse_filter = Control.MOUSE_FILTER_PASS
 		deck_grid.add_child(slot)
@@ -149,30 +265,51 @@ func _build_deck(member : AllyPartyMember) -> void:
 		_make_display_only(card_button)
 		slot.mouse_entered.connect(_on_slot_mouse_entered.bind(slot))
 		slot.mouse_exited.connect(_on_slot_mouse_exited.bind(slot))
-		slot.focus_entered.connect(_on_slot_focus_entered.bind(slot))
-		slot.focus_exited.connect(_on_slot_focus_exited.bind(slot))
+
 
 
 func _on_slot_mouse_entered(slot : Control) -> void:
-	_focus_from_mouse = true
-	slot.grab_focus()
-	_focus_from_mouse = false
+	_select_deck_slot(_deck_slots().find(slot), true)
 
 
+## The cursor stays on the card; only the hover visual goes away
 func _on_slot_mouse_exited(slot : Control) -> void:
-	if slot.has_focus():
-		slot.release_focus()
-
-
-func _on_slot_focus_entered(slot : Control) -> void:
-	if not _focus_from_mouse:
-		deck_scroll.ensure_control_visible(slot)
-	_show_hover(slot)
-
-
-func _on_slot_focus_exited(slot : Control) -> void:
 	if _hover_slot == slot:
 		_hide_hover()
+
+
+func _is_deck_key_scrolling() -> bool:
+	return _deck_scroll_tween != null and _deck_scroll_tween.is_running()
+
+
+## Scrolls the deck just enough to show [param slot]'s whole row (+ its hover
+## lift), plus a peek of the row beyond it. No scroll if it's already in view.
+func _scroll_deck_to(slot : Control) -> void:
+	var view_height := deck_scroll.size.y
+	var row_top := slot.position.y
+	var row_bottom := row_top + slot.size.y
+	var content_height := deck_grid.size.y
+	var current := float(deck_scroll.scroll_vertical)
+	if _is_deck_key_scrolling():
+		current = _deck_scroll_target
+	var target := current
+	var is_first_row := row_top <= 0.5
+	var is_last_row := row_bottom >= content_height - 0.5
+	if row_top < current:
+		# Going up: row at the top, previous row peeking above it
+		target = row_top - (0.0 if is_first_row else DECK_SCROLL_PEEK)
+	elif row_bottom > current + view_height:
+		# Going down: row at the bottom, next row peeking below it
+		target = row_bottom - view_height + (0.0 if is_last_row else DECK_SCROLL_PEEK)
+	var max_scroll := maxf(0.0, content_height - view_height)
+	target = clampf(target, 0.0, max_scroll)
+	if is_equal_approx(target, current):
+		return
+	_deck_scroll_target = target
+	if _deck_scroll_tween:
+		_deck_scroll_tween.kill()
+	_deck_scroll_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_deck_scroll_tween.tween_property(deck_scroll, "scroll_vertical", int(target), DECK_SCROLL_DURATION) 		.from(int(deck_scroll.scroll_vertical))
 
 
 ## Draws a hovered copy of [param slot]'s card on the overlay; the original

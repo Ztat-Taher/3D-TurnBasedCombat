@@ -5,6 +5,9 @@
 [ext_resource type="Script" uid="uid://bsi3dk4tesrkd" path="res://scenes/windows/stat_radar_graph.gd" id="3_graph"]
 [ext_resource type="Script" path="res://scripts/juice/lighting/flicker_light.gd" id="4_flicker"]
 [ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="5_psx"]
+[ext_resource type="PackedScene" uid="uid://ctjy3pwceb03d" path="res://scenes/battle/hud/contextual_buttons/contextual_button_bar.tscn" id="cb_bar"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/contextual_buttons/contextual_button.tscn" id="cb_button"]
+[ext_resource type="PackedScene" uid="uid://b870384gvy6qt" path="res://scenes/menus/options_menu/input/input_icon_mapper.tscn" id="cb_mapper"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_psx"]
 shader = ExtResource("5_psx")
@@ -154,6 +157,8 @@ size = Vector3(0.4, 0.5, 0.28)
 
 [node name="RecruitScreen" type="Node3D"]
 script = ExtResource("1_script")
+
+[node name="InputIconMapper" parent="." groups=["input_icon_mapper"] instance=ExtResource("cb_mapper")]
 
 [node name="ViewportContainer" type="SubViewportContainer" parent="."]
 material = SubResource("ShaderMaterial_psx")
@@ -418,3 +423,31 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 40)
 layout_mode = 2
 text = "Leave"
+
+[node name="ContextualButtons" parent="UI/UIRoot" instance=ExtResource("cb_bar")]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -94.0
+offset_right = -24.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+handle_input_actions = true
+
+[node name="Cancel" parent="UI/UIRoot/ContextualButtons" instance=ExtResource("cb_button")]
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Cancel"
+prompt_action = &"ui_cancel"
+
+[node name="Confirm" parent="UI/UIRoot/ContextualButtons" instance=ExtResource("cb_button")]
+visible = false
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Confirm"
+prompt_action = &"Confirm"
+[connection signal="confirmed" from="UI/UIRoot/ContextualButtons/Cancel" to="." method="_leave"]

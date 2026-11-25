@@ -2,7 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://bkcsjsk2ciff" path="res://addons/maaacks_game_template/base/nodes/music_players/background_music_player.tscn" id="1_kp23o"]
 [ext_resource type="Script" uid="uid://ckeab4gwuxwcd" path="res://scenes/game/scripts/game_timer.gd" id="2_5jirj"]
-[ext_resource type="Script" uid="uid://cyh0d64pfygbl" path="res://addons/maaacks_game_template/base/nodes/utilities/pause_menu_controller.gd" id="3_vaxfo"]
+[ext_resource type="Script" path="res://scenes/game/scripts/pause_menu_controller.gd" id="3_vaxfo"]
 [ext_resource type="PackedScene" uid="uid://cp6w64jgypo4u" path="res://scenes/windows/pause_menu.tscn" id="4_ftsea"]
 [ext_resource type="Script" uid="uid://bbymrin0cm704" path="res://addons/maaacks_game_template/extras/scripts/level_loader.gd" id="5_otnwt"]
 [ext_resource type="Script" uid="uid://bbl5ssv7yiq6v" path="res://scripts/level_and_state_manager.gd" id="6_3xj4h"]

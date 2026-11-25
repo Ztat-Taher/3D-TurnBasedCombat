@@ -1,6 +1,9 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/map/rest_screen.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://ctjy3pwceb03d" path="res://scenes/battle/hud/contextual_buttons/contextual_button_bar.tscn" id="cb_bar"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/contextual_buttons/contextual_button.tscn" id="cb_button"]
+[ext_resource type="PackedScene" uid="uid://b870384gvy6qt" path="res://scenes/menus/options_menu/input/input_icon_mapper.tscn" id="cb_mapper"]
 
 [node name="RestScreen" type="Control"]
 layout_mode = 3
@@ -10,6 +13,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
+
+[node name="InputIconMapper" parent="." groups=["input_icon_mapper"] instance=ExtResource("cb_mapper")]
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -62,5 +67,33 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Done"
 
+[node name="ContextualButtons" parent="." instance=ExtResource("cb_bar")]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -94.0
+offset_right = -24.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+handle_input_actions = true
+
+[node name="Cancel" parent="ContextualButtons" instance=ExtResource("cb_button")]
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Cancel"
+prompt_action = &"ui_cancel"
+
+[node name="Confirm" parent="ContextualButtons" instance=ExtResource("cb_button")]
+visible = false
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Confirm"
+prompt_action = &"Confirm"
+
 [connection signal="pressed" from="CenterContainer/Panel/VBox/Actions/HealAllButton" to="." method="_on_heal_all_button_pressed"]
 [connection signal="pressed" from="CenterContainer/Panel/VBox/Actions/DoneButton" to="." method="_on_done_button_pressed"]
+[connection signal="confirmed" from="ContextualButtons/Cancel" to="." method="_on_done_button_pressed"]

@@ -350,6 +350,16 @@ func initialize_cards_for_players():
 		if player is Battler:
 			card_integration.initialize_for_player(player)
 
+## Open-hand cursor while the mouse is over a valid target during targeting -
+## the same per-frame raycast check the treasure chest uses.
+func _process(_delta: float) -> void:
+	var over_target := false
+	if in_target_selection and mouse_input_toggle and battle_camera:
+		var battler := _raycast_battler_at(get_viewport().get_mouse_position())
+		over_target = battler != null and battler.is_selectable and battler.is_valid_target
+	CursorManager.set_hover(self, over_target)
+
+
 func _input(event: InputEvent) -> void:
 	if !in_target_selection or valid_targets.is_empty():
 		return
@@ -371,44 +381,11 @@ func _input(event: InputEvent) -> void:
 			is_speed_active = false
 			speed_multiplier = 1.0
 	
-	# Cancel is currently bound to Escape key
-	if event.is_action_pressed("Cancel"):
-		if in_target_selection:
-			_cancel_action_target_selection()
-		elif in_menu_selection:
-			_cancel_menu_selection()
+	# Cancel / Back (Esc, Backspace, right-click, gamepad B) is handled by the HUD's
+	# single Back handler, which calls cancel_target_selection() here
 	# Confirm is currently bound to Enter key
-	elif event.is_action_pressed("Confirm") and in_target_selection:
-		var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
-		if pending_card:
-			# Check if this is an AOE card
-			var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
-			if is_aoe:
-				# AOE mode: confirm on all targets at once, no single target selection needed
-				var projectile_aoe = false
-				if pending_card and pending_card.has_method("get"):
-					projectile_aoe = pending_card.get("projectile_aoe") if "projectile_aoe" in pending_card else false
-				if projectile_aoe:
-					await _execute_aoe_projectile_card(pending_card, valid_targets)
-				else:
-					confirm_aoe_execution()
-					set_meta("pending_card", null)
-					exit_targeting_mode()
-					return
-			# Non-AOE: requires a single target to be selected
-			if not current_target and not current_controller_target:
-				return
-			var target = current_target if current_target else current_controller_target
-			current_target = target
-			if battle_camera:
-				battle_camera.set_target_focus(current_target)
-			var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
-			if card_battle_manager:
-				_execute_card_async(card_battle_manager, pending_card, current_target)
-			set_meta("pending_card", null)
-			exit_targeting_mode()
-		elif queued_item:
-			_use_action_on_target()
+	if event.is_action_pressed("Confirm") and in_target_selection:
+		await confirm_target_selection()
 
 func initialize_battle():
 	# Get all nodes and convert to Battler arrays
@@ -535,10 +512,8 @@ func target_selected(target: Battler) -> void:
 		if current_target_type == "ally" and battle_camera:
 			battle_camera.set_target_focus(target)
 		
-		# Hide targeting UI - don't set CARD_EXECUTION_STATE here, play_card() handles it
-		if hud:
-			if hud.target_back_button:
-				hud.target_back_button.visible = false
+		# Targeting UI (incl. the contextual Back) is hidden when play_card() sets
+		# CARD_EXECUTION_STATE
 		
 		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 		if card_battle_manager:
@@ -804,9 +779,10 @@ func _do_item_target_selection() -> void:
 	# Set valid targets based on item type
 	if queued_item:
 		# Simple targeting: items target enemies for damage, allies for healing
-		if queued_item.damage_amount > 0:
+		# Item.hp_delta: negative = damage, positive = healing
+		if queued_item.hp_delta < 0:
 			valid_targets = current_enemies if current_character in current_players else current_players
-		elif queued_item.heal_amount > 0:
+		elif queued_item.hp_delta > 0:
 			valid_targets = current_players if current_character in current_players else current_enemies
 		else:
 			valid_targets = [current_character]  # Default to self for other items
@@ -916,33 +892,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif abs(axis_value) < 0.2:
 				target_joystick_active_direction = 0
 	elif event.is_action_pressed("ui_accept"):
-		# Check if this is AOE mode - confirm on all targets at once
-		var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
-		if is_aoe:
-			var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
-			if pending_card:
-				confirm_aoe_execution()
-			set_meta("pending_card", null)
-			exit_targeting_mode()
-		elif current_controller_target:
-			current_target = current_controller_target
-			# Check pending card first (card combat system)
-			var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
-			if pending_card:
-				if battle_camera:
-					battle_camera.set_target_focus(current_target)
-				var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
-				if card_battle_manager:
-					_execute_card_async(card_battle_manager, pending_card, current_target)
-			set_meta("pending_card", null)
-			exit_targeting_mode()
-		else:
-			_use_action_on_target()
+		confirm_target_selection()
 		handled = true
 	elif event.is_action_pressed("ui_cancel"):
-		_cancel_action_target_selection()
-		if in_target_selection:
-			exit_targeting_mode()
+		# Same path as the HUD's Back button
+		if hud and hud.has_method("_on_global_back_pressed"):
+			hud._on_global_back_pressed()
+		else:
+			_cancel_action_target_selection()
 		handled = true
 	
 	# Only consume input if we actually handled it
@@ -950,22 +907,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 # Camera raycasting for mouse target selection
-func _handle_mouse_click_target_selection() -> void:
-	if not battle_camera:
-		push_warning("[MouseTarget] battle_camera is null — assign it in the Inspector!")
-		return
-
-	var cam: Camera3D = battle_camera.get_camera()
+## The battler under [param root_mouse_pos] (root/HUD space) that the ray can
+## hit; battlers that aren't valid targets are excluded so they never block.
+## Shared by mouse click targeting and the hover check in _process.
+func _raycast_battler_at(root_mouse_pos: Vector2) -> Battler:
+	var cam: Camera3D = battle_camera.get_camera() if battle_camera else null
 	if not cam:
-		return
-
-	# Check if this is AOE mode
-	var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
-
-	# Use the camera's own viewport for the mouse position so SubViewport
-	# offset/scale is already accounted for by BattleCamera.screen_to_viewport().
-	var root_mouse_pos = get_viewport().get_mouse_position()
-
+		return null
 	# project_ray_origin/normal already convert from root HUD space → SubViewport space
 	var ray_origin = battle_camera.project_ray_origin(root_mouse_pos)
 	var ray_direction = battle_camera.project_ray_normal(root_mouse_pos)
@@ -1000,24 +948,29 @@ func _handle_mouse_click_target_selection() -> void:
 
 	if not space_state:
 		push_warning("[MouseTarget] Could not obtain PhysicsDirectSpaceState3D for raycasting!")
-		return
+		return null
 
 	var result = space_state.intersect_ray(ray_params)
 
-	if result.has("collider"):
-		var collider = result["collider"]
-		# Find the Battler node: collider itself or one of its ancestors
-		var battler: Battler = null
-		if collider is Battler:
-			battler = collider
-		else:
-			var curr = collider.get_parent()
-			while curr:
-				if curr is Battler:
-					battler = curr
-					break
-				curr = curr.get_parent()
+	if not result.has("collider"):
+		return null
+	# The Battler node: the collider itself or one of its ancestors
+	var node: Node = result["collider"]
+	while node and not node is Battler:
+		node = node.get_parent()
+	return node as Battler
 
+
+func _handle_mouse_click_target_selection() -> void:
+	if not battle_camera:
+		push_warning("[MouseTarget] battle_camera is null — assign it in the Inspector!")
+		return
+
+	# Check if this is AOE mode
+	var is_aoe = has_meta("is_aoe_mode") if has_method("has_meta") else false
+
+	var battler: Battler = _raycast_battler_at(get_viewport().get_mouse_position())
+	if battler:
 		if battler and battler is Battler:
 			# Check if this is a valid target
 			if battler.is_selectable and battler.is_valid_target:
@@ -1197,8 +1150,18 @@ func _execute_aoe_projectile_card(pending_card: CardConfig, aoe_targets: Array) 
 	if card_battle_manager:
 		card_battle_manager._aoe_execution_context.erase(pending_card)
 
+## Cancels the current target selection: battle-side cleanup here, then the HUD
+## decides where the UI goes (back to the menu targeting started from).
+func cancel_target_selection() -> void:
+	_cancel_action_target_selection()
+
 func _cancel_action_target_selection() -> void:
 	exit_targeting_mode()
+	# A card released to play but cancelled during targeting goes back to its
+	# fan slot (otherwise it stays floating where it was dropped)
+	var card_ui_node = get_tree().get_first_node_in_group("card_ui")
+	if card_ui_node and card_ui_node.has_method("return_pending_card_to_hand"):
+		card_ui_node.return_pending_card_to_hand()
 	current_target = null
 	current_controller_target = null
 	current_default_selector = null
@@ -1216,22 +1179,12 @@ func _cancel_action_target_selection() -> void:
 			battler.is_valid_target = true
 			battler.is_selectable = true
 	
-	if in_menu_selection:
-		_do_menu_selection()
+	SignalBus.allow_select_target.emit(false)
+	# UI: back to the menu the targeting came from (cards / items / base)
+	if hud and hud.has_method("on_targeting_cancelled"):
+		hud.on_targeting_cancelled()
 	else:
 		hud.show_action_buttons(current_character)
-	SignalBus.allow_select_target.emit(false)
-
-func _cancel_menu_selection() -> void:
-	in_menu_selection = false
-	
-	# Use the systematic menu close functions instead of direct manipulation
-	if hud.item_select.visible:
-		if hud.has_method("_close_items_menu"):
-			hud._close_items_menu()
-		else:
-			hud.item_select.hide()
-	hud.show_action_buttons(current_character)
 
 func _do_menu_selection() -> void:
 	in_menu_selection = true
@@ -1256,11 +1209,8 @@ func _use_action_on_target() -> void:
 				battler.is_selectable = false
 				battler.deselect_as_target()
 		valid_targets.clear()
-		if hud:
-			if hud.target_back_button:
-				hud.target_back_button.visible = false
-			if hud.has_method("set_ui_state"):
-				hud.set_ui_state(3) # CARD_EXECUTION_STATE
+		if hud and hud.has_method("set_ui_state"):
+			hud.set_ui_state(3) # CARD_EXECUTION_STATE (also hides the contextual Back)
 		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
 		if card_battle_manager:
 			_execute_card_async(card_battle_manager, pending_card, current_target)
@@ -1270,13 +1220,15 @@ func _use_action_on_target() -> void:
 		_cancel_action_target_selection()
 		return
 	
+	# exit_targeting_mode() clears current_target, so keep it for the item use
+	var item_target: Battler = current_target
 	exit_targeting_mode()
 	in_menu_selection = false
 	is_animating = true
 	if hud and hud.has_method("set_ui_state"):
 		hud.set_ui_state(3) # CARD_EXECUTION_STATE
 	
-	current_character.battle_item(queued_item, current_target)
+	current_character.battle_item(queued_item, item_target)
 	
 	queued_item = null
 	SignalBus.allow_select_target.emit(false)
@@ -1812,6 +1764,46 @@ func exit_targeting_mode():
 	# Restore OTS camera on current character if player turn
 	if battle_camera and current_character in players:
 		battle_camera.set_over_the_shoulder(current_character)
+
+## Confirms the current target selection. Shared by the Confirm/ui_accept input
+## actions and the on-screen contextual confirm button in the battle HUD.
+func confirm_target_selection() -> void:
+	if not in_target_selection:
+		return
+	var pending_card = get_meta("pending_card") if has_meta("pending_card") else null
+
+	# AOE mode: confirm on all targets at once, no single target selection needed
+	if pending_card and has_meta("is_aoe_mode") and get_meta("is_aoe_mode"):
+		var projectile_aoe = false
+		if pending_card.has_method("get"):
+			projectile_aoe = pending_card.get("projectile_aoe") if "projectile_aoe" in pending_card else false
+		if projectile_aoe:
+			await _execute_aoe_projectile_card(pending_card, valid_targets)
+		else:
+			confirm_aoe_execution()
+		set_meta("pending_card", null)
+		exit_targeting_mode()
+		return
+
+	var target: Battler = current_target if current_target else current_controller_target
+	if not target and current_default_selector in valid_targets:
+		target = current_default_selector
+	if target:
+		current_target = target
+
+	if pending_card:
+		# Non-AOE: requires a single target to be selected
+		if not target:
+			return
+		if battle_camera:
+			battle_camera.set_target_focus(current_target)
+		var card_battle_manager = get_tree().get_first_node_in_group("card_battle_manager")
+		if card_battle_manager:
+			_execute_card_async(card_battle_manager, pending_card, current_target)
+		set_meta("pending_card", null)
+		exit_targeting_mode()
+	elif queued_item:
+		_use_action_on_target()
 
 func confirm_aoe_execution():
 	var pending_card = get_meta("pending_card")

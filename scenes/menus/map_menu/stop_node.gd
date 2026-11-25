@@ -54,13 +54,19 @@ func update_state(available: bool, completed: bool) -> void:
 	else:
 		modulate = Color(0.5, 0.5, 0.5, 0.4)  # Grayed out for unavailable
 		disabled = true
+	if not is_available:
+		CursorManager.set_hover(self, false)
 
 func _on_mouse_entered() -> void:
 	if is_locked:
 		return
+	# Open-hand cursor over stops you can travel to (the map's SubViewport
+	# gets pushed input, so the cursor can't see this button by itself)
+	CursorManager.set_hover(self, is_available)
 	node_hovered.emit(node_id)
 
 func _on_mouse_exited() -> void:
+	CursorManager.set_hover(self, false)
 	node_exited.emit(node_id)
 
 func _on_focus_entered() -> void:

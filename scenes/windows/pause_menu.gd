@@ -17,6 +17,8 @@ extends PopupWindowPanel
 
 var open_window : Node
 var restarting : bool = false
+## Bottom-right Back / Confirm hints (authored in the scene; Back is connected to close())
+@onready var contextual_bar : ContextualButtonBar = $ContextualRoot/ContextualButtons
 
 func get_main_menu_scene_path() -> String:
 	return MaaacksGameTemplate.get_main_menu_path(main_menu_scene_path)
@@ -36,8 +38,13 @@ func _load_scene(scene_path: String) -> void:
 func _show_window(window : Control) -> void:
 	window.show()
 	open_window = window
+	# The sub-window (options, party, confirmation) brings its own hints
+	if contextual_bar:
+		contextual_bar.visible = false
 	await window.hidden
 	open_window = null
+	if contextual_bar:
+		contextual_bar.visible = true
 
 func _load_and_show_menu(scene : PackedScene) -> void:
 	var window_instance : Control = scene.instantiate()
@@ -50,6 +57,17 @@ func _handle_cancel_input() -> void:
 	if open_window != null:
 		return
 	super._handle_cancel_input()
+
+## The pause input toggles the menu closed again. Read in _input (before the GUI),
+## because Tab is also Godot's ui_focus_next and a focused button would eat it.
+func _input(event : InputEvent) -> void:
+	if not Engine.is_editor_hint() and is_visible_in_tree() and open_window == null 			and event.is_action_pressed(&"pause"):
+		get_viewport().set_input_as_handled()
+		close()
+
+## Confirm is only shown while a menu button is highlighted, and presses it
+func _setup_contextual_bar() -> void:
+	contextual_bar.follow_focus(self, &"Confirm")
 
 func _refresh_exit_button() -> void:
 	exit_button.visible = !OS.has_feature("web")
@@ -73,6 +91,8 @@ func _ready() -> void:
 	restart_confirmation.closed.connect(_on_restart_confirmation_closed)
 	main_menu_confirmation.confirmed.connect(_on_main_menu_confirmation_confirmed)
 	exit_confirmation.confirmed.connect(_on_exit_confirmation_confirmed)
+	if not Engine.is_editor_hint():
+		_setup_contextual_bar()
 
 func _on_restart_button_pressed() -> void:
 	_show_window(restart_confirmation)

@@ -4,7 +4,7 @@ extends Control
 signal qte_completed(success: bool)
 
 var title_label: Label
-var key_label: Label
+var input_prompt: Control
 var countdown_ring: ColorRect
 var qte_timer: Timer
 var input_key: String = ""
@@ -12,7 +12,7 @@ var time_limit: float = 0.0
 
 func _ready() -> void:
 	title_label = $CenterContainer/QTEContainer/TitleLabel
-	key_label = $CenterContainer/QTEContainer/RingContainer/KeyLabel
+	input_prompt = $CenterContainer/QTEContainer/RingContainer/InputPrompt
 	countdown_ring = $CenterContainer/QTEContainer/RingContainer/CountdownRing
 	
 	# Make sure the ColorRect is transparent so the shader shows through
@@ -34,7 +34,11 @@ func setup(p_input_key: String, p_time_limit: float) -> void:
 	
 	# Set the UI text
 	title_label.text = "ATTACK QTE!"
-	key_label.text = input_key.to_upper()
+	
+	# Register the QTE input action, then point the prompt at it
+	_connect_input()
+	if input_prompt:
+		input_prompt.action_name = StringName("qte_" + input_key.to_lower())
 	
 	# Reset countdown to full circle immediately
 	if countdown_ring and countdown_ring.material is ShaderMaterial:
@@ -43,9 +47,6 @@ func setup(p_input_key: String, p_time_limit: float) -> void:
 	# Start the timer
 	qte_timer.wait_time = time_limit
 	qte_timer.start()
-	
-	# Connect to input for this key
-	_connect_input()
 
 func _process(_delta: float) -> void:
 	# Update the radial countdown based on our own timer
@@ -78,6 +79,9 @@ func _connect_input() -> void:
 				# Try to parse as keycode
 				event.keycode = OS.find_keycode_from_string(input_key)
 		InputMap.action_add_event(action_name, event)
+		var joy_event := InputEventJoypadButton.new()
+		joy_event.button_index = JOY_BUTTON_A
+		InputMap.action_add_event(action_name, joy_event)
 	
 	# Connect to the input signal (this will be handled by the parent or we can check in _input)
 	set_process_input(true)

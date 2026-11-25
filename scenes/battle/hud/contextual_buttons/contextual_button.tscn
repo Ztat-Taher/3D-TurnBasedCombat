@@ -1,0 +1,73 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/hud/contextual_buttons/contextual_button.gd" id="1_cb"]
+[ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://scripts/juice/buttons/button_juice.gd" id="2_juice"]
+[ext_resource type="Texture2D" uid="uid://b2nrjutwl7rx7" path="res://assets/images/ui/menu/button_normal.png" id="3_texn"]
+[ext_resource type="Texture2D" uid="uid://mivsro58mpwj" path="res://assets/images/ui/menu/button_pressed.png" id="4_texp"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="5_font"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/action_system/input/input_prompt.tscn" id="6_prompt"]
+[ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://scripts/systems/effects/visual/shadows/drop_shadow.gd" id="7_shadow"]
+
+[node name="ContextualButton" type="TextureButton"]
+custom_minimum_size = Vector2(250, 60)
+ignore_texture_size = true
+focus_mode = 0
+texture_normal = ExtResource("3_texn")
+texture_pressed = ExtResource("4_texp")
+stretch_mode = 5
+script = ExtResource("1_cb")
+
+[node name="ButtonLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -90.0
+offset_top = -18.0
+offset_right = 58.0
+offset_bottom = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
+theme_override_constants/shadow_offset_x = -5
+theme_override_constants/shadow_offset_y = 5
+theme_override_fonts/font = ExtResource("5_font")
+theme_override_font_sizes/font_size = 30
+text = "Button"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
+
+[node name="InputPrompt" parent="." instance=ExtResource("6_prompt")]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -10.0
+offset_right = -5.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="ButtonJuice" type="Node" parent="."]
+script = ExtResource("2_juice")
+
+[node name="Shadow" type="TextureRect" parent="."]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("7_shadow")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5

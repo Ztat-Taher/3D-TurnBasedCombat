@@ -28,6 +28,8 @@ const MAP_LEVEL_PATH : String = "res://scenes/menus/map_menu/map_menu_3d.tscn"
 @onready var stats_graph : StatRadarGraph = %StatsGraph
 @onready var recruit_button : Button = %RecruitButton
 @onready var leave_button : Button = %LeaveButton
+## Bottom-right Cancel / Confirm (authored in the scene; Cancel is connected to _leave)
+@onready var contextual_bar : ContextualButtonBar = $UI/UIRoot/ContextualButtons
 
 var _template : AllyPartyMember = null
 var _model : Node3D = null
@@ -36,6 +38,12 @@ var _model : Node3D = null
 func _ready() -> void:
 	recruit_button.pressed.connect(_on_recruit_button_pressed)
 	leave_button.pressed.connect(_leave)
+	# Confirm shows while Recruit/Leave is highlighted and presses it
+	contextual_bar.follow_focus(recruit_button.get_parent(), &"Confirm")
+	for button : BaseButton in [recruit_button, leave_button]:
+		button.mouse_entered.connect(func() -> void:
+			if button.is_visible_in_tree() and not button.disabled:
+				button.grab_focus())
 	_template = GameState.get_found_recruit()
 	if _template == null:
 		_show_empty_camp()
@@ -68,6 +76,7 @@ func _show_empty_camp() -> void:
 
 
 func _on_recruit_button_pressed() -> void:
+	contextual_bar.hide_all()
 	recruit_button.disabled = true
 	leave_button.disabled = true
 	var ally_name := _template.get_display_name()

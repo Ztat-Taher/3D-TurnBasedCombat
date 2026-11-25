@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://ctjy3pwceb03d"]
+
+[ext_resource type="Script" uid="uid://bjhfkj61s4h1n" path="res://scenes/battle/hud/contextual_buttons/contextual_button_bar.gd" id="1_bar"]
+
+[node name="ContextualButtonBar" type="HBoxContainer" unique_id=353913358]
+custom_minimum_size = Vector2(0, 80)
+mouse_filter = 2
+theme_override_constants/separation = 10
+script = ExtResource("1_bar")
+
+[node name="Spacer" type="Control" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2

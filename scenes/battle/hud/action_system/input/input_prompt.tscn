@@ -1,0 +1,37 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/hud/action_system/input/battle_input_hint.gd" id="1_hint"]
+
+[node name="InputPrompt" type="Control"]
+custom_minimum_size = Vector2(12, 12)
+script = ExtResource("1_hint")
+
+[node name="Name" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="TextureRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch_mode = 5
+
+[node name="CycleDelay" type="Timer" parent="."]
+unique_name_in_owner = true
+
+[node name="UpdateDelay" type="Timer" parent="."]
+unique_name_in_owner = true
+
+[connection signal="timeout" from="CycleDelay" to="." method="_on_cycle_delay_timeout"]
+[connection signal="timeout" from="UpdateDelay" to="." method="_on_update_delay_timeout"]

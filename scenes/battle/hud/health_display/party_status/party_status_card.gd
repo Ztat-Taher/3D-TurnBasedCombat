@@ -5,7 +5,7 @@ extends Control
 @onready var active_tag: Label = $BackgroundContainer/ActiveTag
 @onready var hp_bar: TextureProgressBar = $BackgroundContainer/HPContainer/HPBar
 @onready var hp_damage_bar: TextureProgressBar = $BackgroundContainer/HPContainer/HPDamageBar
-@onready var hp_num_label: Label = $BackgroundContainer/HPContainer/HPBar/HPNumLabel
+@onready var hp_num_label: Label = $BackgroundContainer/HPContainer/HPNumLabel
 @onready var ap_bar_container: HBoxContainer = $BackgroundContainer/APContainer/APBarContainer
 @onready var level_num_label: Label = $BackgroundContainer/APContainer/LevelNumContainer/LevelNumBackground/LevelNumLabel
 @onready var portrait_background: TextureRect = $BackgroundContainer/PortraitBackground
@@ -20,8 +20,21 @@ extends Control
 
 @export var ap_bar_template: PackedScene # If you want to use a template, otherwise we'll duplicate the existing child
 
+const MAX_AP_BARS := 8
+
 var is_active: bool = false
 var current_ally: Battler = null
+
+func _ready() -> void:
+	shield_container.resized.connect(_relayout_shield_row)
+	ap_bar_container.resized.connect(_relayout_ap_row)
+
+func _relayout_shield_row() -> void:
+	PipRowFitter.relayout_row(shield_container, shield_template, false, hp_bar.size.x)
+
+func _relayout_ap_row() -> void:
+	var row_width := ap_bar_container.offset_right - ap_bar_container.offset_left
+	PipRowFitter.relayout_row(ap_bar_container, null, true, row_width, {"min_separation": 0.0})
 
 func setup(ally: Battler) -> void:
 	if not ally:
@@ -146,14 +159,15 @@ func update_ap(current_ap: int, max_ap: int) -> void:
 		if current_child_count == 0:
 			return
 			
-		# Adjust number of bars to match max_ap
-		if current_child_count < max_ap:
+		# Adjust number of bars to match max_ap, capped at MAX_AP_BARS
+		var target_bars := mini(max_ap, MAX_AP_BARS)
+		if current_child_count < target_bars:
 			var template = ap_bar_container.get_child(0)
-			for i in range(max_ap - current_child_count):
+			for i in range(target_bars - current_child_count):
 				var new_bar = template.duplicate()
 				ap_bar_container.add_child(new_bar)
-		elif current_child_count > max_ap:
-			for i in range(current_child_count - 1, max_ap - 1, -1):
+		elif current_child_count > target_bars:
+			for i in range(current_child_count - 1, target_bars - 1, -1):
 				var child = ap_bar_container.get_child(i)
 				child.queue_free()
 		
@@ -170,6 +184,7 @@ func update_ap(current_ap: int, max_ap: int) -> void:
 					# Dim or hide inactive AP bars
 					bar.modulate = Color(0.3, 0.3, 0.3, 0.5)
 					# bar.hide() # Or keep them visible but dimmed
+		_relayout_ap_row()
 
 func set_portrait_texture(texture: Texture2D) -> void:
 	if portrait_background:
@@ -194,6 +209,7 @@ func update_shields() -> void:
 				var shield = shield_template.duplicate()
 				shield.visible = true
 				shield_container.add_child(shield)
+	_relayout_shield_row()
 
 func _on_shield_changed(shield_count: int) -> void:
 	update_shields()

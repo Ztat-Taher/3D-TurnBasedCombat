@@ -221,6 +221,9 @@ func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provi
 	# But don't call set_as_keyboard_target() which would trigger camera focus
 	if available_targets.size() > 0:
 		battle_manager.current_default_selector = available_targets[0]
+		# Highlighted as the default (Confirm acts on it) without moving the camera
+		if not is_aoe and available_targets[0] is Battler:
+			available_targets[0].set_as_default_target()
 		# Don't set current_controller_target yet - only set it when user actually cycles or selects
 		# This keeps the camera in overview mode until a target is explicitly selected
 	

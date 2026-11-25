@@ -1,8 +1,129 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://culthv16rjfx"]
 
-[ext_resource type="Script" path="res://scripts/ui/map/treasure_screen.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://cdrq8o5jlol8o" path="res://scripts/ui/map/treasure_screen.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://cnwbt5mpovgfs" path="res://scenes/effects/chest.tscn" id="2_chest"]
+[ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="3_psx"]
+[ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="4_badge"]
+[ext_resource type="PackedScene" uid="uid://ctjy3pwceb03d" path="res://scenes/battle/hud/contextual_buttons/contextual_button_bar.tscn" id="5_context"]
+[ext_resource type="Theme" uid="uid://crdk7x2bxdhob" path="res://resources/themes/theme_test.tres" id="6_theme"]
+[ext_resource type="PackedScene" uid="uid://b870384gvy6qt" path="res://scenes/menus/options_menu/input/input_icon_mapper.tscn" id="7_icons"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/contextual_buttons/contextual_button.tscn" id="cb_button"]
 
-[node name="TreasureScreen" type="Control"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_psx"]
+shader = ExtResource("3_psx")
+shader_parameter/enabled = true
+shader_parameter/dithering = true
+shader_parameter/colors = 12
+shader_parameter/dither_size = 1
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_treasure"]
+sky_top_color = Color(0.2, 0.2, 0.3, 1)
+sky_horizon_color = Color(0.1, 0.1, 0.15, 1)
+sky_cover_modulate = Color(0.3, 0.2, 0.25, 1)
+
+[sub_resource type="Sky" id="Sky_treasure"]
+sky_material = SubResource("ProceduralSkyMaterial_treasure")
+
+[sub_resource type="Environment" id="Environment_treasure"]
+background_mode = 2
+sky = SubResource("Sky_treasure")
+fog_enabled = true
+fog_light_color = Color(0.4, 0.35, 0.3, 1)
+fog_density = 0.02
+fog_sky_affect = 0.5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+content_margin_left = 28.0
+content_margin_top = 24.0
+content_margin_right = 28.0
+content_margin_bottom = 24.0
+bg_color = Color(0.04, 0.04, 0.05, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.95, 0.95, 0.95, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+corner_detail = 1
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tag"]
+content_margin_left = 10.0
+content_margin_top = 3.0
+content_margin_right = 10.0
+content_margin_bottom = 3.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.95, 0.95, 0.95, 0.6)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+corner_detail = 1
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_sep"]
+color = Color(0.95, 0.95, 0.95, 0.2)
+thickness = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_primary"]
+content_margin_left = 16.0
+content_margin_top = 6.0
+content_margin_right = 16.0
+content_margin_bottom = 6.0
+bg_color = Color(0.95, 0.95, 0.95, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.95, 0.95, 0.95, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+corner_detail = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_primary_hover"]
+content_margin_left = 16.0
+content_margin_top = 6.0
+content_margin_right = 16.0
+content_margin_bottom = 6.0
+bg_color = Color(0.78, 0.78, 0.78, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.95, 0.95, 0.95, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+corner_detail = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_primary_disabled"]
+content_margin_left = 16.0
+content_margin_top = 6.0
+content_margin_right = 16.0
+content_margin_bottom = 6.0
+bg_color = Color(0.3, 0.3, 0.3, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.45, 0.45, 0.45, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+corner_detail = 1
+
+[node name="TreasureScreen" type="Control" unique_id=894185663]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,83 +132,288 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="InputIconMapper" parent="." groups=["input_icon_mapper"] instance=ExtResource("7_icons")]
+
+[node name="Background" type="ColorRect" parent="." unique_id=1702141943]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
-color = Color(0, 0, 0, 0.75)
+color = Color(0, 0, 0, 0.9)
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="SubViewportContainer" type="SubViewportContainer" parent="." unique_id=1977700000]
+material = SubResource("ShaderMaterial_psx")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
+stretch = true
+stretch_shrink = 2
 
-[node name="Panel" type="PanelContainer" parent="CenterContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(380, 280)
+[node name="SubViewport" type="SubViewport" parent="SubViewportContainer" unique_id=267207887]
+handle_input_locally = false
+size = Vector2i(640, 360)
+render_target_update_mode = 4
 
-[node name="VBox" type="VBoxContainer" parent="CenterContainer/Panel"]
-layout_mode = 2
-theme_override_constants/separation = 12
+[node name="WorldEnvironment" type="WorldEnvironment" parent="SubViewportContainer/SubViewport" unique_id=1988888888]
+environment = SubResource("Environment_treasure")
 
-[node name="TitleLabel" type="Label" parent="CenterContainer/Panel/VBox"]
+[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport" unique_id=501865420]
+transform = Transform3D(-0.9063078, -0.17860618, 0.3830222, 0, 0.9063077, 0.42261824, -0.42261827, 0.38302222, -0.8213937, 0.35, 0.5, -0.75)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport" unique_id=595833885]
+transform = Transform3D(0.8660254, -0.4330127, -0.25000003, 0, -0.50000006, 0.8660254, -0.5, -0.75, -0.43301275, 0, 5, 0)
+light_energy = 1.5
+shadow_enabled = true
+
+[node name="Chest" parent="SubViewportContainer/SubViewport" unique_id=1783331229 instance=ExtResource("2_chest")]
+
+[node name="ScreenFlash" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0)
+
+[node name="RarityBanner" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_top = 90.0
+offset_right = 300.0
+offset_bottom = 160.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 12
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 48
+text = "RARE!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ClickPrompt" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -150.0
+offset_right = 200.0
+offset_bottom = -64.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 14
+alignment = 2
+
+[node name="PromptLabel" type="Label" parent="ClickPrompt"]
 layout_mode = 2
-text = "Treasure Chest"
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 26
+text = "Click the chest to open it"
 horizontal_alignment = 1
 
-[node name="VestigeContainer" type="VBoxContainer" parent="CenterContainer/Panel/VBox"]
+[node name="ProgressPips" type="HBoxContainer" parent="ClickPrompt"]
 layout_mode = 2
-size_flags_vertical = 3
+mouse_filter = 2
 theme_override_constants/separation = 8
+alignment = 1
 
-[node name="VestigeName" type="Label" parent="CenterContainer/Panel/VBox/VestigeContainer"]
+[node name="MainContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 48
+theme_override_constants/margin_top = 48
+theme_override_constants/margin_right = 72
+theme_override_constants/margin_bottom = 48
+
+[node name="HBox" type="HBoxContainer" parent="MainContainer"]
 layout_mode = 2
-text = "Loading..."
+mouse_filter = 2
+
+[node name="LeftSpacer" type="Control" parent="MainContainer/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="RightColumn" type="VBoxContainer" parent="MainContainer/HBox"]
+layout_mode = 2
+mouse_filter = 2
+alignment = 1
+
+[node name="VestigeCard" type="PanelContainer" parent="MainContainer/HBox/RightColumn"]
+custom_minimum_size = Vector2(440, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="CardContent" type="VBoxContainer" parent="MainContainer/HBox/RightColumn/VestigeCard"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="HeaderLabel" type="Label" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 0.5)
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 16
+text = "TREASURE FOUND"
 horizontal_alignment = 1
 
-[node name="VestigeDescription" type="Label" parent="CenterContainer/Panel/VBox/VestigeContainer"]
+[node name="VestigeName" type="Label" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent"]
 layout_mode = 2
-text = "Opening chest..."
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 32
+text = "Vestige Name"
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="RarityLabel" type="Label" parent="CenterContainer/Panel/VBox/VestigeContainer"]
+[node name="Tags" type="HBoxContainer" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent"]
 layout_mode = 2
-text = ""
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="RarityTag" type="PanelContainer" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent/Tags"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_tag")
+
+[node name="RarityLabel" type="Label" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent/Tags/RarityTag"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 16
+text = "Common"
 horizontal_alignment = 1
 
-[node name="PartySelectionContainer" type="HBoxContainer" parent="CenterContainer/Panel/VBox"]
+[node name="ScopeTag" type="PanelContainer" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent/Tags"]
 layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_tag")
+
+[node name="ScopeLabel" type="Label" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent/Tags/ScopeTag"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 0.75)
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 16
+text = "Party-wide"
+horizontal_alignment = 1
+
+[node name="Separator" type="HSeparator" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent"]
+layout_mode = 2
+theme_override_constants/separation = 6
+theme_override_styles/separator = SubResource("StyleBoxLine_sep")
+
+[node name="VestigeDescription" type="Label" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 0.9)
+theme_override_font_sizes/font_size = 18
+text = "Vestige description."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="PartySelectionContainer" type="VBoxContainer" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent"]
 visible = false
-alignment = 1
+layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SelectionLabel" type="Label" parent="CenterContainer/Panel/VBox/PartySelectionContainer"]
+[node name="SelectionLabel" type="Label" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent/PartySelectionContainer"]
 layout_mode = 2
-text = "Award to:"
-theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 0.5)
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 16
+text = "GIVE TO"
+horizontal_alignment = 1
 
-[node name="Actions" type="HBoxContainer" parent="CenterContainer/Panel/VBox"]
+[node name="PartyButtons" type="HFlowContainer" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent/PartySelectionContainer"]
 layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
 alignment = 1
+
+[node name="ActionsSpacer" type="Control" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent"]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Actions" type="HBoxContainer" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent"]
+layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="TakeButton" type="Button" parent="CenterContainer/Panel/VBox/Actions"]
+[node name="SkipButton" type="Button" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent/Actions"]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Take Vestige"
-
-[node name="SkipButton" type="Button" parent="CenterContainer/Panel/VBox/Actions"]
-layout_mode = 2
-size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.6
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 16
 text = "Skip"
 
-[connection signal="pressed" from="CenterContainer/Panel/VBox/Actions/TakeButton" to="." method="_on_take_button_pressed"]
-[connection signal="pressed" from="CenterContainer/Panel/VBox/Actions/SkipButton" to="." method="_on_skip_button_pressed"]
+[node name="TakeButton" type="Button" parent="MainContainer/HBox/RightColumn/VestigeCard/CardContent/Actions"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.04, 0.04, 0.05, 1)
+theme_override_colors/font_hover_color = Color(0.04, 0.04, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.04, 0.04, 0.05, 1)
+theme_override_colors/font_focus_color = Color(0.04, 0.04, 0.05, 1)
+theme_override_colors/font_disabled_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_fonts/font = ExtResource("4_badge")
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxFlat_primary")
+theme_override_styles/hover = SubResource("StyleBoxFlat_primary_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_primary_hover")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_primary_disabled")
+text = "Take Vestige"
+
+[node name="ContextualButtons" parent="." instance=ExtResource("5_context")]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -94.0
+offset_right = -24.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+theme = ExtResource("6_theme")
+handle_input_actions = true
+
+[node name="Cancel" parent="ContextualButtons" instance=ExtResource("cb_button")]
+visible = false
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Cancel"
+prompt_action = &"ui_cancel"
+
+[node name="Confirm" parent="ContextualButtons" instance=ExtResource("cb_button")]
+visible = false
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+button_text = "Confirm"
+prompt_action = &"Confirm"
+
+[connection signal="pressed" from="MainContainer/HBox/RightColumn/VestigeCard/CardContent/Actions/TakeButton" to="." method="_on_take_button_pressed"]
+[connection signal="pressed" from="MainContainer/HBox/RightColumn/VestigeCard/CardContent/Actions/SkipButton" to="." method="_on_skip_button_pressed"]
+[connection signal="confirmed" from="ContextualButtons/Cancel" to="." method="_on_skip_button_pressed"]

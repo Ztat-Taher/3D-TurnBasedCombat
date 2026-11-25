@@ -1313,11 +1313,8 @@ func start_player_turn() -> void:
 	# --- Step 3: Update CardUI display for the new hand and notify HUD ---
 	if battle_manager and battle_manager.hud:
 		if card_ui:
-			# Force a full rebuild by resetting the previous hand size
+			# The old hand was discarded (discard_hand_to_pile), so the whole new hand draws in
 			if card_ui.has_method("update_hand_display"):
-				# Access the internal variable to force rebuild
-				if "previous_hand_size" in card_ui:
-					card_ui.previous_hand_size = 0
 				card_ui.update_hand_display()
 		if battle_manager.hud.has_method("update_party_status"):
 			var ap_info = get_ap_info()

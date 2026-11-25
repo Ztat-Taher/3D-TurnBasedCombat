@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://1mbdi00spy5j" path="res://scripts/juice/buttons/button_juice.gd" id="3_r004x"]
 
 [node name="ItemRow" type="Button" unique_id=633410267]
+focus_mode = 2
 custom_minimum_size = Vector2(259, 40)
 anchor_right = 0.224826
 anchor_bottom = 0.0617284

@@ -1,8 +1,8 @@
 class_name PartyMemberButton
 extends Button
 ## Portrait + name tile in the party screen's member row. Toggle button:
-## the selected member stays pressed (shared ButtonGroup), and focusing the
-## tile with the keyboard/controller selects it too.
+## the selected member stays pressed (shared ButtonGroup). Not focusable:
+## keyboard / controller switch members with cycle_party_previous / _next.
 
 signal member_selected(member : AllyPartyMember)
 
@@ -15,8 +15,8 @@ var member : AllyPartyMember
 
 
 func _ready() -> void:
+	focus_mode = Control.FOCUS_NONE
 	pressed.connect(_emit_selected)
-	focus_entered.connect(_emit_selected)
 
 
 func setup(p_member : AllyPartyMember) -> void:

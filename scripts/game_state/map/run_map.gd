@@ -21,6 +21,33 @@ func get_node_by_id(node_id : String) -> RunMapNode:
 			return map_node
 	return null
 
+## Plain-data form for saving (JSON-safe; see [method RunMapNode.to_dict]).
+func to_dict() -> Dictionary:
+	var node_dicts : Array = []
+	for node in nodes:
+		if node is RunMapNode:
+			node_dicts.append((node as RunMapNode).to_dict())
+	return {"starting_node_ids": Array(starting_node_ids), "nodes": node_dicts}
+
+
+## Rebuilds a map saved with [method to_dict]. Returns null when [param data]
+## isn't a valid saved map (e.g. old saves that stored nodes as
+## "<Resource#...>" strings), so callers can regenerate.
+static func from_dict(data) -> RunMap:
+	if not data is Dictionary:
+		return null
+	var map := RunMap.new()
+	map.starting_node_ids.assign(data.get("starting_node_ids", []))
+	for node_data in data.get("nodes", []):
+		var node := RunMapNode.from_dict(node_data)
+		if node == null:
+			return null
+		map.nodes.append(node)
+	if map.nodes.is_empty():
+		return null
+	return map
+
+
 ## The nodes the player can travel to next, given the completed node ids.
 ## With nothing completed yet, the starting nodes are available.
 func get_available_node_ids(completed_nodes : Array) -> Array[String]:
@@ -42,14 +69,14 @@ func get_available_node_ids(completed_nodes : Array) -> Array[String]:
 ## node_count: Number of nodes to generate (default 75, approximately plane_size^2 / 12)
 ## path_count: Number of unique paths from start to end (default 12)
 ## min_node_distance: Minimum distance between any two nodes (default 3.0)
-static func create_procedural(plane_size: int = 30, node_count: int = 75, path_count: int = 12, min_node_distance: float = 3.0) -> RunMap:
+static func create_procedural(plane_size: int = 30, node_count: int = 75, path_count: int = 12, min_node_distance: float = 3.0, connection_distance: float = -1.0) -> RunMap:
 	# Calculate default node count if not provided
 	if node_count <= 0:
 		node_count = int(float(plane_size * plane_size) / 12.0)
 	
 	# Generate the map data
 	var generator = ProceduralMapGenerator.new()
-	var map_data = generator.generate(plane_size, node_count, path_count, min_node_distance)
+	var map_data = generator.generate(plane_size, node_count, path_count, min_node_distance, connection_distance)
 	
 	# Convert to RunMap format
 	var run_map = MapConverter.convert_to_run_map(map_data, plane_size)

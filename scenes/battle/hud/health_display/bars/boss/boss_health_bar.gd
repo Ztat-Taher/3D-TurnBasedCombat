@@ -22,6 +22,11 @@ var _is_dying: bool = false
 func _ready() -> void:
 	# Start invisible until setup
 	modulate.a = 0.0
+	shield_container.resized.connect(_relayout_shield_row)
+
+func _relayout_shield_row() -> void:
+	var row_width: float = (shield_container.get_parent() as Control).size.x
+	PipRowFitter.relayout_row(shield_container, shield_template, false, row_width)
 
 func setup(battler: Battler) -> void:
 	enemy_battler = battler
@@ -111,6 +116,7 @@ func update_shields() -> void:
 				var shield = shield_template.duplicate()
 				shield.visible = true
 				shield_container.add_child(shield)
+	_relayout_shield_row()
 
 func _on_shield_changed(shield_count: int) -> void:
 	update_shields()

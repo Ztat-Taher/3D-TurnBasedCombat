@@ -60,6 +60,7 @@ var max_value: float = 100.0
 var original_bar_modulate: Color
 var original_label_position: Vector2
 var original_label_offset: Vector2 = Vector2.ZERO
+var original_label_offset_end: Vector2 = Vector2.ZERO
 var original_label_scale: Vector2
 
 # Tween handles so overlapping juice events kill prior animations instead of
@@ -138,6 +139,7 @@ func setup(bar, damage_bar = null, label = null) -> void:
 		# a layout that hasn't resolved yet can't bake in a stale position.
 		original_label_position = associated_label.position
 		original_label_offset = Vector2(associated_label.offset_left, associated_label.offset_top)
+		original_label_offset_end = Vector2(associated_label.offset_right, associated_label.offset_bottom)
 		original_label_scale = associated_label.scale
 	
 	# Setup critical health timer
@@ -246,7 +248,9 @@ func _animate_text_damage() -> void:
 	_kill_label_tweens()
 	
 	if enable_text_shake:
-		var original_pos = original_label_position
+		# Shake around the label's current position. The setup-time captured
+		# position can be stale when setup() ran before the first layout pass.
+		var original_pos = associated_label.position
 		_label_shake_tween = create_tween()
 		_label_shake_tween.tween_property(associated_label, "position:x", original_pos.x + text_shake_intensity, 0.05)
 		_label_shake_tween.tween_property(associated_label, "position:x", original_pos.x - text_shake_intensity, 0.05)
@@ -275,6 +279,9 @@ func _kill_label_tweens() -> void:
 		_label_shake_tween.kill()
 	if _label_pop_tween and _label_pop_tween.is_valid() and _label_pop_tween.is_running():
 		_label_pop_tween.kill()
+	# Killing a tween skips its restore callback, which would leave the label
+	# stranded at shaken offsets/scale - snap it back immediately.
+	_restore_label_layout()
 
 func _kill_bar_tweens() -> void:
 	for tween in [_damage_tween, _damage_scale_tween, _heal_tween, _heal_scale_tween, _critical_tween]:
@@ -289,6 +296,8 @@ func _restore_label_layout() -> void:
 		return
 	associated_label.offset_left = original_label_offset.x
 	associated_label.offset_top = original_label_offset.y
+	associated_label.offset_right = original_label_offset_end.x
+	associated_label.offset_bottom = original_label_offset_end.y
 	associated_label.scale = original_label_scale
 
 func _update_critical_health(current_value: float) -> void:

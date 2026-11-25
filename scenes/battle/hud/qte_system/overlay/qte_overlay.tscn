@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://scenes/battle/hud/qte_system/overlay/qte_overlay.gd" id="1_qte_overlay"]
 [ext_resource type="Shader" path="res://scenes/battle/hud/turn_system/timers/circular_countdown_ring.gdshader" id="2_countdown_shader"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/action_system/input/input_prompt.tscn" id="3_input_prompt"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_1"]
 shader = ExtResource("2_countdown_shader")
@@ -58,7 +59,7 @@ grow_vertical = 2
 color = Color(0, 0, 0, 0)
 material = SubResource("ShaderMaterial_1")
 
-[node name="KeyLabel" type="Label" parent="CenterContainer/QTEContainer/RingContainer"]
+[node name="InputPrompt" parent="CenterContainer/QTEContainer/RingContainer" instance=ExtResource("3_input_prompt")]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -71,8 +72,5 @@ offset_right = 50.0
 offset_bottom = 30.0
 grow_horizontal = 2
 grow_vertical = 2
-text = "F"
-horizontal_alignment = 1
-vertical_alignment = 1
 theme_override_font_sizes/font_size = 48
 theme_override_colors/font_color = Color(1, 1, 1, 1)

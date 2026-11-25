@@ -8,6 +8,8 @@ signal card_drag_ended(card_button: CardButton, dropped_in_play_zone: bool)
 
 var card_config: CardConfig
 var is_hovered: bool = false
+var is_mouse_hovered: bool = false
+var is_controller_hovered: bool = false
 var is_selected: bool = false
 var is_highlighted: bool = false
 var is_dragging: bool = false
@@ -235,6 +237,21 @@ func _ready():
 	_setup_shader()
 	_pop_in()
 
+## Card shadow (Shadow node in the scene, child of the visual card so it follows
+## lift / scale / tilt / drag): off while the card sits in the hand, on while it is
+## highlighted (mouse, keys or controller), further out while it is picked up.
+const SHADOW_OFFSET_RAISED := Vector2(8, 10)
+const SHADOW_OFFSET_HELD := Vector2(14, 22)
+const SHADOW_FADE := 0.12
+
+func _update_shadow() -> void:
+	var shadow := get_node_or_null("Card3DContainer/Shadow") as DropShadow
+	if shadow == null:
+		return
+	var raised := is_dragging or is_hovered or is_highlighted
+	shadow.set_strength(1.0 if raised else 0.0, SHADOW_FADE)
+	shadow.set_shadow_offset(SHADOW_OFFSET_HELD if is_dragging else SHADOW_OFFSET_RAISED, SHADOW_FADE)
+
 func _setup_shader():
 	# Set up the pseudo 3D shader material - MUST be unique per card to avoid shared state
 	var shader = load("res://scenes/battle/card_combat/visual_effects/shaders/card_pseudo_3d.gdshader")
@@ -355,46 +372,40 @@ func _exit_tree():
 func _pop_in():
 	pass
 
-func _get_cursor_manager() -> CursorManager:
-	var battle_hud := get_tree().get_first_node_in_group("BattleHud")
-	if battle_hud:
-		var hud_cursor := battle_hud.get_node_or_null("cursor_system")
-		if hud_cursor is CursorManager:
-			return hud_cursor
-	var manager := get_tree().get_first_node_in_group("cursor_manager")
-	return manager as CursorManager if manager is CursorManager else null
-
 func _on_mouse_entered():
-	if is_dragging:
-		return
-	is_hovered = true
-	z_index = 100
-	_animate_hover(true)
-	
-	var cm = _get_cursor_manager()
-	if cm:
-		cm.notify_hover_entered(self)
+	set_mouse_hover(true)
 
 func _on_mouse_exited():
-	if is_dragging:
+	set_mouse_hover(false)
+
+func set_mouse_hover(hover: bool) -> void:
+	if is_dragging or is_mouse_hovered == hover:
 		return
-	is_hovered = false
-	if not is_highlighted:
-		z_index = base_z_index
-	_animate_hover(false)
-	
-	# Update popup z-index to match base card
-	_hide_description_popup()
-	
-	var cm = _get_cursor_manager()
-	if cm:
-		cm.notify_hover_exited(self)
+	is_mouse_hovered = hover
+	_sync_hover_state()
 
 func set_controller_hover(hover: bool) -> void:
-	if hover and not is_hovered:
-		_on_mouse_entered()
-	elif not hover and is_hovered:
-		_on_mouse_exited()
+	if is_dragging or is_controller_hovered == hover:
+		return
+	is_controller_hovered = hover
+	_sync_hover_state()
+
+func _sync_hover_state() -> void:
+	var was_hovered := is_hovered
+	is_hovered = is_mouse_hovered or is_controller_hovered
+	_update_shadow()
+	if is_hovered == was_hovered:
+		return
+	if is_hovered:
+		z_index = 100
+		_animate_hover(true)
+	else:
+		if not is_highlighted:
+			z_index = base_z_index
+		_animate_hover(false)
+		
+		# Update popup z-index to match base card
+		_hide_description_popup()
 
 func _animate_hover(hover: bool):
 	if hover_tween and hover_tween.is_running():
@@ -421,6 +432,19 @@ func _hide_description_popup() -> void:
 	description_popup.visible = false
 	description_popup.modulate.a = 0.0
 	hover_timer = 0.0
+
+func _decay_tilt(delta: float) -> void:
+	if not card_shader_material:
+		return
+	# Decay tilt values back to zero
+	if abs(current_y_rot) > 0.1 or abs(current_x_rot) > 0.1:
+		current_y_rot = lerp(current_y_rot, 0.0, (1.0 - tilt_inertia) * 15.0 * delta)
+		current_x_rot = lerp(current_x_rot, 0.0, (1.0 - tilt_inertia) * 15.0 * delta)
+		card_shader_material.set_shader_parameter("y_rot", current_y_rot)
+		card_shader_material.set_shader_parameter("x_rot", current_x_rot)
+	else:
+		card_shader_material.set_shader_parameter("y_rot", 0.0)
+		card_shader_material.set_shader_parameter("x_rot", 0.0)
 
 func _process(delta: float) -> void:
 	var mouse_pos = get_viewport().get_mouse_position()
@@ -462,34 +486,29 @@ func _process(delta: float) -> void:
 		
 		is_out_of_hand = not _is_inside_hand_zone()
 	if is_hovered:
-		# Hover state with pseudo 3D effect
-		if card_shader_material:
-			var card_center := global_position + (size * 0.5)
-			var offset_from_center = (mouse_pos - card_center) / (size * 0.5)
-			var target_tilt_y = clamp(offset_from_center.x * max_tilt, -max_tilt, max_tilt)
-			var target_tilt_x = clamp(-offset_from_center.y * max_tilt, -max_tilt, max_tilt)
-			
-			# Apply inertia to tilt values
-			current_y_rot = lerp(current_y_rot, target_tilt_y, (1.0 - tilt_inertia) * 15.0 * delta)
-			current_x_rot = lerp(current_x_rot, target_tilt_x, (1.0 - tilt_inertia) * 15.0 * delta)
-			
-			card_shader_material.set_shader_parameter("y_rot", current_y_rot)
-			card_shader_material.set_shader_parameter("x_rot", current_x_rot)
+		# Pseudo 3D tilt only follows the physical mouse — key/controller
+		# highlighting raises the card but keeps it flat.
+		if is_mouse_hovered:
+			if card_shader_material:
+				var card_center := global_position + (size * 0.5)
+				var offset_from_center = (mouse_pos - card_center) / (size * 0.5)
+				var target_tilt_y = clamp(offset_from_center.x * max_tilt, -max_tilt, max_tilt)
+				var target_tilt_x = clamp(-offset_from_center.y * max_tilt, -max_tilt, max_tilt)
+				
+				# Apply inertia to tilt values
+				current_y_rot = lerp(current_y_rot, target_tilt_y, (1.0 - tilt_inertia) * 15.0 * delta)
+				current_x_rot = lerp(current_x_rot, target_tilt_x, (1.0 - tilt_inertia) * 15.0 * delta)
+				
+				card_shader_material.set_shader_parameter("y_rot", current_y_rot)
+				card_shader_material.set_shader_parameter("x_rot", current_x_rot)
+		else:
+			_decay_tilt(delta)
 		
 		if card_3d_container:
 			card_3d_container.scale = lerp(card_3d_container.scale, Vector2(1.2, 1.2), 0.25)
 	else:
 		# Normal state - respect fanning parameters
-		if card_shader_material:
-			# Decay tilt values back to zero
-			if abs(current_y_rot) > 0.1 or abs(current_x_rot) > 0.1:
-				current_y_rot = lerp(current_y_rot, 0.0, (1.0 - tilt_inertia) * 15.0 * delta)
-				current_x_rot = lerp(current_x_rot, 0.0, (1.0 - tilt_inertia) * 15.0 * delta)
-				card_shader_material.set_shader_parameter("y_rot", current_y_rot)
-				card_shader_material.set_shader_parameter("x_rot", current_x_rot)
-			else:
-				card_shader_material.set_shader_parameter("y_rot", 0.0)
-				card_shader_material.set_shader_parameter("x_rot", 0.0)
+		_decay_tilt(delta)
 		
 		if card_3d_container and not is_draw_animating:
 			if is_highlighted:
@@ -506,6 +525,7 @@ func set_highlighted(highlighted: bool) -> void:
 		return
 	is_highlighted = highlighted
 	z_index = 100 if highlighted else base_z_index
+	_update_shadow()
 	if not card_3d_container:
 		return
 	if highlighted:
@@ -544,6 +564,7 @@ func _start_drag():
 	is_dragging = true
 	is_out_of_hand = false
 	z_index = 200
+	_update_shadow()
 	
 	var mouse_pos = get_viewport().get_mouse_position()
 	# Drag offset relative to card_3d_container's global position
@@ -551,13 +572,6 @@ func _start_drag():
 	drag_offset = mouse_pos - face_global
 	last_mouse_pos = mouse_pos
 	drag_velocity = Vector2.ZERO
-	
-	# Cursor to PRESS
-	var cm = _get_cursor_manager()
-	if cm:
-		cm.notify_hover_entered(self)
-		if cm.cursor_display:
-			cm.cursor_display.set_cursor_state(CursorDisplay.CursorState.PRESS)
 	
 	card_drag_started.emit(self)
 
@@ -567,11 +581,7 @@ func _end_drag():
 	
 	is_dragging = false
 	is_out_of_hand = false
-	
-	var cm = _get_cursor_manager()
-	if cm:
-		cm.notify_hover_exited(self)
-		cm.force_cursor_state(CursorDisplay.CursorState.DEFAULT)
+	_sync_hover_state()
 	
 	# "Play" only when the card is released outside the hand container's
 	# boundaries. Inside them, CardUI slots it back into the fan (reordering

@@ -12,7 +12,7 @@ var _is_dying: bool = false
 @onready var name_label: Label = $VBox/NameLabel
 @onready var hp_bar: ProgressBar = $VBox/HPContainer/HPBar
 @onready var hp_damage_bar: ProgressBar = $VBox/HPContainer/HPDamageBar
-@onready var hp_label: Label = $VBox/HPContainer/HPBar/HPBarOverlaysContainer/HPNumLabel
+@onready var hp_label: Label = $VBox/HPContainer/HPNumLabel
 @onready var hp_juice: ProgressBarJuice = $VBox/HPContainer/HPJuice
 @onready var status_icons_container: StatusIconsContainer = $VBox/StatusIconsContainer
 @onready var status_icon_template: TextureRect = $VBox/StatusIconsContainer/StatusIconTemplate
@@ -22,6 +22,10 @@ var _is_dying: bool = false
 func _ready() -> void:
 	# Start invisible until setup
 	modulate.a = 0.0
+	shield_container.resized.connect(_relayout_shield_row)
+
+func _relayout_shield_row() -> void:
+	PipRowFitter.relayout_row(shield_container, shield_template, false, hp_bar.size.x)
 
 func setup(battler: Battler) -> void:
 	enemy_battler = battler
@@ -107,6 +111,7 @@ func update_shields() -> void:
 				var shield = shield_template.duplicate()
 				shield.visible = true
 				shield_container.add_child(shield)
+	_relayout_shield_row()
 
 func _on_shield_changed(shield_count: int) -> void:
 	update_shields()

@@ -110,6 +110,12 @@ func _cache_siblings() -> void:
 		if not _sibling_hidden_states.has(sibling):
 			_sibling_hidden_states[sibling] = not sibling.visible or sibling.modulate.a < 0.9
 
+## True if the sibling is logically hidden (hidden via set_hidden_state/disappear/
+## disappear_sibling, or not yet shown). Unlike checking modulate, this is
+## already true at the start of a disappear and false at the start of an appear.
+func is_sibling_hidden(sibling: Control) -> bool:
+	return _sibling_hidden_states.get(sibling, false)
+
 ## Returns all direct sibling Controls that should be animated
 func get_target_siblings() -> Array[Control]:
 	var siblings: Array[Control] = []

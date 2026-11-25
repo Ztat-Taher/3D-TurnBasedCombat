@@ -96,22 +96,7 @@ func update_queue(turn_order: Array, turn_idx: int) -> void:
 			if child is TurnQueueCard:
 				child.setup(battler, is_current)
 		
-		# Move wrapper to correct position
-		var current_index = queue_container.get_children().find(wrapper)
-		if current_index != i:
-			queue_container.move_child(wrapper, i)
-		
-		# Set z_index so top cards are drawn over bottom cards
-		# Higher index in VBox (lower down) gets lower z_index
-		# We use a higher base and DISABLE z_as_relative to force absolute Z order
-		wrapper.z_index = 100 + (total - i)
-		wrapper.z_as_relative = false
-		
-		# Also apply to children
-		for child in wrapper.get_children():
-			if child is Control:
-				child.z_index = wrapper.z_index
-				child.z_as_relative = true # Children relative to wrapper
+	_apply_order(turn_order, turn_idx)
 	
 	# Force layout update after state changes
 	await get_tree().process_frame
@@ -161,6 +146,9 @@ func update_queue(turn_order: Array, turn_idx: int) -> void:
 		else:
 			push_error("Instantiated node is not a TurnQueueCard!")
 	
+	# New cards were appended at the end with no draw order yet: put them in place
+	_apply_order(turn_order, turn_idx)
+	
 	# Re-apply states to new cards (since they were just created)
 	for battler in new_battlers:
 		var wrapper = _battler_to_wrapper.get(battler)
@@ -196,6 +184,31 @@ func update_queue(turn_order: Array, turn_idx: int) -> void:
 			for child in wrapper.get_children():
 				if child is Control:
 					container_juice.appear_sibling(child)
+
+## Puts every card in its queue slot and sets the draw order so each card is drawn
+## over the one below it (top of the list in front). Done explicitly for EVERY
+## card, every update, so the result never depends on frame timing.
+func _apply_order(turn_order: Array, turn_idx: int) -> void:
+	var total := turn_order.size()
+	var slot := 0
+	for i in range(total):
+		var battler = turn_order[(turn_idx + i) % total]
+		if not is_instance_valid(battler) or battler.is_defeated():
+			continue
+		var wrapper = _battler_to_wrapper.get(battler)
+		if not wrapper or not is_instance_valid(wrapper):
+			continue
+		if wrapper.get_index() != slot:
+			queue_container.move_child(wrapper, slot)
+		# Absolute Z so the order holds regardless of the HUD's own z setup;
+		# higher in the list = higher z = drawn in front
+		wrapper.z_as_relative = false
+		wrapper.z_index = 100 + (total - slot)
+		for child in wrapper.get_children():
+			if child is CanvasItem:
+				child.z_as_relative = true
+				child.z_index = 0
+		slot += 1
 
 func _clear_all_cards() -> void:
 	if container_juice:

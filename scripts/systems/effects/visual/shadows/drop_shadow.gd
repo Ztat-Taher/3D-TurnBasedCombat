@@ -6,8 +6,8 @@ class_name DropShadow
 ##   - it draws BEHIND its parent (z_index = -1), so it never covers the element.
 ##   - being a child, it inherits the parent's transforms & fade automatically
 ##     (hover scale, press bounce, ContainerJuice slide/fade, drag, fan layout...).
-##   - for TextureButton parents the shadow texture and stretch mode are copied
-##     from the button automatically.
+##   - for TextureButton / TextureRect parents the shadow texture and stretch
+##     mode are copied from the parent automatically.
 ##
 ## The linked shader (res://assets/shaders/drop_shadow.gdshader) is a reworked
 ## version of the "Simple Shadow Shader for 2D Sprites" from GodotShaders:
@@ -25,19 +25,29 @@ const drop_shadow_shader := preload("res://assets/shaders/drop_shadow.gdshader")
 
 var shadow_material: ShaderMaterial
 var _strength_tween: Tween
+var _offset_tween: Tween
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	z_index = -1
-	_mirror_button_texture()
+	_mirror_parent_texture()
 	_apply_material()
 
-## If the parent is a TextureButton, mirror its icon so the shadow matches.
-func _mirror_button_texture() -> void:
+## If the parent is a TextureRect / TextureButton, mirror its texture (and how it
+## is fitted) so the shadow has the same silhouette.
+func _mirror_parent_texture() -> void:
 	var parent := get_parent()
-	if parent is TextureButton:
+	if parent is TextureRect:
+		var rect := parent as TextureRect
+		if texture == null:
+			texture = rect.texture
+		expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		stretch_mode = rect.stretch_mode
+		flip_h = rect.flip_h
+		flip_v = rect.flip_v
+	elif parent is TextureButton:
 		var button := parent as TextureButton
 
 		if texture == null:
@@ -68,6 +78,28 @@ func _apply_material() -> void:
 	shadow_material.set_shader_parameter("blur_amount", blur_amount)
 	shadow_material.set_shader_parameter("disable_rotating", disable_rotating)
 	material = shadow_material
+
+
+## Move the shadow (e.g. further away while an element is lifted / dragged).
+## Pass duration <= 0 for an instant change.
+func set_shadow_offset(new_offset: Vector2, duration: float = 0.0) -> void:
+	if _offset_tween and _offset_tween.is_valid():
+		_offset_tween.kill()
+	shadow_offset = new_offset
+	if shadow_material == null:
+		return
+	if duration <= 0.0:
+		shadow_material.set_shader_parameter("shadow_offset", new_offset)
+		return
+	_offset_tween = create_tween()
+	_offset_tween.tween_method(
+		func(v: Vector2) -> void:
+			if shadow_material:
+				shadow_material.set_shader_parameter("shadow_offset", v),
+		shadow_material.get_shader_parameter("shadow_offset"),
+		new_offset,
+		duration
+	)
 
 
 ## Fade the shadow in/out. Pass duration <= 0 for an instant change.

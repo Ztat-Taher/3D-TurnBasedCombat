@@ -4,6 +4,8 @@ extends Node
 signal defense_result(defender: Battler, result_type: String)
 signal defense_input_buffered(action: String)
 signal counterattack_triggered(defender: Battler, attacker: Battler)
+signal defense_window_opened(defender: Battler, attacker: Battler, config: EnemyAttackConfig)
+signal defense_window_closed()
 
 var parry_action: String = "parry"
 var dodge_action: String = "dodge"
@@ -35,8 +37,11 @@ func open_buffer(attacker: Battler, defender: Battler, config: EnemyAttackConfig
 	_last_press_time = -1.0
 	_attack_start_time = Time.get_ticks_msec() / 1000.0
 	_buffer_active = true
+	defense_window_opened.emit(_current_defender, _current_attacker, _current_attack_config)
 
 func lock_and_evaluate(actual_hit_time: float) -> String:
+	if _buffer_active:
+		defense_window_closed.emit()
 	_buffer_active = false
 	
 	if not _current_defender or _current_defender.is_defeated():
@@ -81,6 +86,8 @@ func lock_and_evaluate(actual_hit_time: float) -> String:
 	return "none"
 
 func close_buffer() -> void:
+	if _buffer_active:
+		defense_window_closed.emit()
 	_buffer_active = false
 	_current_attacker = null
 	_current_defender = null

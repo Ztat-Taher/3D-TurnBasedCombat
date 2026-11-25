@@ -4,6 +4,10 @@
 [ext_resource type="PackedScene" uid="uid://d2nt213thaby7" path="res://scenes/menus/map_menu/pawns/pawn_player.tscn" id="2_p1035"]
 [ext_resource type="Texture2D" uid="uid://f44jyxit6ht3" path="res://assets/images/map/map_background.png" id="2_rayjf"]
 [ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="3_psx"]
+[ext_resource type="PackedScene" uid="uid://ctjy3pwceb03d" path="res://scenes/battle/hud/contextual_buttons/contextual_button_bar.tscn" id="cb_bar"]
+[ext_resource type="PackedScene" path="res://scenes/battle/hud/contextual_buttons/contextual_button.tscn" id="cb_button"]
+[ext_resource type="PackedScene" uid="uid://b870384gvy6qt" path="res://scenes/menus/options_menu/input/input_icon_mapper.tscn" id="cb_mapper"]
+[ext_resource type="Texture2D" uid="uid://dn7n37frpdjy3" path="res://assets/images/map/icon_select.png" id="cb_select"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_psxmap"]
 shader = ExtResource("3_psx")
@@ -31,11 +35,13 @@ size = Vector2(3.54, 2)
 
 [node name="MapMenu3D" type="Node3D" unique_id=1714182536]
 script = ExtResource("1_map_menu_3d")
-use_procedural_map = false
 map_plane_size = 100
 map_node_count = 30
-map_min_node_distance = 20.0
+map_min_node_distance = 14.0
+map_connection_distance = 25.0
 map_3d_width = 3.54
+
+[node name="InputIconMapper" parent="." unique_id=118832151 groups=["input_icon_mapper"] instance=ExtResource("cb_mapper")]
 
 [node name="ViewportContainer" type="SubViewportContainer" parent="." unique_id=357567546]
 material = SubResource("ShaderMaterial_psxmap")
@@ -87,20 +93,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="PartyCanvas" type="CanvasLayer" parent="." unique_id=1844220917]
-layer = 10
-
-[node name="PauseButton" type="Button" parent="PartyCanvas" unique_id=1640093319]
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -140.0
-offset_top = 16.0
-offset_right = -16.0
-offset_bottom = 52.0
-grow_horizontal = 0
-text = "Pause"
-
 [node name="Background" type="TextureRect" parent="ViewportContainer/WorldViewport/MapUIViewport/MapUI" unique_id=952907324]
 layout_mode = 1
 anchors_preset = 15
@@ -110,4 +102,51 @@ grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("2_rayjf")
 
+[node name="SelectIndicator" type="TextureRect" parent="ViewportContainer/WorldViewport/MapUIViewport/MapUI" unique_id=874821255]
+visible = false
+z_index = 11
+layout_mode = 0
+offset_right = 80.0
+offset_bottom = 80.0
+pivot_offset = Vector2(40, 40)
+mouse_filter = 2
+texture = ExtResource("cb_select")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PartyCanvas" type="CanvasLayer" parent="." unique_id=1844220917]
+layer = 10
+
+[node name="PauseButton" parent="PartyCanvas" unique_id=1870582794 instance=ExtResource("cb_button")]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -274.0
+offset_top = 16.0
+offset_right = -24.0
+offset_bottom = 76.0
+grow_horizontal = 0
+button_text = "Pause"
+prompt_action = &"pause"
+
+[node name="ContextualButtons" parent="PartyCanvas" unique_id=770934510 instance=ExtResource("cb_bar")]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -94.0
+offset_right = -24.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+handle_input_actions = true
+
+[node name="Confirm" parent="PartyCanvas/ContextualButtons" unique_id=587627915 instance=ExtResource("cb_button")]
+visible = false
+layout_mode = 2
+button_text = "Confirm"
+prompt_action = &"Confirm"
+
 [connection signal="pressed" from="PartyCanvas/PauseButton" to="." method="_on_pause_button_pressed"]
+[connection signal="confirmed" from="PartyCanvas/ContextualButtons/Confirm" to="." method="_on_contextual_confirm"]

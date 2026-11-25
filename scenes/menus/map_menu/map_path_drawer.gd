@@ -1,11 +1,15 @@
 extends Control
 class_name MapPathDrawer
 
-## Draws the paths between map nodes with dashed lines
-## Differentiates between traveled and untraveled paths
+## Draws the paths between map nodes with dashed lines:
+##   - viable: from the current node to a node you can travel to next -
+##     colored and animated (this includes the start node on a fresh run)
+##   - traveled: between two nodes already on your route - colored
+##   - everything else is unreachable from here - grayed out
 
 var run_map: RunMap
 var completed_nodes: Array = []
+var current_node_id: String = ""
 
 ## Path styling
 @export var line_color: Color = Color(0.5, 0.5, 0.5, 0.5)  # Gray for untraveled
@@ -37,6 +41,21 @@ func set_completed_nodes(nodes: Array) -> void:
 	completed_nodes = nodes
 	queue_redraw()
 
+func set_path_state(nodes: Array, current_id: String) -> void:
+	completed_nodes = nodes
+	current_node_id = current_id
+	queue_redraw()
+
+## Viable: leaves the node the pawn stands on (the start node on a fresh run).
+func is_viable_path(from_id: String) -> bool:
+	return not current_node_id.is_empty() and from_id == current_node_id
+
+## Traveled: both ends are on the route already walked (route nodes are the
+## completed ones plus the start node).
+func is_traveled_path(from_id: String, to_id: String) -> bool:
+	var from_on_route: bool = from_id in completed_nodes or (run_map and from_id in run_map.starting_node_ids)
+	return from_on_route and to_id in completed_nodes
+
 func _draw() -> void:
 	if not run_map:
 		return
@@ -46,9 +65,6 @@ func _draw() -> void:
 		if map_node == null:
 			continue
 		
-		# Draw paths from this node to its next nodes
-		var traveled: bool = map_node.id in completed_nodes
-		
 		for next_id in map_node.next_node_ids:
 			var next_node := run_map.get_node_by_id(next_id)
 			if next_node == null:
@@ -57,8 +73,11 @@ func _draw() -> void:
 			var from_pos: Vector2 = _get_node_pixel_position(map_node)
 			var to_pos: Vector2 = _get_node_pixel_position(next_node)
 			
-			var color: Color = line_color_traveled if traveled else line_color
-			_draw_dashed_line(from_pos, to_pos, color, traveled)
+			var viable := is_viable_path(map_node.id)
+			var colored := viable or is_traveled_path(map_node.id, next_id)
+			var color: Color = line_color_traveled if colored else line_color
+			# Only the paths you can take next march
+			_draw_dashed_line(from_pos, to_pos, color, viable)
 
 func _get_node_pixel_position(map_node: RunMapNode) -> Vector2:
 	# This should match the positioning logic in map_menu_3d.gd exactly

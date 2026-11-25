@@ -1,8 +1,10 @@
 class_name CharacterPreview
 extends Control
 ## Turntable 3D preview of a party member's battle model, rendered in its own
-## isolated World3D. Drag with the mouse (or press ui_left / ui_right while it
-## has focus) to rotate.
+## isolated World3D. Rotate by dragging with the mouse, or with
+## rotate_preview_left / _right (Left / Right arrow keys, right stick) at any
+## time - no focus needed. The arrow keys are consumed so they don't also move
+## GUI focus (WASD / d-pad / left stick still navigate).
 ##
 ## Every ally is shown at true scale: the camera frames a fixed slice of the
 ## world ([member framed_height] above the ground) instead of zooming to each
@@ -12,7 +14,7 @@ extends Control
 
 ## Radians of rotation per pixel of horizontal mouse drag.
 @export var drag_rotate_speed : float = 0.01
-## Radians per second while rotating with ui_left / ui_right.
+## Radians per second at full rotate_preview_left / _right input.
 @export var key_rotate_speed : float = 2.5
 ## Starting yaw so the model is seen slightly from the side.
 @export var default_yaw_degrees : float = -20.0
@@ -103,15 +105,20 @@ func _gui_input(event : InputEvent) -> void:
 	elif event is InputEventMouseMotion and _dragging:
 		pivot.rotate_y(event.relative.x * drag_rotate_speed)
 		accept_event()
-	elif event.is_action(&"ui_left") or event.is_action(&"ui_right"):
-		# Rotation is applied in _process; keep left/right from moving focus
-		# away (up/down still navigate out of the preview).
-		accept_event()
 
 
+## Rotation keys are read in _input (before the GUI) so the arrow keys, which are
+## also ui_left / ui_right, rotate instead of moving focus.
+func _input(event : InputEvent) -> void:
+	if is_visible_in_tree() and (event.is_action(&"rotate_preview_left") or event.is_action(&"rotate_preview_right")):
+		get_viewport().set_input_as_handled()
+
+
+## Rotation itself is polled (Input state updates even for handled events), so
+## the stick's analog strength sets the speed.
 func _process(delta : float) -> void:
-	if not has_focus():
+	if not is_visible_in_tree():
 		return
-	var axis := Input.get_axis(&"ui_left", &"ui_right")
+	var axis := Input.get_axis(&"rotate_preview_left", &"rotate_preview_right")
 	if not is_zero_approx(axis):
 		pivot.rotate_y(axis * key_rotate_speed * delta)

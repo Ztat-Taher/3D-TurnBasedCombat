@@ -17,6 +17,11 @@ signal level_changed(next_level_path : String)
 @export var map_node_count : int = 90  # Number of nodes to generate (0 = auto-calculate)
 @export var map_path_count : int = 15  # Number of unique paths from start to end
 @export var map_min_node_distance : float = 3.0  # Minimum distance between nodes (prevents clustering)
+## Max distance between two directly connected stops. Shorter = more steps per
+## route (longer runs); too short and routes can't reach the boss. <= 0 uses
+## plane_size / 2.5. With plane 100 / min distance 14: 25 gives ~20 stops and
+## ~4-5 stops per run.
+@export var map_connection_distance : float = 25.0
 
 ## Scene references
 var _camera : Camera3D
@@ -40,12 +45,25 @@ var _node_icons : Dictionary = {}
 @export var camera_follow_speed := 2.0
 @export var camera_follow_enabled := true
 @export var camera_z_offset := 0.5  # Camera stays this far behind pawn on Z axis
+## How far (world units) the view may show past the map's top/bottom edge
+## before the camera stops following the pawn. 0 = never show past the edge.
+@export var camera_edge_margin := 0.0
 
 ## Current state
 var _current_node_id : String = ""
 var _stop_node_scene : PackedScene = load("res://scenes/menus/map_menu/stop_node.tscn")
 var _pawn_scene : PackedScene = load("res://scenes/menus/map_menu/pawns/pawn_player.tscn")
 var _initial_load : bool = true
+
+## Selection (keyboard / gamepad / hover): the stop the contextual Confirm travels to.
+## Nodes authored in the scene; the ring is positioned over the selected stop.
+@onready var pause_button : ContextualButton = $PartyCanvas/PauseButton
+@onready var contextual_bar : ContextualButtonBar = $PartyCanvas/ContextualButtons
+@onready var select_indicator : TextureRect = $ViewportContainer/WorldViewport/MapUIViewport/MapUI/SelectIndicator
+var _selected_id : String = ""
+var _traveling : bool = false
+var _pause_menu_open : bool = false
+var _select_tween : Tween
 
 ## Decorative follower pawns - one per extra party member (visual only).
 var _party_pawns : Array[MeshInstance3D] = []
@@ -60,7 +78,7 @@ const PARTY_OFFSETS : Array[Vector2] = [
 func _ready() -> void:
 	if run_map == null:
 		if use_procedural_map:
-			run_map = GameState.get_or_create_procedural_map(map_plane_size, map_node_count, map_path_count, map_min_node_distance)
+			run_map = GameState.get_or_create_procedural_map(map_plane_size, map_node_count, map_path_count, map_min_node_distance, map_connection_distance)
 		else:
 			run_map = RunMap.create_default()
 	
@@ -194,7 +212,7 @@ func _rebuild_map() -> void:
 	
 	# Update path drawer
 	if _path_drawer:
-		_path_drawer.set_completed_nodes(completed)
+		_path_drawer.set_path_state(completed, _current_node_id)
 	
 	# Position nodes in 2D UI
 	_refresh_2d_layout()
@@ -206,6 +224,8 @@ func _rebuild_map() -> void:
 	
 	# Keep the follower pawn group in sync with the party size (visual only).
 	_refresh_party_pawns()
+	
+	_refresh_selection()
 
 func _refresh_2d_layout() -> void:
 	var viewport_size = Vector2(_map_viewport.size)
@@ -308,8 +328,11 @@ func _on_node_selected(node_id : String, node_level_path : String) -> void:
 	if current_node:
 		available = current_node.next_node_ids.duplicate()
 	
-	if node_id not in available:
+	if node_id not in available or _traveling:
 		return
+	
+	_traveling = true
+	_set_selected("")
 	
 	# Animate 3D pawn
 	if _pawn:
@@ -323,6 +346,7 @@ func _on_node_selected(node_id : String, node_level_path : String) -> void:
 	GameState.set_current_node_id(node_id)
 	GameState.complete_current_node()
 	_current_node_id = node_id
+	_traveling = false
 	
 	_rebuild_map()
 
@@ -330,7 +354,9 @@ func _on_node_selected(node_id : String, node_level_path : String) -> void:
 		level_changed.emit(node_level_path)
 
 func _on_node_hovered(node_id : String) -> void:
-	pass
+	# Mouse hover moves the selection too, so the ring always marks what Confirm does
+	if not _traveling and node_id in _get_selectable_ids():
+		_set_selected(node_id)
 
 func _on_node_exited(node_id : String) -> void:
 	pass
@@ -339,6 +365,12 @@ func _on_pawn_movement_finished() -> void:
 	pass
 
 func _on_pause_button_pressed() -> void:
+	if _pause_menu_open:
+		return
+	_pause_menu_open = true
+	# The menu has its own Back / Confirm hints
+	pause_button.visible = false
+	contextual_bar.visible = false
 	if pause_menu_scene:
 		var pause_menu = pause_menu_scene.instantiate()
 		add_child(pause_menu)
@@ -357,6 +389,9 @@ func _on_pause_button_pressed() -> void:
 				await get_tree().process_frame
 		if is_instance_valid(pause_menu):
 			pause_menu.queue_free()
+	_pause_menu_open = false
+	pause_button.visible = true
+	contextual_bar.visible = true
 
 func _process(delta: float) -> void:
 	# Keep follower pawns locked to the leader (they mirror its arc while hopping).
@@ -368,8 +403,9 @@ func _process(delta: float) -> void:
 	# Get current camera position
 	var current_cam_pos = _camera.position
 	
-	# Target Z is pawn's position plus offset (camera stays behind pawn)
-	var target_z = _pawn.position.z + camera_z_offset
+	# Target Z is pawn's position plus offset (camera stays behind pawn),
+	# clamped so the view doesn't run past the map's edges
+	var target_z = _clamp_camera_z(_pawn.position.z + camera_z_offset)
 	
 	# Smoothly interpolate camera Z to follow pawn (creates lag effect)
 	var new_z = lerp(current_cam_pos.z, target_z, camera_follow_speed * delta)
@@ -377,13 +413,119 @@ func _process(delta: float) -> void:
 	# Keep X and Y fixed, only move Z
 	_camera.position = Vector3(current_cam_pos.x, current_cam_pos.y, new_z)
 
+## Clamps a camera Z so the screen's top and bottom edges stay on the map
+## plane (+ camera_edge_margin). If the view is taller than the map, the camera
+## locks to the position that centers the map instead.
+func _clamp_camera_z(camera_z: float) -> float:
+	var offsets := _get_view_ground_offsets()
+	if offsets.is_empty():
+		return camera_z
+	var half_height := map_3d_height * 0.5 + camera_edge_margin
+	var map_top := _map_plane.position.z - half_height     # far edge (top of screen)
+	var map_bottom := _map_plane.position.z + half_height  # near edge (bottom of screen)
+	var min_z: float = map_top - offsets[0]     # top of screen at the far edge
+	var max_z: float = map_bottom - offsets[1]  # bottom of screen at the near edge
+	if min_z > max_z:
+		return (min_z + max_z) * 0.5
+	return clampf(camera_z, min_z, max_z)
+
+
+## Where the top / bottom screen edges hit the ground, as Z offsets from the
+## camera (constant, since the camera only slides along Z). Empty if the edge
+## rays miss the ground.
+func _get_view_ground_offsets() -> Array[float]:
+	var view_size := Vector2(_camera.get_viewport().size)
+	var result : Array[float] = []
+	for screen_y in [0.0, view_size.y]:
+		var screen_pos := Vector2(view_size.x * 0.5, screen_y)
+		var origin := _camera.project_ray_origin(screen_pos)
+		var direction := _camera.project_ray_normal(screen_pos)
+		if direction.y >= -0.0001:
+			return []
+		var hit := origin + direction * ((_map_plane.position.y - origin.y) / direction.y)
+		result.append(hit.z - _camera.position.z)
+	return result
+
+
 func _input(event: InputEvent) -> void:
-	# Forward keyboard/gamepad events directly to viewport
-	if event is InputEventKey or event is InputEventJoypadButton:
-		_map_viewport.push_input(event)
-	# Forward mouse events through raycast conversion
-	elif event is InputEventMouseMotion or event is InputEventMouseButton:
+	# `pause` is read before the GUI (Tab is also ui_focus_next)
+	if event.is_action_pressed(&"pause"):
+		get_viewport().set_input_as_handled()
+		_on_pause_button_pressed()
+		return
+	# Keyboard/gamepad are handled by the map itself (_unhandled_input + the
+	# contextual Confirm), not by the stop buttons, so only the mouse is forwarded
+	if event is InputEventMouseMotion or event is InputEventMouseButton:
 		_forward_mouse_to_viewport(event)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _traveling or _pause_menu_open:
+		return
+	var step := 0
+	if event.is_action_pressed(&"ui_left") or event.is_action_pressed(&"ui_up"):
+		step = -1
+	elif event.is_action_pressed(&"ui_right") or event.is_action_pressed(&"ui_down"):
+		step = 1
+	if step == 0:
+		return
+	get_viewport().set_input_as_handled()
+	var ids := _get_selectable_ids()
+	if ids.is_empty():
+		return
+	var index := ids.find(_selected_id)
+	index = 0 if index == -1 else wrapi(index + step, 0, ids.size())
+	_set_selected(ids[index])
+
+## Stops the player can travel to next, left to right on the map
+func _get_selectable_ids() -> Array[String]:
+	var ids : Array[String] = []
+	var current_node : RunMapNode = run_map.get_node_by_id(_current_node_id) if run_map else null
+	if current_node == null:
+		return ids
+	for id in current_node.next_node_ids:
+		var stop : StopNode = _node_icons.get(id)
+		if stop and stop.is_available and not stop.is_locked:
+			ids.append(id)
+	ids.sort_custom(func(a, b): return run_map.get_node_by_id(a).map_position.x < run_map.get_node_by_id(b).map_position.x)
+	return ids
+
+## Keeps the selection valid after the map changes; defaults to the stop closest
+## (horizontally) to where the pawn stands
+func _refresh_selection() -> void:
+	var ids := _get_selectable_ids()
+	if _selected_id in ids:
+		_set_selected(_selected_id)
+		return
+	var best := ""
+	var current_node := run_map.get_node_by_id(_current_node_id)
+	var from_x : float = current_node.map_position.x if current_node else 0.5
+	for id in ids:
+		if best == "" or absf(run_map.get_node_by_id(id).map_position.x - from_x) < absf(run_map.get_node_by_id(best).map_position.x - from_x):
+			best = id
+	_set_selected(best)
+
+func _set_selected(node_id : String) -> void:
+	_selected_id = node_id
+	if _select_tween:
+		_select_tween.kill()
+	var stop : StopNode = _node_icons.get(node_id)
+	if stop == null:
+		select_indicator.visible = false
+		contextual_bar.hide_button(&"Confirm")
+		return
+	select_indicator.position = stop.position + (stop.size - select_indicator.size) * 0.5
+	select_indicator.visible = true
+	contextual_bar.show_button(&"Confirm")
+	# Choppy pulse, in steps to match the low-framerate PS2 look
+	select_indicator.scale = Vector2.ONE
+	_select_tween = create_tween().set_loops()
+	_select_tween.tween_property(select_indicator, "scale", Vector2.ONE * 1.12, 0.0).set_delay(0.35)
+	_select_tween.tween_property(select_indicator, "scale", Vector2.ONE, 0.0).set_delay(0.35)
+
+func _on_contextual_confirm() -> void:
+	var stop : StopNode = _node_icons.get(_selected_id)
+	if stop and not _traveling:
+		_on_node_selected(stop.node_id, stop.level_path)
 
 func _forward_mouse_to_viewport(event: InputEvent) -> void:
 	# Raycast from camera to plane (convert to low-res WorldViewport space first)

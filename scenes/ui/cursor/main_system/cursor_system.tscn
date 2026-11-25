@@ -3,9 +3,7 @@
 [ext_resource type="Script" uid="uid://hweq51x3ed3k" path="res://scenes/ui/cursor/main_system/cursor_manager.gd" id="1_cursor_manager"]
 [ext_resource type="Script" uid="uid://bn1xbffpap3g8" path="res://scenes/ui/cursor/display/cursor_display.gd" id="2_cursor_display"]
 [ext_resource type="Texture2D" uid="uid://civ88sr146ibq" path="res://assets/images/cursors/cursor_default.png" id="3_pv2k7"]
-[ext_resource type="Texture2D" uid="uid://dcw4i2eewrbd0" path="res://assets/images/cursors/cursor_attack.png" id="4_eqr23"]
 [ext_resource type="Texture2D" uid="uid://t0x151045p81" path="res://assets/images/cursors/cursor_interact.png" id="5_n8rhr"]
-[ext_resource type="Texture2D" uid="uid://5bsildqw8mgc" path="res://assets/images/cursors/cursor_targeting.png" id="6_3puft"]
 [ext_resource type="Texture2D" uid="uid://biirsroouiiyp" path="res://assets/images/cursors/hand_small_closed.png" id="6_press"]
 [ext_resource type="Script" uid="uid://45gyrg158vij" path="res://scenes/ui/cursor/effects/trail_2d.gd" id="7_trail_script"]
 [ext_resource type="Script" uid="uid://c544b7m24uk1v" path="res://scenes/ui/cursor/effects/cursor_juice.gd" id="8_juice_script"]
@@ -31,11 +29,9 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2_cursor_display")
-cursor_default_texture = ExtResource("3_pv2k7")
-cursor_attack_texture = ExtResource("4_eqr23")
-cursor_interact_texture = ExtResource("5_n8rhr")
-cursor_targeting_texture = ExtResource("6_3puft")
-cursor_press_texture = ExtResource("6_press")
+point_texture = ExtResource("3_pv2k7")
+open_texture = ExtResource("5_n8rhr")
+closed_texture = ExtResource("6_press")
 cursor_scale = 2.0
 
 [node name="CursorSprite" type="TextureRect" parent="CursorDisplay" unique_id=1015417382]

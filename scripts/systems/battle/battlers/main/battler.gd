@@ -747,11 +747,11 @@ func defend():
 
 func battle_item(item: Item, target: Battler) -> void:
 	# Apply item effects
-	if item.damage_amount > 0:
-		var damage = item.damage_amount
-		target.take_damage(damage, self)
-	elif item.heal_amount > 0:
-		var _healing = target.take_healing(item.heal_amount)
+	# Item.hp_delta: negative = damage, positive = healing
+	if item.hp_delta < 0:
+		target.take_damage(-item.hp_delta, self)
+	elif item.hp_delta > 0:
+		var _healing = target.take_healing(item.hp_delta)
 	
 	# Remove item from inventory
 	if inventory and inventory.collection.has(item):

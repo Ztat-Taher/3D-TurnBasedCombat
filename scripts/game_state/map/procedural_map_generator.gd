@@ -11,8 +11,11 @@ extends Node
 ## node_count: Number of nodes to generate (excluding start/end)
 ## path_count: Number of unique paths from start to end
 ## min_node_distance: Minimum distance between any two nodes (default 3.0)
+## connection_distance: Max distance between two directly connected nodes.
+##   Shorter = more, smaller steps per route (longer runs). <= 0 uses the old
+##   default of plane_size / 2.5.
 ## Returns: GeneratedMapData containing paths and node positions
-func generate(plane_size: int, node_count: int, path_count: int, min_node_distance: float = 3.0) -> GeneratedMapData:
+func generate(plane_size: int, node_count: int, path_count: int, min_node_distance: float = 3.0, connection_distance: float = -1.0) -> GeneratedMapData:
 	# Randomize for different maps each time
 	randomize()
 	
@@ -51,7 +54,8 @@ func generate(plane_size: int, node_count: int, path_count: int, min_node_distan
 	
 	# Step 2: Connect points using distance-based approach (Godot 4 compatible)
 	# Connect each point to its nearest neighbors within a threshold
-	var connection_distance = plane_size / 2.5  # Connect to points within 2/5 of grid size (increased for better spread)
+	if connection_distance <= 0.0:
+		connection_distance = plane_size / 2.5
 	
 	var astar = AStar2D.new()
 	for i in range(points.size()):

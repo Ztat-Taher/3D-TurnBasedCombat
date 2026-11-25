@@ -7,6 +7,8 @@
 [ext_resource type="FontFile" uid="uid://bflwo51m5acfa" path="res://assets/fonts/tinyRPGFontKit01_v1_2/TinyRPG-BadgeFont.ttf" id="5_8ugqd"]
 [ext_resource type="Texture2D" uid="uid://cr244eente0qr" path="res://assets/images/cards/template/card_template_main.png" id="6_f5rll"]
 [ext_resource type="Texture2D" uid="uid://c2ohq62uuh7ac" path="res://assets/images/ui/party_card/party_card_ap_container.png" id="7_8gau4"]
+[ext_resource type="Script" uid="uid://cnq5lvwuroipl" path="res://scripts/systems/effects/visual/shadows/drop_shadow.gd" id="8_shadow"]
+
 
 [node name="CardButton" type="Control" unique_id=1369546722]
 custom_minimum_size = Vector2(120, 180)
@@ -27,6 +29,19 @@ offset_bottom = 180.0
 pivot_offset = Vector2(60, 90)
 mouse_filter = 2
 stretch = true
+
+[node name="Shadow" type="TextureRect" parent="Card3DContainer"]
+z_index = -1
+layout_mode = 2
+offset_right = 120.0
+offset_bottom = 180.0
+mouse_filter = 2
+texture = ExtResource("2_kg3nd")
+expand_mode = 1
+script = ExtResource("8_shadow")
+shadow_offset = Vector2(8, 10)
+shadow_strength = 0.0
+blur_amount = 0.5
 
 [node name="CardViewport" type="SubViewport" parent="Card3DContainer" unique_id=2051745250]
 transparent_bg = true
