@@ -2,6 +2,7 @@
 extends PopupWindowPanel
 
 @export var options_menu_scene : PackedScene
+@export var party_screen_scene : PackedScene
 ## Path to a main menu scene.
 ## Will use ProjectSettings paths if left empty.
 @export_file("*.tscn") var main_menu_scene_path : String
@@ -10,6 +11,7 @@ extends PopupWindowPanel
 @onready var main_menu_confirmation = %MainMenuConfirmation
 @onready var exit_confirmation = %ExitConfirmation
 @onready var options_button = %OptionsButton
+@onready var party_button = %PartyButton
 @onready var main_menu_button = %MainMenuButton
 @onready var exit_button = %ExitButton
 
@@ -55,6 +57,9 @@ func _refresh_exit_button() -> void:
 func _refresh_options_button() -> void:
 	options_button.visible = options_menu_scene != null
 
+func _refresh_party_button() -> void:
+	party_button.visible = party_screen_scene != null
+
 func _refresh_main_menu_button() -> void:
 	main_menu_button.visible = !get_main_menu_scene_path().is_empty()
 
@@ -62,6 +67,7 @@ func _ready() -> void:
 	super._ready()
 	_refresh_exit_button()
 	_refresh_options_button()
+	_refresh_party_button()
 	_refresh_main_menu_button()
 	restart_confirmation.confirmed.connect(_on_restart_confirmation_confirmed)
 	restart_confirmation.closed.connect(_on_restart_confirmation_closed)
@@ -73,6 +79,9 @@ func _on_restart_button_pressed() -> void:
 
 func _on_options_button_pressed() -> void:
 	_load_and_show_menu(options_menu_scene)
+
+func _on_party_button_pressed() -> void:
+	_load_and_show_menu(party_screen_scene)
 
 func _on_main_menu_button_pressed() -> void:
 	_show_window(main_menu_confirmation)

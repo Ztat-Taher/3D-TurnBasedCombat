@@ -1,0 +1,73 @@
+[gd_scene format=3 uid="uid://dfkm1scpndc4k"]
+
+[ext_resource type="Script" uid="uid://cvx7r2cpds4a5" path="res://scenes/windows/character_preview.gd" id="1_script"]
+
+[sub_resource type="Environment" id="Environment_preview"]
+ambient_light_source = 2
+ambient_light_color = Color(0.75, 0.78, 0.85, 1)
+ambient_light_energy = 0.6
+
+[sub_resource type="World3D" id="World3D_preview"]
+environment = SubResource("Environment_preview")
+
+[node name="CharacterPreview" type="Control" unique_id=1143317528]
+custom_minimum_size = Vector2(240, 240)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 2
+mouse_default_cursor_shape = 6
+script = ExtResource("1_script")
+
+[node name="ViewportContainer" type="SubViewportContainer" parent="." unique_id=177229463]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+stretch_shrink = 2
+
+[node name="Viewport" type="SubViewport" parent="ViewportContainer" unique_id=250374926]
+own_world_3d = true
+world_3d = SubResource("World3D_preview")
+transparent_bg = true
+handle_input_locally = false
+msaa_3d = 2
+size = Vector2i(640, 360)
+render_target_update_mode = 4
+
+[node name="Pivot" type="Node3D" parent="ViewportContainer/Viewport" unique_id=207064327]
+
+[node name="Camera3D" type="Camera3D" parent="ViewportContainer/Viewport" unique_id=1228287403]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4)
+fov = 30.0
+
+[node name="KeyLight" type="DirectionalLight3D" parent="ViewportContainer/Viewport" unique_id=110274334]
+transform = Transform3D(0.8660254, -0.28678823, 0.40957603, 0, 0.81915206, 0.57357645, -0.5, -0.49673176, 0.7094065, 0, 0, 0)
+light_energy = 1.2
+
+[node name="RimLight" type="DirectionalLight3D" parent="ViewportContainer/Viewport" unique_id=1272549036]
+transform = Transform3D(-0.9396926, 0.14454396, -0.3099755, 0, 0.90630776, 0.42261827, 0.34202015, 0.39713126, -0.8516507, 0, 0, 0)
+light_color = Color(0.75, 0.85, 1, 1)
+light_energy = 0.6
+
+[node name="PlaceholderLabel" type="Label" parent="." unique_id=1505827147]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"PartyCaptionLabel"
+text = "No preview available"
+horizontal_alignment = 1
+vertical_alignment = 1

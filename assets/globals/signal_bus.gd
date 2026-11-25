@@ -25,3 +25,14 @@ signal cursor_state_changed(new_state: String)
 signal cursor_hover_target(target: Node)
 @warning_ignore("unused_signal")
 signal cursor_clicked(position: Vector2)
+
+#===============================================================================
+# Combat Events
+#-------------------------------------------------------------------------------
+## Emitted by CardBattleManager whenever a card resolves a combat effect
+## (damage, states, weapon procs). info: {"kind": "effects"|"strike"|"projectile",
+## "card", "actor", "target", "strike_index", "damage_multiplier",
+## "qte_multiplier"}. Weapon systems and other listeners decide what to do —
+## the card pipeline stays mechanic-agnostic.
+@warning_ignore("unused_signal")
+signal card_hit_resolved(info: Dictionary)

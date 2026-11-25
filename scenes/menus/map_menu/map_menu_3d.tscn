@@ -87,6 +87,20 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="PartyCanvas" type="CanvasLayer" parent="." unique_id=1844220917]
+layer = 10
+
+[node name="PauseButton" type="Button" parent="PartyCanvas" unique_id=1640093319]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -140.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 52.0
+grow_horizontal = 0
+text = "Pause"
+
 [node name="Background" type="TextureRect" parent="ViewportContainer/WorldViewport/MapUIViewport/MapUI" unique_id=952907324]
 layout_mode = 1
 anchors_preset = 15
@@ -95,3 +109,5 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("2_rayjf")
+
+[connection signal="pressed" from="PartyCanvas/PauseButton" to="." method="_on_pause_button_pressed"]

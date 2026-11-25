@@ -23,6 +23,21 @@ const PARTY_TEMPLATE_PATH : String = "res://database/party/player_party.tres"
 ## don't join the party automatically at run start.
 const RECRUITABLES_PATH : String = "res://database/party/recruitables.tres"
 
+## Default weapon granted to each weapon type when a member has none equipped.
+## Keyed by Weapon.WType value (BLADE=0, ORB=1, GUN=2). Acquisition UI is deferred —
+## these starters make the equipment layer testable immediately.
+const DEFAULT_WEAPON_PATHS : Dictionary = {
+	Weapon.WType.BLADE: "res://database/weapons/items/soldiers_blade.tres",
+	Weapon.WType.ORB: "res://database/weapons/items/prism_circuit.tres",
+	Weapon.WType.GUN: "res://database/weapons/items/flintlock_pistol.tres",
+}
+
+## Extra weapons granted to a member's inventory (not auto-equipped) once
+## their default weapon is in place. Keyed by Weapon.WType.
+const BONUS_WEAPON_PATHS : Dictionary = {
+	Weapon.WType.BLADE: ["res://database/weapons/items/elf_leaf_blade.tres"],
+}
+
 ## The run party roster. Each entry carries an ally's stats, deck and runtime HP
 ## between map nodes and battles. Persisted via GlobalState alongside the rest
 ## of the run state.
@@ -155,9 +170,44 @@ static func ensure_starter_party() -> void:
 		copy.current_health = -1  # fresh ally: full HP.
 		copy.exp_total = 0
 		copy.level = 1
+		_prepare_member_equipment(copy)
 		next_id += 1
 		game_state.party.append(copy)
 	GlobalState.save()
+
+
+## Ensures a party member has an inventory and a type-matched weapon equipped.
+## Grants the default weapon for the member's weapon_type when none is owned.
+static func _prepare_member_equipment(member : AllyPartyMember) -> void:
+	if member.inventory == null:
+		member.inventory = Inventory.new()
+	if member.equipped_weapon != null and member.can_equip_weapon(member.equipped_weapon):
+		return
+	var path : String = DEFAULT_WEAPON_PATHS.get(member.weapon_type, "")
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return
+	var template := load(path) as Weapon
+	if template == null:
+		return
+	# Duplicate so each member owns an independent weapon instance (XP/level).
+	var weapon := template.duplicate() as Weapon
+	member.inventory.add_item_to_collection(weapon, 1)
+	member.equip_weapon(weapon)
+	# Grant bonus weapons for this weapon type into the inventory (un-equipped;
+	# swapping happens through the party/equipment UI).
+	for bonus_path in BONUS_WEAPON_PATHS.get(member.weapon_type, []):
+		if not ResourceLoader.exists(bonus_path):
+			continue
+		var bonus := load(bonus_path) as Weapon
+		if bonus == null:
+			continue
+		var owned := false
+		for item in member.inventory.collection.keys():
+			if item is Weapon and (item as Weapon).item_name == bonus.item_name:
+				owned = true
+				break
+		if not owned:
+			member.inventory.add_item_to_collection(bonus.duplicate() as Weapon, 1)
 
 
 ## Recruit a new ally cloned from [param source] (one of the recruit
@@ -186,6 +236,7 @@ static func recruit_ally(source : AllyPartyMember = null) -> AllyPartyMember:
 	member.current_health = -1
 	member.exp_total = 0
 	member.level = 1
+	_prepare_member_equipment(member)
 	game_state.party.append(member)
 	GlobalState.save()
 	return member
@@ -195,15 +246,39 @@ static func recruit_ally(source : AllyPartyMember = null) -> AllyPartyMember:
 ## (legacy behaviour) followed by every entry in the recruitables template.
 static func get_recruit_templates() -> Array[AllyPartyMember]:
 	var templates : Array[AllyPartyMember] = []
-	var starter := get_recruit_template()
+	"""var starter := get_recruit_template()
 	if starter != null:
-		templates.append(starter)
+		templates.append(starter)"""
 	var recruitables := load(RECRUITABLES_PATH) as PartyData
 	if recruitables != null:
 		for member in recruitables.allies:
 			if member is AllyPartyMember:
 				templates.append(member)
 	return templates
+
+
+## The ally "found" resting at the current recruit node: one recruit template
+## whose type isn't in the party yet (types are matched by battle scene, which
+## recruiting copies over). The pick is seeded by the run map and node id, so
+## re-entering the same node shows the same ally. Null when everyone has
+## already been recruited.
+static func get_found_recruit() -> AllyPartyMember:
+	var game_state := get_or_create_state()
+	if game_state.party.is_empty():
+		ensure_starter_party()
+	var owned := {}
+	for member in game_state.party:
+		if member != null:
+			owned[member.ally_scene_path] = true
+	var candidates : Array[AllyPartyMember] = []
+	for template in get_recruit_templates():
+		if not owned.has(template.ally_scene_path):
+			candidates.append(template)
+	if candidates.is_empty():
+		return null
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("%s|%s" % [game_state.run_map_serialized.hash(), game_state.current_node_id])
+	return candidates[rng.randi_range(0, candidates.size() - 1)]
 
 
 ## Returns the template ally used for recruiting (first entry of the PartyData
@@ -289,6 +364,13 @@ static func sync_from_battlers(battlers : Array = []) -> void:
 		member.exp_total = b.current_exp
 		if b.stats != null and b.stats.deck != null:
 			member.deck = b.stats.deck
+		# Equipment: inventory/weapon are shared refs so XP and the equipped slot
+		# persist automatically; only cover cases where the battler carried a
+		# different inventory than the member template.
+		if b.inventory != null:
+			member.inventory = b.inventory
+		if b.weapon != null:
+			member.equipped_weapon = b.weapon
 	GlobalState.save()
 
 

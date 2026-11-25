@@ -166,6 +166,10 @@ func set_hovering(hovering: bool) -> void:
 		visible = false
 
 func _exit_tree():
+	## Only clean up on real destruction - reparenting (hover overlays)
+	## exits the tree without deleting the node.
+	if not is_queued_for_deletion():
+		return
 	# Clean up status popups when popup is destroyed
 	for popup in active_status_popups:
 		if is_instance_valid(popup):

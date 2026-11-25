@@ -21,6 +21,19 @@ enum TEAM {ALLY, ENEMY}
 @export var enemy_stats: EnemyStats ## Configuration for enemy battlers
 
 @export var inventory: Inventory
+## Equipped weapon. When set, a [WeaponSystem] child is spawned in _ready()
+## (or immediately via [method set_weapon]) and procs the weapon's effects.
+@export var weapon: Weapon = null
+var weapon_system: WeaponSystem = null
+## Scene-authored socket node (e.g. a BoneAttachment3D) that handheld weapon
+## models instance into. Empty = no socket (ORB/root-space weapons unaffected).
+@export var weapon_socket_path: NodePath = NodePath("")
+## Stat deltas currently applied by the equipped weapon (for clean re-equip).
+var _applied_weapon_mods: Dictionary = {}
+## Last canonical combat animation slot played ("melee_combo_1", "ranged_cast_1", ...)
+## Exposed for the weapon system to distinguish melee vs ranged hits.
+var _last_combat_slot: String = ""
+
 @export_group("Team and AI Controls")
 ## Define the battler's Team - Allies are Player-controlled
 @export var team: TEAM # This will default to ALLY
@@ -391,6 +404,29 @@ func _ready():
 	if team == TEAM.ALLY:
 		_initialize_vestiges()
 
+	# Spawn the weapon system for the equipped weapon (if any).
+	if weapon != null:
+		set_weapon(weapon)
+
+## Equips [param p_weapon], spawning/refreshing the [WeaponSystem] child.
+## Safe to call before or after _ready (party sync configures allies early).
+func set_weapon(p_weapon: Weapon) -> void:
+	weapon = p_weapon
+	if weapon_system and is_instance_valid(weapon_system):
+		weapon_system.queue_free()
+		weapon_system = null
+	if weapon == null:
+		apply_weapon_stat_modifiers(null)
+		_hide_socket_weapon()
+		return
+	if not is_inside_tree():
+		return
+	weapon_system = WeaponSystem.new()
+	weapon_system.name = "WeaponSystem"
+	weapon_system.setup(weapon, self)
+	add_child(weapon_system)
+
+
 ## Animation callback methods called by AnimationPlayer method tracks
 ## These are the new reference point system replacing timer-based hit frames
 
@@ -564,9 +600,16 @@ func take_damage(amount: int, attacker: Battler = null, damage_type: String = "p
 	
 	# Trigger vestige hooks for ON_DAMAGE_TAKEN (before damage is applied)
 	trigger_vestige_hooks(TriggerHook.TriggerType.ON_DAMAGE_TAKEN, {"attacker": attacker, "damage": amount, "damage_amount": amount, "damage_type": damage_type, "element": element, "battle_manager": battle_manager})
+
+	# Weapon procs (e.g. sword riposte stacks)
+	if weapon_system:
+		weapon_system.notify_damage_taken(attacker, amount)
 	
 	# Apply vestige damage taken multiplier
 	var multiplier = get_vestige_damage_taken_multiplier()
+	# Apply weapon damage taken multiplier (e.g. defensive weapon bonuses)
+	if weapon_system:
+		multiplier *= weapon_system.get_damage_taken_multiplier()
 	amount = int(float(amount) * multiplier)
 	
 	# Play hit effects before damage calculation
@@ -841,6 +884,52 @@ func apply_vestige_modifiers() -> void:
 		attack += int(attack * vestige.attack_percent * stack_count)
 		defense += int(defense * vestige.defense_percent * stack_count)
 		agility += int(agility * vestige.agility_percent * stack_count)
+
+
+## Apply stat modifiers from the equipped weapon. Previously-applied weapon
+## mods are subtracted first so re-equipping or unequipping never
+## double-applies. Pass null to clear.
+func apply_weapon_stat_modifiers(p_weapon: Weapon) -> void:
+	# Revert the last weapon's mods.
+	for stat_name in _applied_weapon_mods:
+		set(stat_name, get(stat_name) - _applied_weapon_mods[stat_name])
+	_applied_weapon_mods.clear()
+	if p_weapon == null:
+		return
+	var mods := {}
+	# Flat bonuses.
+	mods["max_health"] = p_weapon.max_health_bonus
+	mods["attack"] = p_weapon.attack_bonus
+	mods["defense"] = p_weapon.defense_bonus
+	mods["agility"] = p_weapon.agility_bonus
+	mods["max_ap"] = p_weapon.max_ap_bonus
+	mods["ap_regen_per_turn"] = p_weapon.ap_regen_bonus
+	# Percent bonuses (of the current — post-vestige — value, same as vestiges).
+	mods["max_health"] += int(max_health * p_weapon.max_health_percent)
+	mods["attack"] += int(attack * p_weapon.attack_percent)
+	mods["defense"] += int(defense * p_weapon.defense_percent)
+	mods["agility"] += int(agility * p_weapon.agility_percent)
+	for stat_name in mods:
+		var delta: int = mods[stat_name]
+		if delta != 0:
+			set(stat_name, get(stat_name) + delta)
+			_applied_weapon_mods[stat_name] = delta
+	# Keep current_health consistent if max_health changed.
+	if max_health > 0 and current_health > max_health:
+		current_health = max_health
+
+
+## Hides the socket's placeholder "Weapon" child (unarmed state). The node
+## stays in the tree so animation method tracks keep resolving.
+func _hide_socket_weapon() -> void:
+	if weapon_socket_path == NodePath("") or not is_inside_tree():
+		return
+	var socket := get_node_or_null(weapon_socket_path)
+	if socket == null:
+		return
+	var weapon_node := socket.get_node_or_null("Weapon")
+	if weapon_node:
+		weapon_node.visible = false
 
 
 ## Trigger all vestige hooks for a specific trigger type
@@ -1212,6 +1301,8 @@ func _try_animation(anim_name: String) -> bool:
 	]
 	var leaf_name := resolved_name
 	var is_combat_slot := (resolved_name in combat_slots) or (anim_name in combat_slots)
+	if is_combat_slot:
+		_last_combat_slot = anim_name
 
 	# Accept "combat_actions/leaf" paths; map legacy "basic_attacks/leaf" onto the
 	# same routing (that sub-machine no longer exists).

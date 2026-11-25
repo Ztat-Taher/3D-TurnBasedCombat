@@ -11,7 +11,7 @@ enum TARGETS_TYPES {
 @export var item_name : String = ""
 @export var description : String = ""
 @export var item_tags : String = ""
-@export var icon : Resource
+@export var icon : Texture2D
 @export var is_battle_item:bool = true
 @export var is_key_item:bool = false:
 	set(key_item):

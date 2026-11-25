@@ -53,6 +53,7 @@ ProjectMusicController="*uid://r5t485lr3p7t"
 ProjectUISoundController="*uid://cc37235kj4384"
 CursorSystem="*res://scenes/ui/cursor/main_system/cursor_system.tscn"
 GlobalHitEffectLibrary="*res://assets/globals/hit_effect_library/hit_effect_library_globals.gd"
+SceneRenderManager="*uid://c26kedkmqh7ew"
 
 [display]
 
@@ -66,7 +67,7 @@ project/assembly_name="Turn-Based Combat"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/anthonyec.camera_preview/plugin.cfg", "res://addons/debug_menu/plugin.cfg", "res://addons/maaacks_game_template/plugin.cfg", "res://addons/plugin_updater/plugin.cfg")
+enabled=PackedStringArray("res://addons/anthonyec.camera_preview/plugin.cfg", "res://addons/debug_menu/plugin.cfg", "res://addons/godot_mcp/plugin.cfg", "res://addons/maaacks_game_template/plugin.cfg", "res://addons/plugin_updater/plugin.cfg", "res://addons/scene_texture/plugin.cfg")
 
 [file_customization]
 

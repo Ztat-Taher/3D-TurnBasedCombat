@@ -1,0 +1,264 @@
+[gd_scene format=3 uid="uid://bv6qop1nnbq28"]
+
+[ext_resource type="Script" uid="uid://bq57ntchuo8aj" path="res://scenes/windows/party_screen.gd" id="1_script"]
+[ext_resource type="Theme" uid="uid://n4jldirxin3o" path="res://scenes/windows/party/party_screen_theme.tres" id="2_theme"]
+[ext_resource type="PackedScene" uid="uid://dfkm1scpndc4k" path="res://scenes/windows/character_preview.tscn" id="3_preview"]
+[ext_resource type="PackedScene" uid="uid://bun0stwgmcp2k" path="res://scenes/windows/stats_section.tscn" id="4_stats"]
+[ext_resource type="PackedScene" uid="uid://c5ewnjph3mdnd" path="res://scenes/windows/vestiges_section.tscn" id="5_vestiges"]
+[ext_resource type="PackedScene" uid="uid://b374vs4dc4g28" path="res://scenes/windows/weapon_info_section.tscn" id="6_weapon_info"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_background"]
+bg_color = Color(0.26324546, 0.26324546, 0.26324546, 1)
+
+[node name="PartyScreen" type="PanelContainer" unique_id=784213747]
+process_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+theme_override_styles/panel = SubResource("StyleBoxFlat_background")
+script = ExtResource("1_script")
+update_content = true
+title = "Party"
+
+[node name="ContentContainer" type="MarginContainer" parent="." unique_id=1750238449]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 16
+
+[node name="BoxContainer" type="BoxContainer" parent="ContentContainer" unique_id=274641296]
+layout_mode = 2
+theme_override_constants/separation = 12
+vertical = true
+
+[node name="TitleMargin" type="MarginContainer" parent="ContentContainer/BoxContainer" unique_id=1016535793]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="TitleBox" type="VBoxContainer" parent="ContentContainer/BoxContainer/TitleMargin" unique_id=768796273]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TitleLabel" type="Label" parent="ContentContainer/BoxContainer/TitleMargin/TitleBox" unique_id=1947335379]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PartyHeadingLabel"
+text = "Party"
+
+[node name="HSeparator" type="HSeparator" parent="ContentContainer/BoxContainer/TitleMargin/TitleBox" unique_id=352184112]
+layout_mode = 2
+
+[node name="BodyMargin" type="MarginContainer" parent="ContentContainer/BoxContainer" unique_id=1294029052]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DescriptionLabel" type="RichTextLabel" parent="ContentContainer/BoxContainer/BodyMargin" unique_id=1090835723]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+
+[node name="Columns" type="HBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin" unique_id=41060207]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LeftColumn" type="VBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns" unique_id=955023789]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="PartyMembersPanel" type="PanelContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn" unique_id=646561531]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+
+[node name="PartyMembersMargin" type="MarginContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel" unique_id=1575972484]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="PartyMembersScroll" type="ScrollContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin" unique_id=1014959904]
+layout_mode = 2
+follow_focus = true
+vertical_scroll_mode = 0
+
+[node name="PartyMembersList" type="HBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/PartyMembersPanel/PartyMembersMargin/PartyMembersScroll" unique_id=36675174]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="DeckPanel" type="PanelContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn" unique_id=144301999]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DeckMargin" type="MarginContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/DeckPanel" unique_id=1067539517]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="DeckVBox" type="VBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/DeckPanel/DeckMargin" unique_id=1309700071]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DeckTitle" type="Label" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/DeckPanel/DeckMargin/DeckVBox" unique_id=2048479302]
+layout_mode = 2
+theme_type_variation = &"PartyHeadingLabel"
+text = "Deck"
+
+[node name="DeckScroll" type="ScrollContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/DeckPanel/DeckMargin/DeckVBox" unique_id=937184524]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="DeckGrid" type="GridContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/LeftColumn/DeckPanel/DeckMargin/DeckVBox/DeckScroll" unique_id=2105332681]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 6
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 3
+
+[node name="CenterColumn" type="VBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns" unique_id=405014569]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+
+[node name="PreviewPanel" type="PanelContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn" unique_id=892415862]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CharacterPreview" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/PreviewPanel" unique_id=2025048728 instance=ExtResource("3_preview")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="PreviewHint" type="Label" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/PreviewPanel" unique_id=1175335210]
+layout_mode = 2
+size_flags_vertical = 8
+theme_type_variation = &"PartySmallLabel"
+text = "Drag to rotate"
+horizontal_alignment = 1
+
+[node name="WeaponPanel" type="PanelContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn" unique_id=269324809]
+custom_minimum_size = Vector2(0, 170)
+layout_mode = 2
+
+[node name="WeaponHBox" type="HBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel" unique_id=1026301525]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="WeaponInfoMargin" type="MarginContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox" unique_id=1738784432]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="WeaponInfoVBox" type="VBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox/WeaponInfoMargin" unique_id=949180329]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="WeaponInfoTitle" type="Label" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox/WeaponInfoMargin/WeaponInfoVBox" unique_id=1346348558]
+layout_mode = 2
+theme_type_variation = &"PartySubheadingLabel"
+text = "Equipped"
+
+[node name="WeaponInfoSection" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox/WeaponInfoMargin/WeaponInfoVBox" unique_id=1395541293 instance=ExtResource("6_weapon_info")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="VSeparator" type="VSeparator" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox" unique_id=657687706]
+layout_mode = 2
+
+[node name="WeaponListMargin" type="MarginContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox" unique_id=1177399831]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="WeaponListOuter" type="VBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox/WeaponListMargin" unique_id=1395358184]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="WeaponListTitle" type="Label" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox/WeaponListMargin/WeaponListOuter" unique_id=145954773]
+layout_mode = 2
+theme_type_variation = &"PartySubheadingLabel"
+text = "Owned weapons"
+
+[node name="WeaponListScroll" type="ScrollContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox/WeaponListMargin/WeaponListOuter" unique_id=1898476273]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="WeaponListVBox" type="VBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/CenterColumn/WeaponPanel/WeaponHBox/WeaponListMargin/WeaponListOuter/WeaponListScroll" unique_id=514613266]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="RightColumn" type="VBoxContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns" unique_id=2056671909]
+custom_minimum_size = Vector2(340, 0)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="StatsPanel" type="PanelContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/RightColumn" unique_id=2075711040]
+layout_mode = 2
+
+[node name="StatsMargin" type="MarginContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/RightColumn/StatsPanel" unique_id=67381883]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="StatsSection" parent="ContentContainer/BoxContainer/BodyMargin/Columns/RightColumn/StatsPanel/StatsMargin" unique_id=1163847332 instance=ExtResource("4_stats")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="VestigesPanel" type="PanelContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/RightColumn" unique_id=2034212363]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VestigesMargin" type="MarginContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/RightColumn/VestigesPanel" unique_id=1880196365]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VestigesScroll" type="ScrollContainer" parent="ContentContainer/BoxContainer/BodyMargin/Columns/RightColumn/VestigesPanel/VestigesMargin" unique_id=1572612242]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="VestigesSection" parent="ContentContainer/BoxContainer/BodyMargin/Columns/RightColumn/VestigesPanel/VestigesMargin/VestigesScroll" unique_id=786398797 instance=ExtResource("5_vestiges")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MenuButtonsMargin" type="MarginContainer" parent="ContentContainer/BoxContainer" unique_id=1158919605]
+layout_mode = 2
+
+[node name="MenuButtons" type="BoxContainer" parent="ContentContainer/BoxContainer/MenuButtonsMargin" unique_id=30953493]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="CloseButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=2115758283]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(104, 32)
+layout_mode = 2
+text = "Close"

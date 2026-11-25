@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://d1vl1kh8ljne3"]
+
+[ext_resource type="PackedScene" uid="uid://cen57mvnxd7vg" path="res://assets/models/weapons/guns/flintlock_pistol_low.glb" id="1_model"]
+
+[node name="FlintlockPistol" type="Node3D" unique_id=1849434103]
+
+[node name="Model" parent="." unique_id=1352975817 instance=ExtResource("1_model")]
+transform = Transform3D(1.7484556e-08, 0.4, -6.039832e-08, 0.4, -1.7484556e-08, 0, -2.6400945e-15, -6.039832e-08, -0.4, 0, 0.05, 0)

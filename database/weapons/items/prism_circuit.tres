@@ -1,0 +1,66 @@
+[gd_resource type="Resource" script_class="Weapon" format=3 uid="uid://whfoag7e1snn"]
+
+[ext_resource type="Script" uid="uid://bhfua1agxwjvk" path="res://database/weapons/weapon.gd" id="1_weapon"]
+[ext_resource type="Script" uid="uid://dukowmcc3o8kc" path="res://database/weapons/orb_definition.gd" id="2_orb"]
+[ext_resource type="Script" path="res://database/weapons/orb_module.gd" id="3_orb_mod"]
+[ext_resource type="Script" uid="uid://b5m65qbffcyad" path="res://database/weapons/weapon_effect.gd" id="4_fx"]
+[ext_resource type="PackedScene" uid="uid://cipyj0uumpl4n" path="res://scenes/battle/weapons/prism_orb_weapon.tscn" id="5_visual"]
+[ext_resource type="Resource" uid="uid://m34442o38e3v" path="res://database/states/resources/burning_state.tres" id="6_burning"]
+[ext_resource type="Resource" uid="uid://sbnf76wvb2xt" path="res://database/states/resources/chilled_state.tres" id="7_chilled"]
+[ext_resource type="Resource" uid="uid://dsg4kkuxxddx7" path="res://database/states/resources/electrocuted_state.tres" id="8_electro"]
+
+[sub_resource type="Resource" id="0_attuned_dmg"]
+script = ExtResource("4_fx")
+kind = 0
+value = 3.0
+value_is_attack_percent = true
+
+[sub_resource type="Resource" id="1_ember"]
+script = ExtResource("2_orb")
+orb_name = "Ember"
+color = Color(1, 0.35, 0.1, 1)
+emission_energy = 2.0
+state = ExtResource("6_burning")
+stack_count = 2
+damage = 6
+damage_is_attack_percent = true
+chance = 0.9
+element = "fire"
+attuned_effect = SubResource("0_attuned_dmg")
+
+[sub_resource type="Resource" id="2_tide"]
+script = ExtResource("2_orb")
+orb_name = "Tide"
+color = Color(0.2, 0.6, 1, 1)
+emission_energy = 1.6
+state = ExtResource("7_chilled")
+stack_count = 1
+damage = 4
+damage_is_attack_percent = true
+chance = 0.9
+element = "water"
+attuned_effect = SubResource("0_attuned_dmg")
+
+[sub_resource type="Resource" id="3_volt"]
+script = ExtResource("2_orb")
+orb_name = "Volt"
+color = Color(0.7, 0.4, 1, 1)
+emission_energy = 2.4
+state = ExtResource("8_electro")
+stack_count = 1
+damage = 8
+damage_is_attack_percent = true
+chance = 0.8
+element = "lightning"
+attuned_effect = SubResource("0_attuned_dmg")
+
+[sub_resource type="Resource" id="4_orb_module"]
+script = ExtResource("3_orb_mod")
+orbs = Array[ExtResource("2_orb")]([SubResource("1_ember"), SubResource("2_tide"), SubResource("3_volt")])
+
+[resource]
+script = ExtResource("1_weapon")
+model_scene = ExtResource("5_visual")
+modules = Array[ExtResource("3_orb_mod")]([SubResource("4_orb_module")])
+item_name = "Prism Circuit"
+description = "Three orbiting orbs cycle on every hit: Ember burns, Tide chills, Volt shocks. Each detonation empowers the next orb with Overcharge."

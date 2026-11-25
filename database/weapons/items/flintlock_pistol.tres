@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Weapon" format=3 uid="uid://cyv1wxsvm5ha"]
+
+[ext_resource type="Script" uid="uid://b5m65qbffcyad" path="res://database/weapons/weapon_effect.gd" id="1_vki0j"]
+[ext_resource type="Script" uid="uid://bhfua1agxwjvk" path="res://database/weapons/weapon.gd" id="1_weapon"]
+[ext_resource type="Script" uid="uid://b6thyop4nt4gb" path="res://database/weapons/weapon_module.gd" id="2_modbase"]
+[ext_resource type="Script" uid="uid://crux28g2h4cs2" path="res://database/weapons/gun_module.gd" id="3_gun_mod"]
+[ext_resource type="PackedScene" uid="uid://d1vl1kh8ljne3" path="res://scenes/battle/weapons/flintlock_pistol.tscn" id="4_model"]
+
+[sub_resource type="Resource" id="1_gun"]
+script = ExtResource("3_gun_mod")
+
+[resource]
+script = ExtResource("1_weapon")
+model_scene = ExtResource("4_model")
+attack_bonus = 2
+modules = Array[ExtResource("2_modbase")]([SubResource("1_gun")])
+item_name = "Flintlock Pistol"
+description = "A reliable flintlock pistol. Hits harder than a blade but slower to reload."

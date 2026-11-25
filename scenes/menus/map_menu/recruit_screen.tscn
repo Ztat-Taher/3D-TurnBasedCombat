@@ -1,70 +1,420 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://v37ki1ny1g3o"]
 
-[ext_resource type="Script" path="res://scripts/ui/map/recruit_screen.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://cx8no1nvhmn15" path="res://scripts/ui/map/recruit_screen.gd" id="1_script"]
+[ext_resource type="Theme" uid="uid://n4jldirxin3o" path="res://scenes/windows/party/party_screen_theme.tres" id="2_theme"]
+[ext_resource type="Script" uid="uid://bsi3dk4tesrkd" path="res://scenes/windows/stat_radar_graph.gd" id="3_graph"]
+[ext_resource type="Script" path="res://scripts/juice/lighting/flicker_light.gd" id="4_flicker"]
+[ext_resource type="Shader" uid="uid://du0vaywgwtcnu" path="res://assets/shaders/psx_postprocessing.gdshader" id="5_psx"]
 
-[node name="RecruitScreen" type="Control"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_psx"]
+shader = ExtResource("5_psx")
+shader_parameter/enabled = true
+shader_parameter/dithering = true
+shader_parameter/colors = 12
+shader_parameter/dither_size = 1
+
+[sub_resource type="Environment" id="Environment_camp"]
+background_mode = 1
+background_color = Color(0.025, 0.03, 0.055, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.3, 0.34, 0.5, 1)
+ambient_light_energy = 1.0
+tonemap_mode = 3
+glow_enabled = true
+glow_bloom = 0.05
+fog_enabled = true
+fog_light_color = Color(0.04, 0.05, 0.08, 1)
+fog_density = 0.035
+
+[sub_resource type="StandardMaterial3D" id="Mat_dirt"]
+albedo_color = Color(0.2, 0.16, 0.11, 1)
+roughness = 1.0
+
+[sub_resource type="PlaneMesh" id="Mesh_ground"]
+material = SubResource("Mat_dirt")
+size = Vector2(30, 30)
+
+[sub_resource type="StandardMaterial3D" id="Mat_rock"]
+albedo_color = Color(0.26, 0.26, 0.28, 1)
+roughness = 0.95
+
+[sub_resource type="SphereMesh" id="Mesh_boulder"]
+material = SubResource("Mat_rock")
+radial_segments = 10
+rings = 6
+
+[sub_resource type="BoxMesh" id="Mesh_cliff"]
+material = SubResource("Mat_rock")
+size = Vector3(1, 1, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_pine"]
+albedo_color = Color(0.07, 0.16, 0.11, 1)
+roughness = 1.0
+
+[sub_resource type="CylinderMesh" id="Mesh_pine"]
+material = SubResource("Mat_pine")
+top_radius = 0.0
+bottom_radius = 1.0
+height = 3.4
+radial_segments = 8
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.3, 0.2, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="Mesh_trunk"]
+material = SubResource("Mat_wood")
+top_radius = 0.12
+bottom_radius = 0.16
+height = 1.0
+radial_segments = 8
+
+[sub_resource type="CylinderMesh" id="Mesh_log"]
+material = SubResource("Mat_wood")
+top_radius = 0.18
+bottom_radius = 0.2
+height = 1.7
+radial_segments = 10
+
+[sub_resource type="CylinderMesh" id="Mesh_firewood"]
+material = SubResource("Mat_wood")
+top_radius = 0.05
+bottom_radius = 0.06
+height = 0.7
+radial_segments = 6
+
+[sub_resource type="SphereMesh" id="Mesh_stone"]
+material = SubResource("Mat_rock")
+radius = 0.09
+height = 0.12
+radial_segments = 8
+rings = 4
+
+[sub_resource type="StandardMaterial3D" id="Mat_embers"]
+albedo_color = Color(0.2, 0.05, 0.02, 1)
+emission_enabled = true
+emission = Color(1, 0.35, 0.08, 1)
+emission_energy_multiplier = 2.5
+
+[sub_resource type="SphereMesh" id="Mesh_embers"]
+material = SubResource("Mat_embers")
+radius = 0.22
+height = 0.08
+radial_segments = 12
+rings = 4
+
+[sub_resource type="Gradient" id="Gradient_flame_sprite"]
+offsets = PackedFloat32Array(0, 0.45, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.55, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="Tex_flame_sprite"]
+gradient = SubResource("Gradient_flame_sprite")
+width = 64
+height = 64
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(0.5, 0)
+
+[sub_resource type="StandardMaterial3D" id="Mat_flame"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+billboard_keep_scale = true
+albedo_texture = SubResource("Tex_flame_sprite")
+
+[sub_resource type="QuadMesh" id="Mesh_flame"]
+material = SubResource("Mat_flame")
+size = Vector2(0.28, 0.36)
+
+[sub_resource type="Curve" id="Curve_flame_scale"]
+_data = [Vector2(0, 0.6), 0.0, 0.0, 0, 0, Vector2(0.3, 1), 0.0, 0.0, 0, 0, Vector2(1, 0.1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="Gradient" id="Gradient_flame"]
+offsets = PackedFloat32Array(0, 0.35, 0.75, 1)
+colors = PackedColorArray(1, 0.9, 0.5, 1, 1, 0.55, 0.15, 0.9, 0.8, 0.18, 0.05, 0.5, 0.3, 0.05, 0.02, 0)
+
+[sub_resource type="StandardMaterial3D" id="Mat_bedroll"]
+albedo_color = Color(0.42, 0.16, 0.13, 1)
+roughness = 1.0
+
+[sub_resource type="BoxMesh" id="Mesh_bedroll"]
+material = SubResource("Mat_bedroll")
+size = Vector3(0.85, 0.07, 1.9)
+
+[sub_resource type="StandardMaterial3D" id="Mat_pack"]
+albedo_color = Color(0.36, 0.3, 0.2, 1)
+roughness = 1.0
+
+[sub_resource type="BoxMesh" id="Mesh_pack"]
+material = SubResource("Mat_pack")
+size = Vector3(0.4, 0.5, 0.28)
+
+[node name="RecruitScreen" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="ViewportContainer" type="SubViewportContainer" parent="."]
+material = SubResource("ShaderMaterial_psx")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+stretch_shrink = 2
+
+[node name="WorldViewport" type="SubViewport" parent="ViewportContainer"]
+handle_input_locally = false
+size = Vector2i(640, 360)
+render_target_update_mode = 4
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="ViewportContainer/WorldViewport"]
+environment = SubResource("Environment_camp")
+
+[node name="Moonlight" type="DirectionalLight3D" parent="ViewportContainer/WorldViewport"]
+rotation_degrees = Vector3(-40, -150, 0)
+light_color = Color(0.55, 0.65, 1, 1)
+light_energy = 1.1
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="ViewportContainer/WorldViewport"]
+position = Vector3(0.2, 1.7, 5.6)
+rotation_degrees = Vector3(-9, 2, 0)
+current = true
+fov = 40.0
+
+[node name="Ground" type="MeshInstance3D" parent="ViewportContainer/WorldViewport"]
+mesh = SubResource("Mesh_ground")
+
+[node name="Backdrop" type="Node3D" parent="ViewportContainer/WorldViewport"]
+
+[node name="Cliff" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+transform = Transform3D(9, 0, 0, 0, 4.5, 0, 0, 0, 2, -1, 2, -5.5)
+mesh = SubResource("Mesh_cliff")
+
+[node name="CliffLeft" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+position = Vector3(-5.5, 1.5, -3)
+rotation_degrees = Vector3(0, 30, 0)
+scale = Vector3(3, 3.2, 3)
+mesh = SubResource("Mesh_cliff")
+
+[node name="Boulder1" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+transform = Transform3D(1.6, 0, 0, 0, 1.1, 0, 0, 0, 1.3, -3.2, 0.35, -2.2)
+mesh = SubResource("Mesh_boulder")
+
+[node name="Boulder2" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+transform = Transform3D(0.9, 0, 0, 0, 0.7, 0, 0, 0, 0.8, 3.4, 0.2, -1.8)
+mesh = SubResource("Mesh_boulder")
+
+[node name="Boulder3" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+transform = Transform3D(0.6, 0, 0, 0, 0.45, 0, 0, 0, 0.55, -2.3, 0.12, 0.9)
+mesh = SubResource("Mesh_boulder")
+
+[node name="Pine1" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 2.2, -3.4)
+mesh = SubResource("Mesh_pine")
+
+[node name="Trunk" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop/Pine1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.7, 0)
+mesh = SubResource("Mesh_trunk")
+
+[node name="Pine2" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 2.6, 2.7, -4.6)
+mesh = SubResource("Mesh_pine")
+
+[node name="Trunk" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop/Pine2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.7, 0)
+mesh = SubResource("Mesh_trunk")
+
+[node name="Pine3" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, -4.4, 1.9, -1)
+mesh = SubResource("Mesh_pine")
+
+[node name="Trunk" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop/Pine3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.7, 0)
+mesh = SubResource("Mesh_trunk")
+
+[node name="Pine4" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop"]
+transform = Transform3D(1.1, 0, 0, 0, 1.1, 0, 0, 0, 1.1, 5.8, 2.4, -1.2)
+mesh = SubResource("Mesh_pine")
+
+[node name="Trunk" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Backdrop/Pine4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.7, 0)
+mesh = SubResource("Mesh_trunk")
+
+[node name="Campfire" type="Node3D" parent="ViewportContainer/WorldViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0, 0.6)
+
+[node name="Embers" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.03, 0)
+mesh = SubResource("Mesh_embers")
+
+[node name="Firewood1" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+position = Vector3(0.08, 0.14, 0)
+rotation_degrees = Vector3(0, 0, 60)
+mesh = SubResource("Mesh_firewood")
+
+[node name="Firewood2" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+position = Vector3(-0.04, 0.14, 0.07)
+rotation_degrees = Vector3(0, 120, 60)
+mesh = SubResource("Mesh_firewood")
+
+[node name="Firewood3" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+position = Vector3(-0.04, 0.14, -0.07)
+rotation_degrees = Vector3(0, 240, 60)
+mesh = SubResource("Mesh_firewood")
+
+[node name="Stone1" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.38, 0.04, 0)
+mesh = SubResource("Mesh_stone")
+
+[node name="Stone2" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.19, 0.04, 0.33)
+mesh = SubResource("Mesh_stone")
+
+[node name="Stone3" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.19, 0.04, 0.33)
+mesh = SubResource("Mesh_stone")
+
+[node name="Stone4" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.38, 0.04, 0)
+mesh = SubResource("Mesh_stone")
+
+[node name="Stone5" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.19, 0.04, -0.33)
+mesh = SubResource("Mesh_stone")
+
+[node name="Stone6" type="MeshInstance3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.19, 0.04, -0.33)
+mesh = SubResource("Mesh_stone")
+
+[node name="Flames" type="CPUParticles3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+amount = 28
+lifetime = 0.75
+mesh = SubResource("Mesh_flame")
+emission_shape = 1
+emission_sphere_radius = 0.12
+direction = Vector3(0, 1, 0)
+spread = 12.0
+gravity = Vector3(0, 0.6, 0)
+initial_velocity_min = 0.35
+initial_velocity_max = 0.7
+scale_amount_curve = SubResource("Curve_flame_scale")
+color_ramp = SubResource("Gradient_flame")
+
+[node name="FireLight" type="OmniLight3D" parent="ViewportContainer/WorldViewport/Campfire"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+light_color = Color(1, 0.55, 0.22, 1)
+light_energy = 2.4
+shadow_enabled = true
+omni_range = 7.0
+script = ExtResource("4_flicker")
+
+[node name="Bedroll" type="MeshInstance3D" parent="ViewportContainer/WorldViewport"]
+position = Vector3(-1, 0.035, 0)
+rotation_degrees = Vector3(0, 20, 0)
+mesh = SubResource("Mesh_bedroll")
+
+[node name="SeatLog" type="MeshInstance3D" parent="ViewportContainer/WorldViewport"]
+position = Vector3(-1.2, 0.2, -1.05)
+rotation_degrees = Vector3(0, 20, 90)
+mesh = SubResource("Mesh_log")
+
+[node name="Backpack" type="MeshInstance3D" parent="ViewportContainer/WorldViewport"]
+position = Vector3(-2, 0.25, -0.6)
+rotation_degrees = Vector3(0, -30, 8)
+mesh = SubResource("Mesh_pack")
+
+[node name="RestSpot" type="Marker3D" parent="ViewportContainer/WorldViewport"]
+unique_name_in_owner = true
+position = Vector3(-1, 0, 0)
+rotation_degrees = Vector3(0, 30, 0)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="UIRoot" type="Control" parent="UI"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_script")
+mouse_filter = 2
+theme = ExtResource("2_theme")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="EncounterPanel" type="PanelContainer" parent="UI/UIRoot"]
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
 anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
+anchor_bottom = 0.5
+offset_left = -420.0
+offset_top = -250.0
+offset_right = -48.0
+offset_bottom = 250.0
+grow_horizontal = 0
 grow_vertical = 2
-mouse_filter = 0
-color = Color(0, 0, 0, 0.75)
+theme_type_variation = &"PartyOverlayPanel"
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="Panel" type="PanelContainer" parent="CenterContainer"]
+[node name="VBox" type="VBoxContainer" parent="UI/UIRoot/EncounterPanel"]
 layout_mode = 2
-custom_minimum_size = Vector2(360, 220)
+theme_override_constants/separation = 10
 
-[node name="VBox" type="VBoxContainer" parent="CenterContainer/Panel"]
+[node name="Eyebrow" type="Label" parent="UI/UIRoot/EncounterPanel/VBox"]
+layout_mode = 2
+theme_type_variation = &"PartySubheadingLabel"
+text = "Campsite"
+
+[node name="TitleLabel" type="Label" parent="UI/UIRoot/EncounterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PartyTitleLabel"
+text = "Ally Name"
+
+[node name="StatsLabel" type="Label" parent="UI/UIRoot/EncounterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PartyCaptionLabel"
+text = "Lv 1 · Blade"
+
+[node name="DescriptionLabel" type="Label" parent="UI/UIRoot/EncounterPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_type_variation = &"PartyBodyLabel"
+text = "Someone is resting by the fire."
+autowrap_mode = 3
+
+[node name="StatsGraph" type="Control" parent="UI/UIRoot/EncounterPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 220)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 6
+mouse_filter = 2
+script = ExtResource("3_graph")
+
+[node name="HSeparator" type="HSeparator" parent="UI/UIRoot/EncounterPanel/VBox"]
+layout_mode = 2
+
+[node name="Buttons" type="HBoxContainer" parent="UI/UIRoot/EncounterPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="TitleLabel" type="Label" parent="CenterContainer/Panel/VBox"]
-layout_mode = 2
-text = "Recruit Ally"
-horizontal_alignment = 1
-
-[node name="DescLabel" type="Label" parent="CenterContainer/Panel/VBox"]
-layout_mode = 2
-text = "Recruit a new ally for the next battle."
-horizontal_alignment = 1
-
-[node name="PreviewLabel" type="Label" parent="CenterContainer/Panel/VBox"]
-layout_mode = 2
-text = "Recruit"
-horizontal_alignment = 1
-
-[node name="RecruitOptions" type="VBoxContainer" parent="CenterContainer/Panel/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 6
-alignment = 1
-
-[node name="Actions" type="HBoxContainer" parent="CenterContainer/Panel/VBox"]
-layout_mode = 2
-alignment = 1
-theme_override_constants/separation = 12
-
-[node name="CancelButton" type="Button" parent="CenterContainer/Panel/VBox/Actions"]
+[node name="RecruitButton" type="Button" parent="UI/UIRoot/EncounterPanel/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Cancel"
+text = "Recruit"
 
-[connection signal="pressed" from="CenterContainer/Panel/VBox/Actions/CancelButton" to="." method="_on_cancel_button_pressed"]
+[node name="LeaveButton" type="Button" parent="UI/UIRoot/EncounterPanel/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 40)
+layout_mode = 2
+text = "Leave"

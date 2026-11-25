@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://ds2n1ktewvr7a"]
+
+[ext_resource type="Script" uid="uid://b74pq6daa76lm" path="res://assets/effects/slash/weapon_trail.gd" id="1_trail"]
+[ext_resource type="PackedScene" uid="uid://bv04q74txapdb" path="res://assets/models/weapons/swords/highland_claymore_low.glb" id="1_vkm87"]
+[ext_resource type="Material" uid="uid://d28phoi8n0e6o" path="res://assets/effects/materials/slash_trail_mat.tres" id="2_trail_mat"]
+
+[node name="SoldiersBlade" type="Node3D" unique_id=44283710]
+
+[node name="AuxScene" parent="." unique_id=153859217 instance=ExtResource("1_vkm87")]
+transform = Transform3D(-4.371139e-08, 0.70710677, 0.70710677, 0, 0.70710677, -0.70710677, -1, -3.090862e-08, -3.090862e-08, 0.4, 0, 0)
+
+[node name="WeaponTrail" type="MeshInstance3D" parent="." unique_id=193660648]
+material_override = ExtResource("2_trail_mat")
+script = ExtResource("1_trail")
+
+[node name="trail_top" type="Node3D" parent="." unique_id=2122479841]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0599796, 0.02, 0)
+
+[node name="trail_bottom" type="Node3D" parent="." unique_id=286352964]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22003894, 0.02, 0)

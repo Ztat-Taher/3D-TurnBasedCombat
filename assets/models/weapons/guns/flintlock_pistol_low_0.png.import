@@ -2,20 +2,20 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://1rcv8abm7frb"
-path.s3tc="res://.godot/imported/Tidus_ffx0000.png-237342b05a8506bebf81a0c23bda18c5.s3tc.ctex"
+uid="uid://bcydr3t6jby81"
+path.s3tc="res://.godot/imported/flintlock_pistol_low_0.png-53ae122f196880987e1394fcba218a54.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "9b837b1428f922406e6140f70c84e6d5"
+"md5": "0675009d90d6c13aba16d173c3f26722"
 }
 
 [deps]
 
-source_file="res://assets/models/player/Tidus_ffx0000.png"
-dest_files=["res://.godot/imported/Tidus_ffx0000.png-237342b05a8506bebf81a0c23bda18c5.s3tc.ctex"]
+source_file="res://assets/models/weapons/guns/flintlock_pistol_low_0.png"
+dest_files=["res://.godot/imported/flintlock_pistol_low_0.png-53ae122f196880987e1394fcba218a54.s3tc.ctex"]
 
 [params]
 

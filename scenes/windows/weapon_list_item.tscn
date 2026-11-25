@@ -1,0 +1,41 @@
+[gd_scene format=3 uid="uid://dsg1wmm7xkppc"]
+
+[ext_resource type="Script" uid="uid://b4hawgxgtyv28" path="res://scenes/windows/weapon_list_item.gd" id="1"]
+
+[node name="WeaponListItem" type="PanelContainer" unique_id=708541134]
+custom_minimum_size = Vector2(0, 48)
+size_flags_horizontal = 3
+theme_type_variation = &"PartyListItem"
+script = ExtResource("1")
+
+[node name="HBox" type="HBoxContainer" parent="." unique_id=557862655]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Icon" type="TextureRect" parent="HBox" unique_id=1297803395]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="VBox" type="VBoxContainer" parent="HBox" unique_id=2087086282]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 2
+
+[node name="NameLabel" type="Label" parent="HBox/VBox" unique_id=1408296635]
+layout_mode = 2
+theme_type_variation = &"PartyBodyLabel"
+text = "Weapon Name"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="LevelLabel" type="Label" parent="HBox/VBox" unique_id=512934282]
+layout_mode = 2
+theme_type_variation = &"PartySmallLabel"
+text = "Lv. 1"

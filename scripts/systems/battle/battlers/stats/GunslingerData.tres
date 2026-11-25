@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BattlerStats" format=3 uid="uid://e8m8wcc5erbe"]
+
+[ext_resource type="Script" uid="uid://d2mintfjxyqei" path="res://scripts/systems/battle/battlers/stats/BattlerStats.gd" id="1_stats"]
+[ext_resource type="Resource" path="res://database/decks/gunslinger_deck.tres" id="3_deck"]
+[ext_resource type="Texture2D" uid="uid://n0e72skevc4m" path="res://assets/images/ui/character_portrait.png" id="3_vxkye"]
+
+[resource]
+script = ExtResource("1_stats")
+character_name = "Gunslinger"
+thumbnail = ExtResource("3_vxkye")
+max_health = 75
+attack = 16
+defense = 2
+agility = 10
+health_multiplier = 12
+attack_multiplier = 3
+deck = ExtResource("3_deck")

@@ -181,3 +181,9 @@ static func configure_ally(battler : Battler, member : AllyPartyMember) -> void:
 	var experience := battler.get_node_or_null("Experience") as Experience
 	if experience:
 		experience.exp_total = member.exp_total
+	# Equipment: share the member's inventory (weapons are unique resources, so
+	# XP/levels persist automatically) and equip the chosen weapon.
+	if member.inventory != null:
+		battler.inventory = member.inventory
+	if member.equipped_weapon != null:
+		battler.set_weapon(member.equipped_weapon)

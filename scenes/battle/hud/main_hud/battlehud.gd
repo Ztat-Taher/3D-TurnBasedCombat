@@ -6,6 +6,8 @@ signal menu_opened
 signal card_selected(card: CardConfig)
 signal end_turn_pressed
 
+@export var pause_menu_scene: PackedScene = preload("res://scenes/windows/pause_menu.tscn")
+
 @onready var item_button_scene: PackedScene = preload("res://scenes/battle/hud/action_system/input/item_button/item-button-preset.tscn")
 @onready var item_container = $Control/Items/ScrollContainer/BoxContainer
 @onready var turn_queue_ui: TurnQueueUI = $Control/TurnQueueUI
@@ -17,6 +19,7 @@ signal end_turn_pressed
 @onready var run_button: TextureButton = $Control/ActionButtons.get_node("RunWrapper/Run")
 @onready var end_turn_button: TextureButton = $Control/ActionButtons.get_node("EndTurnWrapper/EndTurnButton")
 @onready var global_back_button: TextureButton = $Control/BackButton
+@onready var pause_button = $Control.get_node_or_null("PauseButton")
 @onready var item_select: Control = $Control/Items
 @onready var card_ui: Control = $Control/CardUI
 @onready var party_status_panel: VBoxContainer = $Control/PartyStatusPanel
@@ -977,3 +980,23 @@ func hide_move_announcement() -> void:
 	_move_banner_tween.tween_property(move_banner, "modulate:a", 0.0, 0.2)
 	_move_banner_tween.tween_property(move_banner, "scale", Vector2(0.9, 0.9), 0.2)
 	_move_banner_tween.chain().tween_callback(func(): move_banner.visible = false)
+
+func _on_pause_button_pressed() -> void:
+	if pause_menu_scene:
+		var pause_menu = pause_menu_scene.instantiate()
+		add_child(pause_menu)
+		if pause_menu.has_method("open"):
+			pause_menu.open()
+		else:
+			pause_menu.show()
+		# Wait for menu to close - use hidden signal if available
+		if pause_menu.has_signal("hidden"):
+			await pause_menu.hidden
+		elif pause_menu.has_signal("closed"):
+			await pause_menu.closed
+		else:
+			# Fallback: wait for it to become invisible
+			while pause_menu and pause_menu.visible:
+				await get_tree().process_frame
+		if is_instance_valid(pause_menu):
+			pause_menu.queue_free()

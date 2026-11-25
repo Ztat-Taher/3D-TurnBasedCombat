@@ -29,8 +29,18 @@ const META_PARTY_MEMBER_ID : StringName = &"party_member_id"
 ## This ally's own card deck. Kept per ally so card rewards can be applied to a
 ## single party member later. Null = load [member deck_path].
 @export var deck : DeckResource
-## Portrait used by out-of-battle UIs (rest site, recruit screen).
+## Fallback portrait for out-of-battle UIs, used only when [member stats] has
+## no [member BattlerStats.thumbnail] (set the portrait there, see [method get_portrait]).
 @export_file("*.svg", "*.png") var portrait_path : String = "res://Placeholder.svg"
+
+## This ally's weapon type — type-locks which [Weapon]s may be equipped.
+@export var weapon_type : Weapon.WType = Weapon.WType.BLADE
+## The currently equipped weapon (must be in [member inventory] and match
+## [member weapon_type]). Null = fights unarmed.
+@export var equipped_weapon : Weapon = null
+## Per-ally item storage. Weapons are non-stackable [Weapon] items living here;
+## battle items can share the same inventory.
+@export var inventory : Inventory = null
 ## Character level, driving the level-progression stat scaling in battle.
 @export var level : int = 1
 ## Accumulated experience, carried between battles.
@@ -54,8 +64,47 @@ func has_full_health() -> bool:
 
 
 ## Max HP as a usable number, even before the ally has fought a battle.
+## Single source of truth for UIs: the value the last battle wrote back
+## (includes vestige bonuses), else the level-scaled base stat that battles
+## start from (same formula as [method Battler.apply_level_progression]).
 func get_max_health() -> int:
-	return max_health if max_health > 0 else 1
+	if max_health > 0:
+		return max_health
+	return maxi(int(get_level_stats().get("max_health", 1)), 1)
+
+
+## Current HP as a usable number ([code]-1[/code] = fresh ally = full HP).
+func get_current_health() -> int:
+	if current_health < 0:
+		return get_max_health()
+	return mini(current_health, get_max_health())
+
+
+## Base stats scaled to this ally's level (HP, ATK, DEF, AGI, AP).
+## Empty when [member stats] is unset.
+func get_level_stats() -> Dictionary:
+	if stats == null:
+		return {}
+	var base := {
+		"max_health": stats.max_health,
+		"attack": stats.attack,
+		"defense": stats.defense,
+		"agility": stats.agility,
+		"max_ap": stats.max_ap,
+	}
+	var mults := {
+		"max_health": stats.health_multiplier,
+		"attack": stats.attack_multiplier,
+		"defense": stats.defense_multiplier,
+		"agility": stats.agility_multiplier,
+		"max_ap": stats.ap_multiplier,
+	}
+	return LevelProgression.get_stats_at_level(base, mults, level)
+
+
+## Name for UIs, falling back to [member id] when no display name is set.
+func get_display_name() -> String:
+	return display_name if not display_name.is_empty() else id
 
 
 # ---------------------------------------------------------------------------
@@ -123,16 +172,12 @@ func get_vestiges_by_scope(scope: Vestige.Scope) -> Array[Vestige]:
 
 ## HP as a 0..1 ratio, for progress bars.
 func get_hp_ratio() -> float:
-	if max_health <= 0:
-		return 1.0
-	return clampf(float(maxi(current_health, 0)) / float(max_health), 0.0, 1.0)
+	return clampf(float(get_current_health()) / float(get_max_health()), 0.0, 1.0)
 
 
-## Human readable HP for labels ("72/100", or "Full" for a fresh ally).
+## Human readable HP for labels ("72/100"; a fresh ally shows full HP).
 func get_hp_text() -> String:
-	if max_health <= 0:
-		return "Full"
-	return "%d/%d" % [maxi(current_health, 0), max_health]
+	return "%d/%d" % [get_current_health(), get_max_health()]
 
 
 ## Restores [param amount] HP, returning the amount actually healed.
@@ -181,11 +226,42 @@ func duplicate_deck() -> DeckResource:
 	return copy
 
 
-## Portrait texture for out-of-battle UIs (null when the path is missing).
+## Portrait texture for out-of-battle UIs. Uses [member BattlerStats.thumbnail]
+## (the same portrait battles show), falling back to [member portrait_path];
+## null when neither is set.
 func get_portrait() -> Texture2D:
+	if stats != null and stats.thumbnail != null:
+		return stats.thumbnail
 	if portrait_path.is_empty() or not ResourceLoader.exists(portrait_path):
 		return null
 	return load(portrait_path) as Texture2D
+
+
+# ---------------------------------------------------------------------------
+# Equipment (weapons)
+# ---------------------------------------------------------------------------
+
+## True when [param w] is a weapon this ally's type allows.
+func can_equip_weapon(w : Weapon) -> bool:
+	return w != null and w.equip_kind() == weapon_type
+
+
+## Equips [param w]. The weapon must already be in [member inventory] and match
+## [member weapon_type]; returns false (with a warning) otherwise. The item is
+## NOT consumed — unequipping just clears the reference.
+func equip_weapon(w : Weapon) -> bool:
+	if not can_equip_weapon(w):
+		push_warning("AllyPartyMember '%s': cannot equip '%s' (type mismatch or null)." % [id, w.item_name if w else "null"])
+		return false
+	if inventory != null and not inventory.collection.has(w):
+		push_warning("AllyPartyMember '%s': weapon '%s' is not in inventory." % [id, w.item_name])
+		return false
+	equipped_weapon = w
+	return true
+
+
+func unequip_weapon() -> void:
+	equipped_weapon = null
 
 
 ## Standalone copy of this entry for a newly recruited ally of the same type.

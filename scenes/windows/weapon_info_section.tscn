@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://b374vs4dc4g28"]
+
+[ext_resource type="Script" uid="uid://d4m25267otlgl" path="res://scenes/windows/weapon_info_section.gd" id="1"]
+
+[node name="WeaponInfoSection" type="HBoxContainer" unique_id=1687068132]
+custom_minimum_size = Vector2(200, 72)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+script = ExtResource("1")
+
+[node name="Icon" type="TextureRect" parent="." unique_id=777566369]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+
+[node name="InfoVBox" type="VBoxContainer" parent="." unique_id=308056443]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 2
+
+[node name="NameLabel" type="Label" parent="InfoVBox" unique_id=1471615102]
+layout_mode = 2
+theme_type_variation = &"PartyHeadingLabel"
+text = "Weapon Name"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="LevelLabel" type="Label" parent="InfoVBox" unique_id=321126370]
+layout_mode = 2
+theme_type_variation = &"PartyBodyLabel"
+text = "Level 1"
+
+[node name="TypeLabel" type="Label" parent="InfoVBox" unique_id=1031832283]
+layout_mode = 2
+theme_type_variation = &"PartyCaptionLabel"
+text = "Type: Blade"

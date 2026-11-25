@@ -4,7 +4,7 @@ extends Resource
 ## Configuration and progression stats for player/ally battlers
 
 @export var character_name: String = "Player" ## Character display name
-@export var thumbnail: Texture2D = preload("res://Placeholder.svg") ## Portrait shown in battle results and HUD
+@export var thumbnail: Texture2D ## Portrait shown in battle results and HUD
 
 ## LEVEL-FOCUSED PROGRESSION SYSTEM
 ## Stat = base_stat + (level - 1) * stat_multiplier

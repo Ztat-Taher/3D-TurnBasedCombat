@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://bhuexcsdhruy6"]
+
+[ext_resource type="PackedScene" uid="uid://dsjmjrwa8nik0" path="res://assets/models/weapons/swords/elven_leaf_blade_low.glb" id="1_model"]
+[ext_resource type="Script" uid="uid://b74pq6daa76lm" path="res://assets/effects/slash/weapon_trail.gd" id="2_trail"]
+[ext_resource type="Material" uid="uid://d28phoi8n0e6o" path="res://assets/effects/materials/slash_trail_mat.tres" id="3_trail_mat"]
+
+[node name="ElfLeafBlade" type="Node3D" unique_id=1122781796]
+
+[node name="Model" parent="." unique_id=1412092892 instance=ExtResource("1_model")]
+transform = Transform3D(0.7071067, 0.7071067, 0, 0.7071067, -0.7071067, 8.742278e-08, 6.181723e-08, -6.181723e-08, -1, 0.4, 0, 0)
+
+[node name="WeaponTrail" type="MeshInstance3D" parent="." unique_id=1021451988]
+material_override = ExtResource("3_trail_mat")
+script = ExtResource("2_trail")
+
+[node name="trail_top" type="Node3D" parent="." unique_id=2101194777]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.05, 0)
+
+[node name="trail_bottom" type="Node3D" parent="." unique_id=1377594866]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.05, 0)

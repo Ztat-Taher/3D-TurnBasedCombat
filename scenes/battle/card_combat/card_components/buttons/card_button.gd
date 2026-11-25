@@ -344,7 +344,11 @@ func _setup_description_popup():
 	description_popup.visible = false
 
 func _exit_tree():
-	## Clean up description popup when card is destroyed
+	## Clean up description popup when card is destroyed.
+	## is_queued_for_deletion() distinguishes real destruction from a
+	## reparent (e.g. hover overlays), which must keep the popup alive.
+	if not is_queued_for_deletion():
+		return
 	if description_popup and is_instance_valid(description_popup):
 		description_popup.queue_free()
 

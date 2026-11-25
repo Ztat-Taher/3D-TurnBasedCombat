@@ -1,0 +1,188 @@
+[gd_scene format=3 uid="uid://cipyj0uumpl4n"]
+
+[ext_resource type="Script" uid="uid://d0wd43l8kgiov" path="res://scenes/battle/weapons/orb_weapon_visual.gd" id="1_visual"]
+[ext_resource type="Texture2D" uid="uid://cta8ibxdihoia" path="res://assets/effects/textures/noise2.png" id="2_uqkxj"]
+[ext_resource type="Texture2D" uid="uid://bhgsicqubqqdo" path="res://assets/effects/textures/trail3.png" id="3_bg3j5"]
+[ext_resource type="Script" uid="uid://ekbh4q16llgl" path="res://assets/effects/core/trail3d.gd" id="4_tqb4d"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_ember"]
+albedo_color = Color(1, 0.35, 0.1, 1)
+emission_enabled = true
+emission = Color(1, 0.35, 0.1, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_orb"]
+radial_segments = 16
+rings = 8
+
+[sub_resource type="Shader" id="Shader_1rx6d"]
+code = "shader_type spatial;
+render_mode unshaded, cull_disabled;
+
+uniform float emission = 1.0;
+
+uniform sampler2D tex_1 : source_color, filter_linear_mipmap, repeat_disable;
+uniform sampler2D noise_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform vec2 noise_tiling = vec2(1.0);
+uniform sampler2D gradient : source_color, repeat_disable;
+uniform vec2 speed = vec2(0.0);
+uniform float distortion_intensity = 1.0;
+
+void vertex()
+{
+}
+
+void fragment()
+{
+	float a = 1.0 - COLOR.b;
+	vec4 noise = texture(noise_tex, UV * noise_tiling + speed * TIME);
+	float d = distortion_intensity * ((1.0 - a) + smoothstep(0.0, 1.0, 1.0 - a) * 1.0);
+	vec4 tex_sampled_1 = texture(tex_1, UV + (noise.r * 2.0 - 1.0) * d);
+	ALPHA = clamp(tex_sampled_1.r * a, 0.0, 1.0);
+	ALBEDO = texture(gradient, vec2(ALPHA)).rgb * emission;
+}"
+
+[sub_resource type="Gradient" id="Gradient_n4cs8"]
+colors = PackedColorArray(0.735357, 0.24767272, 0.06258772, 1, 1, 0.34901962, 0.101960786, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_64ava"]
+gradient = SubResource("Gradient_n4cs8")
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_uqkxj"]
+load_path = "res://.godot/imported/noise2.png-811e6f69adc7d6739c9d9860a5e5d8b2.ctex"
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_bg3j5"]
+load_path = "res://.godot/imported/trail3.png-a328b7293a54ce735a9d6132a4f62498.ctex"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tqb4d"]
+render_priority = 0
+shader = SubResource("Shader_1rx6d")
+shader_parameter/emission = 6.0
+shader_parameter/tex_1 = SubResource("CompressedTexture2D_bg3j5")
+shader_parameter/noise_tex = SubResource("CompressedTexture2D_uqkxj")
+shader_parameter/noise_tiling = Vector2(0.2, 0.4)
+shader_parameter/gradient = SubResource("GradientTexture1D_64ava")
+shader_parameter/speed = Vector2(0, -0.1)
+shader_parameter/distortion_intensity = 0.1
+
+[sub_resource type="ImmediateMesh" id="ImmediateMesh_uqkxj"]
+
+[sub_resource type="Curve" id="Curve_mk45u"]
+_data = [Vector2(0, 1), 0.0, -0.5133404, 0, 1, Vector2(1, 0.4866596), -0.5133404, 0.0, 1, 0]
+point_count = 2
+
+[sub_resource type="StandardMaterial3D" id="Mat_tide"]
+albedo_color = Color(0.2, 0.6, 1, 1)
+emission_enabled = true
+emission = Color(0.2, 0.6, 1, 1)
+emission_energy_multiplier = 1.6
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_shbj1"]
+render_priority = 0
+shader = SubResource("Shader_1rx6d")
+shader_parameter/emission = 6.0
+shader_parameter/tex_1 = ExtResource("3_bg3j5")
+shader_parameter/noise_tex = ExtResource("2_uqkxj")
+shader_parameter/noise_tiling = Vector2(0.2, 0.4)
+shader_parameter/gradient = SubResource("GradientTexture1D_64ava")
+shader_parameter/speed = Vector2(0, -0.1)
+shader_parameter/distortion_intensity = 0.1
+
+[sub_resource type="ImmediateMesh" id="ImmediateMesh_bg3j5"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_volt"]
+albedo_color = Color(0.7, 0.4, 1, 1)
+emission_enabled = true
+emission = Color(0.7, 0.4, 1, 1)
+emission_energy_multiplier = 2.4
+
+[sub_resource type="Gradient" id="Gradient_2n3p7"]
+colors = PackedColorArray(0.51207983, 0.28586486, 0.735357, 1, 0.7019608, 0.4, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_oppc5"]
+gradient = SubResource("Gradient_2n3p7")
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_36vsi"]
+load_path = "res://.godot/imported/noise2.png-811e6f69adc7d6739c9d9860a5e5d8b2.ctex"
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_mk45u"]
+load_path = "res://.godot/imported/trail3.png-a328b7293a54ce735a9d6132a4f62498.ctex"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_7qt1m"]
+render_priority = 0
+shader = SubResource("Shader_1rx6d")
+shader_parameter/emission = 6.0
+shader_parameter/tex_1 = SubResource("CompressedTexture2D_mk45u")
+shader_parameter/noise_tex = SubResource("CompressedTexture2D_36vsi")
+shader_parameter/noise_tiling = Vector2(0.2, 0.4)
+shader_parameter/gradient = SubResource("GradientTexture1D_oppc5")
+shader_parameter/speed = Vector2(0, -0.1)
+shader_parameter/distortion_intensity = 0.1
+
+[sub_resource type="ImmediateMesh" id="ImmediateMesh_tqb4d"]
+
+[node name="PrismOrbWeapon" type="Node3D" unique_id=449855049]
+script = ExtResource("1_visual")
+
+[node name="Orb0" type="Node3D" parent="." unique_id=789409811]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.5, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Orb0" unique_id=1859379299]
+transform = Transform3D(0.18, 0, 0, 0, 0.18, 0, 0, 0, 0.18, 0, 0, 0)
+material_override = SubResource("Mat_ember")
+mesh = SubResource("SphereMesh_orb")
+
+[node name="TrailPrefab" type="MeshInstance3D" parent="Orb0/Mesh" unique_id=1514466430]
+transform = Transform3D(0.18, 0, 0, 0, 0.18, 0, 0, 0, 0.18, 0, 0, 0)
+material_override = SubResource("ShaderMaterial_tqb4d")
+cast_shadow = 0
+mesh = SubResource("ImmediateMesh_uqkxj")
+script = ExtResource("4_tqb4d")
+enabled = false
+speed_scale = 2.0
+width = 2.0
+width_over_lifetime = SubResource("Curve_mk45u")
+lifetime = 0.2
+texture_length = 0.5
+
+[node name="Orb1" type="Node3D" parent="." unique_id=714203272]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.5, 0.866)
+
+[node name="Mesh" type="MeshInstance3D" parent="Orb1" unique_id=165591979]
+transform = Transform3D(0.18, 0, 0, 0, 0.18, 0, 0, 0, 0.18, 0, 0, 0)
+material_override = SubResource("Mat_tide")
+mesh = SubResource("SphereMesh_orb")
+
+[node name="TrailPrefab" type="MeshInstance3D" parent="Orb1/Mesh" unique_id=1680587228]
+transform = Transform3D(0.18, 0, 0, 0, 0.18, 0, 0, 0, 0.18, 0, 0, 0)
+material_override = SubResource("ShaderMaterial_shbj1")
+cast_shadow = 0
+mesh = SubResource("ImmediateMesh_bg3j5")
+script = ExtResource("4_tqb4d")
+enabled = false
+speed_scale = 2.0
+width = 2.0
+width_over_lifetime = SubResource("Curve_mk45u")
+lifetime = 0.2
+texture_length = 0.5
+
+[node name="Orb2" type="Node3D" parent="." unique_id=1065209010]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.5, -0.866)
+
+[node name="Mesh" type="MeshInstance3D" parent="Orb2" unique_id=1607033155]
+transform = Transform3D(0.18, 0, 0, 0, 0.18, 0, 0, 0, 0.18, 0, 0, 0)
+material_override = SubResource("Mat_volt")
+mesh = SubResource("SphereMesh_orb")
+
+[node name="TrailPrefab" type="MeshInstance3D" parent="Orb2/Mesh" unique_id=1132117635]
+transform = Transform3D(0.18, 0, 0, 0, 0.18, 0, 0, 0, 0.18, 0, 0, 0)
+material_override = SubResource("ShaderMaterial_7qt1m")
+cast_shadow = 0
+mesh = SubResource("ImmediateMesh_tqb4d")
+script = ExtResource("4_tqb4d")
+enabled = false
+speed_scale = 2.0
+width = 2.0
+width_over_lifetime = SubResource("Curve_mk45u")
+lifetime = 0.2
+texture_length = 0.5

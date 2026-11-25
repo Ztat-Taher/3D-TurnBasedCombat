@@ -141,6 +141,65 @@ texture_normal = ExtResource("8_27igj")
 texture_pressed = ExtResource("9_dab75")
 stretch_mode = 5
 
+[node name="PauseButton" type="TextureButton" parent="Control" unique_id=1466459216]
+custom_minimum_size = Vector2(100, 40)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -120.0
+offset_top = 16.0
+offset_right = -20.0
+offset_bottom = 56.0
+grow_horizontal = 0
+grow_vertical = 0
+texture_normal = ExtResource("8_27igj")
+texture_pressed = ExtResource("9_dab75")
+stretch_mode = 5
+
+[node name="PauseButtonLabel" type="Label" parent="Control/PauseButton" unique_id=1809113556]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -33.0
+offset_top = -12.0
+offset_right = 27.0
+offset_bottom = 12.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.19607843, 0.19607843, 0.19607843, 1)
+theme_override_constants/shadow_offset_x = -5
+theme_override_constants/shadow_offset_y = 5
+theme_override_fonts/font = ExtResource("11_4ei2w")
+theme_override_font_sizes/font_size = 20
+text = "Pause"
+horizontal_alignment = 1
+vertical_alignment = 1
+uppercase = true
+
+[node name="ButtonJuice" type="Node" parent="Control/PauseButton" unique_id=1929906411]
+script = ExtResource("7_p32nk")
+
+[node name="Shadow" type="TextureRect" parent="Control/PauseButton" unique_id=1477610450]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+script = ExtResource("14_dab75")
+shadow_offset = Vector2(8, 10)
+blur_amount = 0.5
+
 [node name="BackButtonLabel" type="Label" parent="Control/BackButton" unique_id=1809113555]
 layout_mode = 1
 anchors_preset = 8
@@ -248,3 +307,4 @@ color = Color(1, 1, 1, 0)
 script = ExtResource("10_flash")
 
 [connection signal="pressed" from="Control/BackButton" to="." method="_on_global_back_pressed"]
+[connection signal="pressed" from="Control/PauseButton" to="." method="_on_pause_button_pressed"]

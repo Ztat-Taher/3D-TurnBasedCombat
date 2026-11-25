@@ -1311,7 +1311,11 @@ func damage_calculation(attacker, target, damage, attack_config: EnemyAttackConf
 	
 	if attacker_damage_multiplier != 1.0:
 		damage = int(damage * attacker_damage_multiplier)
-	
+
+	# Apply equipped weapon's damage dealt multiplier
+	if attacker.weapon_system:
+		damage = int(damage * attacker.weapon_system.get_damage_dealt_multiplier())
+
 	# Apply Marked state bonus damage to target
 	if target.active_states.has("Marked"):
 		var marked_state = target.active_states["Marked"] as MarkedState

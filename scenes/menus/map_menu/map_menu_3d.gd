@@ -9,6 +9,7 @@ signal level_changed(next_level_path : String)
 
 @export var run_map : RunMap
 @export var clear_game_state_on_load : bool = false  # Debug option to reset progress
+@export var pause_menu_scene : PackedScene = preload("res://scenes/windows/pause_menu.tscn")
 
 ## Procedural map generation parameters
 @export var use_procedural_map : bool = true  # Use procedural generation instead of hand-authored map
@@ -336,6 +337,26 @@ func _on_node_exited(node_id : String) -> void:
 
 func _on_pawn_movement_finished() -> void:
 	pass
+
+func _on_pause_button_pressed() -> void:
+	if pause_menu_scene:
+		var pause_menu = pause_menu_scene.instantiate()
+		add_child(pause_menu)
+		if pause_menu.has_method("open"):
+			pause_menu.open()
+		else:
+			pause_menu.show()
+		# Wait for menu to close - use hidden signal if available
+		if pause_menu.has_signal("hidden"):
+			await pause_menu.hidden
+		elif pause_menu.has_signal("closed"):
+			await pause_menu.closed
+		else:
+			# Fallback: wait for it to become invisible
+			while pause_menu and pause_menu.visible:
+				await get_tree().process_frame
+		if is_instance_valid(pause_menu):
+			pause_menu.queue_free()
 
 func _process(delta: float) -> void:
 	# Keep follower pawns locked to the leader (they mirror its arc while hopping).

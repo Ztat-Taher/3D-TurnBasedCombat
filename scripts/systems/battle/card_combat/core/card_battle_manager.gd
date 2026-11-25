@@ -182,6 +182,89 @@ func _return_projectile_to_pool(proj: BattleProjectile) -> void:
 			proj.queue_free()
 
 var is_executing_card: bool = false
+## >0 while replay_card_resolution re-runs card effects (e.g. for a hit-echo
+## weapon's ghost strike) — emitted resolutions are tagged is_replay so
+## listeners don't react recursively.
+var _replay_depth: int = 0
+
+## Emits the generic card-resolution combat event. Weapon systems and other
+## listeners subscribe via SignalBus.card_hit_resolved — this pipeline stays
+## mechanic-agnostic.
+func _emit_card_hit_resolved(actor, target, info: Dictionary) -> void:
+	if actor == null or target == null:
+		return
+	info["actor"] = actor
+	info["target"] = target
+	info["is_replay"] = info.get("is_replay", false) or _replay_depth > 0
+	SignalBus.card_hit_resolved.emit(info)
+
+
+## Re-runs a card resolution captured by a listener (e.g. a hit-echo weapon's
+## ghost strike). Rebuilds a fresh context and calls the same effect function
+## the original used, so damage_calculation / apply_state / weapon procs all
+## run through the real pipeline.
+func replay_card_resolution(info: Dictionary) -> void:
+	var actor = info.get("actor")
+	var card_cfg: CardConfig = info.get("card")
+	var target = info.get("target")
+	if not is_instance_valid(actor) or not is_instance_valid(target) or card_cfg == null:
+		return
+	if target is Battler and (target as Battler).is_defeated():
+		return
+	var allies_array: Array = []
+	if battle_manager and battle_manager.players:
+		for player in battle_manager.players:
+			if is_instance_valid(player) and player is Battler and not (player as Battler).is_defeated():
+				allies_array.append(player)
+	if actor is Battler and actor not in allies_array:
+		allies_array.append(actor)
+	var context := {
+		"card_config": card_cfg,
+		"actor": actor,
+		"target": target,
+		"enemies": battle_manager.enemies if battle_manager else [],
+		"allies": allies_array,
+		"effect_manager": battle_manager.effect_manager if battle_manager else null,
+		"qte_manager": qte_manager,
+		"camera": battle_manager.battle_camera if battle_manager else null,
+		"parent_node": self,
+		"qte_multiplier": float(info.get("qte_multiplier", 1.0)),
+	}
+	_replay_depth += 1
+	match str(info.get("kind", "")):
+		"effects":
+			_execute_effects_immediate(card_cfg, context, float(info.get("qte_multiplier", 1.0)))
+		"strike":
+			apply_strike_damage_inline(context, float(info.get("damage_multiplier", 1.0)), float(info.get("qte_multiplier", 1.0)))
+		"projectile":
+			# Re-fire the real projectile visual; its impact re-applies damage
+			# (at the echo fraction) through _apply_projectile_damage. The
+			# is_replay flag rides through damage_data so the impact-time
+			# resolution event is tagged even after _replay_depth resets.
+			# aoe_targets (merged same-card resolutions) restores the AOE
+			# execution context so one projectile hits every recorded target.
+			var dmg_mult := float(info.get("damage_multiplier", 1.0))
+			var aoe_targets: Array = info.get("aoe_targets", [])
+			if card_cfg.projectile_enabled and not card_cfg.projectile_scene.is_empty():
+				if card_cfg.get("projectile_aoe") and not aoe_targets.is_empty() and battle_manager:
+					var ctx := BattleManager.ProjectileExecutionContext.new()
+					var center := Vector3.ZERO
+					var n := 0
+					for t in aoe_targets:
+						if is_instance_valid(t):
+							center += (t as Node3D).global_position
+							n += 1
+					if n > 0:
+						center /= n
+						center.y = 1.0
+						ctx.center_position = center
+						ctx.targets = aoe_targets.duplicate()
+						_aoe_execution_context[card_cfg] = ctx
+				_travel_projectile(card_cfg, actor, target, dmg_mult, [], [], true, true)
+				_aoe_execution_context.erase(card_cfg)
+			else:
+				_apply_projectile_damage(card_cfg, actor, target, dmg_mult, aoe_targets, true)
+	_replay_depth -= 1
 
 func play_card(card: CardConfig, target: Battler = null) -> bool:
 	if is_executing_card or not can_play_card(card):
@@ -190,6 +273,8 @@ func play_card(card: CardConfig, target: Battler = null) -> bool:
 	# Trigger vestige hooks for ON_CARD_PLAY on the active battler
 	if current_player_battler and current_player_battler.has_method("trigger_vestige_hooks"):
 		current_player_battler.trigger_vestige_hooks(TriggerHook.TriggerType.ON_CARD_PLAY, {"card": card, "target": target, "battle_manager": battle_manager})
+	if current_player_battler and current_player_battler.weapon_system:
+		current_player_battler.weapon_system.notify_card_play(card)
 	
 	is_executing_card = true
 	if battle_manager:
@@ -275,7 +360,12 @@ func execute_card_with_config(card: CardConfig, target: Battler) -> void:
 	# Ensure current player is included in allies for self-targeting
 	if current_player_battler and current_player_battler not in allies_array:
 		allies_array.append(current_player_battler)
-	
+
+	# Expose the card's target on the battler so hit-frame callbacks
+	# (hit_moment -> weapon system) know who was struck.
+	if current_player_battler:
+		current_player_battler.current_target = target
+
 	var context = {
 		"card_config": card_cfg,
 		"actor": current_player_battler,
@@ -879,6 +969,14 @@ func apply_strike_damage_inline(context: Dictionary, damage_multiplier: float, q
 			var dmg_type = card_cfg.primary_effect.damage_type if "damage_type" in card_cfg.primary_effect else "physical"
 			var elem = card_cfg.primary_effect.element if "element" in card_cfg.primary_effect else "none"
 			await battle_manager.damage_calculation(actor, target, strike_damage, null, dmg_type, elem)
+			# Generic combat event — listeners (echo weapons, etc.) may replay it.
+			_emit_card_hit_resolved(actor, target, {
+				"kind": "strike",
+				"card": card_cfg,
+				"strike_index": int(context.get("strike_index", 0)),
+				"damage_multiplier": damage_multiplier,
+				"qte_multiplier": qte_multiplier,
+			})
 
 ## Execute effects immediately
 func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
@@ -940,6 +1038,13 @@ func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_m
 	# Update health bars only (don't call update_hud during card execution)
 	if battle_manager and battle_manager.hud:
 		battle_manager.hud.update_health_bars()
+	
+	# Generic combat event — listeners (echo weapons, etc.) may replay it.
+	_emit_card_hit_resolved(actor, target, {
+		"kind": "effects",
+		"card": card_cfg,
+		"qte_multiplier": qte_multiplier,
+	})
 
 ## Execute effects on hit frame
 func _execute_effects_on_hit(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
@@ -1304,7 +1409,7 @@ func await_qte_completion() -> bool:
 ## [param used_spawn_positions] tracks already-used spawn positions to prevent overlap
 ## [param used_target_positions] tracks already-used target positions to prevent path overlap
 ## [param wait_for_impact] if true, waits for projectile to hit; if false, returns after launch
-func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float = 1.0, used_spawn_positions: Array[Vector3] = [], used_target_positions: Array[Vector3] = [], wait_for_impact: bool = true) -> void:
+func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float = 1.0, used_spawn_positions: Array[Vector3] = [], used_target_positions: Array[Vector3] = [], wait_for_impact: bool = true, is_replay: bool = false) -> void:
 	if card_cfg.projectile_scene.is_empty() or not ResourceLoader.exists(card_cfg.projectile_scene):
 		push_error("BattleProjectile: projectile_scene not found — " + card_cfg.projectile_scene)
 		return
@@ -1364,7 +1469,8 @@ func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, dam
 		"target": target,
 		"card_cfg": card_cfg,
 		"damage_multiplier": damage_multiplier,
-		"battle_manager": battle_manager
+		"battle_manager": battle_manager,
+		"is_replay": is_replay
 	}
 	
 	# Check if this is an AOE projectile (single projectile hitting multiple targets)
@@ -1438,7 +1544,7 @@ func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, dam
 		
 		# Apply damage for projectiles BEFORE returning to pool
 		var aoe_targets = battle_proj.damage_data.get("aoe_targets", []) if battle_proj.damage_data else []
-		await _apply_projectile_damage(card_cfg, actor, target, damage_multiplier, aoe_targets)
+		await _apply_projectile_damage(card_cfg, actor, target, damage_multiplier, aoe_targets, is_replay)
 		
 		# Return container to pool AFTER damage is applied
 		if is_instance_valid(battle_proj):
@@ -1472,9 +1578,10 @@ func _on_projectile_arrived_with_data(battle_proj: BattleProjectile) -> void:
 	var actor = battle_proj.damage_data.get("actor")
 	var damage_multiplier = battle_proj.damage_data.get("damage_multiplier", 1.0)
 	var aoe_targets = battle_proj.damage_data.get("aoe_targets", [])
+	var is_replay: bool = battle_proj.damage_data.get("is_replay", false)
 	
 	# Apply damage on impact
-	await _apply_projectile_damage(card_cfg, actor, target, damage_multiplier, aoe_targets)
+	await _apply_projectile_damage(card_cfg, actor, target, damage_multiplier, aoe_targets, is_replay)
 	
 	# Play close animation
 	if is_instance_valid(proj_vfx) and proj_vfx.has_method("stop"):
@@ -1489,7 +1596,7 @@ func _on_projectile_arrived_with_data(battle_proj: BattleProjectile) -> void:
 		_return_projectile_to_pool(battle_proj)
 
 ## Apply damage from projectile impact
-func _apply_projectile_damage(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float, aoe_targets: Array = []) -> void:
+func _apply_projectile_damage(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float, aoe_targets: Array = [], is_replay: bool = false) -> void:
 	if not battle_manager or not card_cfg.primary_effect:
 		return
 	
@@ -1519,6 +1626,13 @@ func _apply_projectile_damage(card_cfg: CardConfig, actor: Node3D, target: Node3
 		var elem: String = card_cfg.primary_effect.element \
 			if "element" in card_cfg.primary_effect else "none"
 		battle_manager.damage_calculation(actor, t, final_val, null, dmg_type, elem)
+		# Generic combat event — listeners (echo weapons, etc.) may replay it.
+		_emit_card_hit_resolved(actor, t, {
+			"kind": "projectile",
+			"card": card_cfg,
+			"damage_multiplier": damage_multiplier,
+			"is_replay": is_replay,
+		})
 
 ## Calculate a spread position with collision detection
 ## [param base_pos] Center position to spread around

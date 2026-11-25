@@ -132,6 +132,10 @@ animation = &"sword_02/sword_jump_combat_start_var001"
 [sub_resource type="AnimationNodeAnimation" id="anim_parry"]
 animation = &"sword_02/sword_block_start_var001"
 
+[sub_resource type="AnimationNodeAnimation" id="anim_rest"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_rest_stand_up"]
+
 [sub_resource type="AnimationNodeAnimation" id="anim_walk"]
 animation = &"sword_02/sword_dodge_combat_forward_var001"
 
@@ -200,6 +204,26 @@ advance_condition = &"allow_jump_to_idle"
 [sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_death"]
 advance_condition = &"is_dead"
 
+[sub_resource type="AnimationNodeStateMachineTransition" id="idle_to_rest"]
+xfade_time = 0.3
+advance_mode = 2
+advance_condition = &"is_resting"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="rest_to_stand_up"]
+xfade_time = 0.2
+advance_mode = 2
+advance_condition = &"is_standing_up"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="rest_to_idle"]
+xfade_time = 0.4
+advance_mode = 2
+advance_condition = &"is_standing_up_instant"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="stand_up_to_idle"]
+xfade_time = 0.25
+switch_mode = 2
+advance_mode = 2
+
 [sub_resource type="AnimationNodeStateMachine" id="base_sm"]
 states/End/position = Vector2(1300, 200)
 states/Start/position = Vector2(38, 200)
@@ -217,11 +241,15 @@ states/jump_land/node = SubResource("anim_jump_land")
 states/jump_land/position = Vector2(617.5989, 347.9558)
 states/parry/node = SubResource("anim_parry")
 states/parry/position = Vector2(36.34611, 343.83453)
+states/rest/node = SubResource("anim_rest")
+states/rest/position = Vector2(36, 500)
+states/rest_stand_up/node = SubResource("anim_rest_stand_up")
+states/rest_stand_up/position = Vector2(240, 500)
 states/walk/node = SubResource("anim_walk")
 states/walk/position = Vector2(240, 49.297882)
 states/walk_back/node = SubResource("anim_walk_back")
 states/walk_back/position = Vector2(240, 347.82397)
-transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "combat_actions", "idle1", SubResource("combat_to_idle"), "idle1", "dodge", SubResource("idle_to_dodge"), "dodge", "idle1", SubResource("dodge_to_idle"), "idle1", "parry", SubResource("idle_to_parry"), "parry", "idle1", SubResource("parry_to_idle"), "idle1", "jump", SubResource("idle_to_jump"), "jump", "jump_land", SubResource("jump_to_jump_land"), "jump_land", "idle1", SubResource("jump_land_to_idle"), "idle1", "death", SubResource("idle_to_death")]
+transitions = ["Start", "idle1", SubResource("start_to_idle"), "idle1", "walk", SubResource("idle_to_walk"), "walk", "idle1", SubResource("walk_to_idle"), "idle1", "walk_back", SubResource("idle_to_walk_back"), "walk_back", "idle1", SubResource("walk_back_to_idle"), "idle1", "combat_actions", SubResource("idle_to_combat"), "walk", "combat_actions", SubResource("walk_to_combat"), "combat_actions", "idle1", SubResource("combat_to_idle"), "idle1", "dodge", SubResource("idle_to_dodge"), "dodge", "idle1", SubResource("dodge_to_idle"), "idle1", "parry", SubResource("idle_to_parry"), "parry", "idle1", SubResource("parry_to_idle"), "idle1", "jump", SubResource("idle_to_jump"), "jump", "jump_land", SubResource("jump_to_jump_land"), "jump_land", "idle1", SubResource("jump_land_to_idle"), "idle1", "death", SubResource("idle_to_death"), "idle1", "rest", SubResource("idle_to_rest"), "rest", "rest_stand_up", SubResource("rest_to_stand_up"), "rest", "idle1", SubResource("rest_to_idle"), "rest_stand_up", "idle1", SubResource("stand_up_to_idle")]
 graph_offset = Vector2(-316.4016, -16.259888)
 
 [sub_resource type="AnimationNodeAnimation" id="anim_hit"]
@@ -244,7 +272,6 @@ transitions = ["Start", "hit", SubResource("empty_to_hit"), "hit", "End", SubRes
 graph_offset = Vector2(-292.4016, -16.259884)
 
 [resource]
-graph_offset = Vector2(-289, 125)
 nodes/output/position = Vector2(800, 120)
 nodes/Add2/node = SubResource("add2_layer")
 nodes/Add2/position = Vector2(520, 120)

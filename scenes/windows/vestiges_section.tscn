@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://c5ewnjph3mdnd"]
+
+[ext_resource type="Script" uid="uid://ojxums5x1dn" path="res://scenes/windows/vestiges_section.gd" id="1_script"]
+
+[node name="VestigesSection" type="VBoxContainer"]
+theme_override_constants/separation = 6
+script = ExtResource("1_script")
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+theme_type_variation = &"PartyHeadingLabel"
+text = "Vestiges"
+
+[node name="CharacterTitle" type="Label" parent="."]
+layout_mode = 2
+theme_type_variation = &"PartySubheadingLabel"
+text = "Character"
+
+[node name="CharacterVestiges" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Separator" type="HSeparator" parent="."]
+layout_mode = 2
+
+[node name="PartyTitle" type="Label" parent="."]
+layout_mode = 2
+theme_type_variation = &"PartySubheadingLabel"
+text = "Party"
+
+[node name="PartyVestiges" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 4

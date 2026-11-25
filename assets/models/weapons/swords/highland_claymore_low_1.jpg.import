@@ -2,20 +2,20 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://1ectklip7721"
-path.s3tc="res://.godot/imported/Tidus_ffx0001.png-e0889baeb81de833d057db4656245ab1.s3tc.ctex"
+uid="uid://62xukkmebfww"
+path.s3tc="res://.godot/imported/highland_claymore_low_1.jpg-17a711fc1b458049ab19f0d416bd149a.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "fe091ddc25e3f7f93e56f97fc427c5e9"
+"md5": "484b156b29acc928c17c25aa09950c14"
 }
 
 [deps]
 
-source_file="res://assets/models/player/Tidus_ffx0001.png"
-dest_files=["res://.godot/imported/Tidus_ffx0001.png-e0889baeb81de833d057db4656245ab1.s3tc.ctex"]
+source_file="res://assets/models/weapons/swords/highland_claymore_low_1.jpg"
+dest_files=["res://.godot/imported/highland_claymore_low_1.jpg-17a711fc1b458049ab19f0d416bd149a.s3tc.ctex"]
 
 [params]
 

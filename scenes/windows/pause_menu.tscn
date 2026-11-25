@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://ocjoht0qbwye" path="res://scenes/windows/pause_menu.gd" id="2_00o4m"]
 [ext_resource type="PackedScene" uid="uid://djd1otv7t1bd8" path="res://addons/maaacks_game_template/base/nodes/windows/popup_parent.tscn" id="3_00o4m"]
 [ext_resource type="PackedScene" uid="uid://tl81kbh541gy" path="res://scenes/windows/pause_menu_options_window.tscn" id="3_mdvg7"]
+[ext_resource type="PackedScene" path="res://scenes/windows/party_screen.tscn" id="5_party"]
 [ext_resource type="PackedScene" uid="uid://cwt4p3bufkke5" path="res://addons/maaacks_game_template/base/nodes/windows/confirmation_popup_window_panel.tscn" id="4_6lma4"]
 [ext_resource type="Script" uid="uid://1nf36h0gms3q" path="res://addons/maaacks_game_template/base/nodes/utilities/capture_focus.gd" id="4_mdvg7"]
 
@@ -22,6 +23,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2_00o4m")
 options_menu_scene = ExtResource("3_mdvg7")
+party_screen_scene = ExtResource("5_party")
 pauses_game = true
 parent_scene = ExtResource("3_00o4m")
 
@@ -93,6 +95,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Resume"
 
+[node name="PartyButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1188334512]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Party"
+
 [node name="RestartButton" type="Button" parent="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons" unique_id=1371657172]
 layout_mode = 2
 text = "Restart"
@@ -136,5 +143,6 @@ text = "Exit the game?"
 
 [connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/RestartButton" to="." method="_on_restart_button_pressed"]
 [connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/OptionsButton" to="." method="_on_options_button_pressed"]
+[connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/PartyButton" to="." method="_on_party_button_pressed"]
 [connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/MainMenuButton" to="." method="_on_main_menu_button_pressed"]
 [connection signal="pressed" from="ContentContainer/BoxContainer/MenuButtonsMargin/MenuButtons/ExitButton" to="." method="_on_exit_button_pressed"]
