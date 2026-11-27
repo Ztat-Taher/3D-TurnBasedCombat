@@ -641,8 +641,12 @@ func execute_multi_strike_sequence(card_cfg: CardConfig, context: Dictionary) ->
 		strike_context["qte_window"] = qte_window
 		strike_context["has_next_strike"] = has_next_strike
 		strike_context["chain_lead"] = chain_lead
-		
+
+		if actor is Battler:
+			actor.chaining_strikes = has_next_strike
 		await execute_single_strike_inline(strike_context)
+		if actor is Battler and is_instance_valid(actor):
+			actor.chaining_strikes = false
 		
 		# Track QTE success for cumulative effect
 		if strike_context.get("qte_success_set", false):
@@ -752,11 +756,17 @@ func execute_single_strike_inline(context: Dictionary) -> void:
 		context["damage_applied_at_hit"] = true
 		_play_impact_feedback(strike_card, context)
 	
-	# Wait out the remainder of this strike's clip before the next strike (or the
-	# post-combat transition) begins. Timing is anchored to animation_start_time so
-	# the wait is always correct regardless of how long damage_calculation takes.
-	# `chain_lead` shortens the wait for mid-combo strikes so the next travel() is
-	# issued while this clip is still playing, keeping the actor inside combat_actions.
+	# Mid-combo: the next strike takes over once this swing's attack is done
+	# (its _on_attack_end key, `chain_lead` early), cutting its recovery instead
+	# of playing it out. Timed by the clip's own clock (hit-stop freezes it).
+	if context.get("has_next_strike", false) and actor is Battler:
+		var release: float = actor.get_strike_release_time(animation_name, chain_lead)
+		await actor.await_attack_clip_time(animation_name, release, clip_length + 2.0)
+		return
+
+	# Last strike: wait out the rest of its clip before the post-combat transition.
+	# Timing is anchored to animation_start_time so the wait is always correct
+	# regardless of how long damage_calculation takes.
 	var clip_end_time = animation_start_time + clip_length
 	var clip_remaining = clip_end_time - (Time.get_ticks_msec() / 1000.0)
 	var wait_time = maxf(0.0, clip_remaining - chain_lead)

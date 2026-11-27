@@ -14,22 +14,22 @@ Enemies in this project are decoupled from ally/player systems:
 ```
 Enemy Scene (.tscn)
  └── Root (Battler - battler.gd)
-      └── enemy_stats: EnemyStats (.tres or inlined)
-           ├── enemy_name: String
-           ├── is_boss: bool (cinematic top-center health bar)
-           ├── Combat Stats (max_health, attack, defense, agility, element)
-           ├── attacks: Array[EnemyAttackConfig]
-           │    ├── attack_name: String (e.g. "Heavy Slam")
-           │    ├── animation_name: String (e.g. "attack", "kick")
-           │    ├── damage_multiplier: float (e.g. 1.5)
-           │    ├── can_dodge: bool (allow dodge defense)
-           │    ├── can_parry: bool (allow parry defense)
-           │    ├── requires_jump: bool (require jump defense)
-           │    ├── defense_window_duration: float (defense timing)
-           │    ├── perfect_parry_window: float (perfect parry timing)
-           │    ├── move_announcement_type: String ("attack", "heal", "buff")
-           │    └── weight: float (AI selection weighting)
-           └── Battle Rewards & Drops (exp_reward, cash_reward, item_drops)
+	  └── enemy_stats: EnemyStats (.tres or inlined)
+		   ├── enemy_name: String
+		   ├── is_boss: bool (cinematic top-center health bar)
+		   ├── Combat Stats (max_health, attack, defense, agility, element)
+		   ├── attacks: Array[EnemyAttackConfig]
+		   │    ├── attack_name: String (e.g. "Heavy Slam")
+		   │    ├── animation_name: String (e.g. "attack", "kick")
+		   │    ├── damage_multiplier: float (e.g. 1.5)
+		   │    ├── can_dodge: bool (allow dodge defense)
+		   │    ├── can_parry: bool (allow parry defense)
+		   │    ├── requires_jump: bool (require jump defense)
+		   │    ├── defense_window_duration: float (defense timing)
+		   │    ├── perfect_parry_window: float (perfect parry timing)
+		   │    ├── move_announcement_type: String ("attack", "heal", "buff")
+		   │    └── weight: float (AI selection weighting)
+		   └── Battle Rewards & Drops (exp_reward, cash_reward, item_drops)
 ```
 
 ---

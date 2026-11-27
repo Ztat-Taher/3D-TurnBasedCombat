@@ -54,7 +54,6 @@ speed_key = "Tab"
 speed_increase_amount = 2.0
 speed_is_toggle = true
 formation_spacing = 4.0
-instant_turning = true
 active_troop = ExtResource("3_yxp8s")
 use_procedural_formation = false
 

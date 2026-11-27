@@ -1835,11 +1835,6 @@ libraries/ = SubResource("AnimationLibrary_3ol52")
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1722305896]
 tree_root = ExtResource("14_fpmip")
 anim_player = NodePath("../AnimationPlayer")
-parameters/Add2/add_amount = 0.25
-parameters/BaseSM/conditions/is_attacking = false
-parameters/BaseSM/conditions/is_dead = false
-parameters/BaseSM/conditions/is_walking = false
-parameters/HitSM/conditions/is_hit = false
 script = ExtResource("15_yuvg8")
 target_fps = 24.0
 

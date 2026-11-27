@@ -47,7 +47,7 @@ script = ExtResource("1")
 - `animation_name`: Animation name (string) - for single-strike cards
   - Use **canonical slot names only** — these work on every standardised character:
     - Offensive: `"melee_combo_1"`, `"melee_combo_2"`, `"melee_combo_3"`, `"ranged_cast_1"`, `"ranged_cast_2"`
-    - Locomotion: `"walk"` · Defensive: `"dodge"`, `"parry"`, `"jump"`, `"jump_land"`, `"hit"`, `"death"`
+    - Locomotion: `"walk"` · Defensive: `"dodge"`, `"parry"`, `"jump"`, `"hit"`, `"death"`
   - Non-melee skills/casts (heal, buff, debuff, spell attacks) all use the canonical cast slots `"ranged_cast_1"` / `"ranged_cast_2"`
   - Legacy names like `"attack"`, `"heal"`, `"magic_cast"`, `"cast"`, `"defend"`, `"heavy_attack"` do **not** exist on the standardised AnimationTree and will fail validation
 

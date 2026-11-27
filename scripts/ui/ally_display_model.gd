@@ -86,6 +86,12 @@ static func start_resting(model : Node3D) -> bool:
 	var playback := _get_playback(model)
 	if playback == null:
 		return false
+	# A previous stand_up() leaves these set; clear them or the rest state's
+	# Auto transitions would stand the model straight back up.
+	var tree := get_animation_tree(model)
+	var conditions := "parameters/%s/conditions/" % STATE_MACHINE
+	tree.set(conditions + "is_standing_up", false)
+	tree.set(conditions + "is_standing_up_instant", false)
 	playback.start(REST_STATE)
 	return true
 

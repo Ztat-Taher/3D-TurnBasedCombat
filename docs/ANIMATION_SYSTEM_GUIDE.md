@@ -64,10 +64,10 @@ Rather than invoking `AnimationPlayer.play()` directly, the game uses an **`Anim
 
 ### BlendTree Structure:
 - **Root: AnimationNodeBlendTree** - Uses an Add2 node to blend animations additively
-  - **Input 0: BaseSM** - A state machine containing base states like `idle1`, `walk`, `dodge`, `parry`, `jump`, `jump_land`, `death`, and a sub-state machine `combat_actions`
+  - **Input 0: BaseSM** - A state machine containing base states like `idle1`, `walk`, `dodge`, `parry`, `jump`, `death`, and a sub-state machine `combat_actions`
   - **Input 1: HitSM** - A state machine for additive hit reactions
 - **BaseSM State Machine**: Contains the main animation states
-  - Root states: `idle1`, `walk`, `dodge`, `parry`, `jump`, `jump_land`, `death`
+  - Root states: `idle1`, `walk`, `dodge`, `parry`, `jump`, `death`
   - Sub-state machine: `combat_actions` - Houses the standardised offensive slots `melee_combo_1..3` and `ranged_cast_1..2`
 - **HitSM State Machine**: Contains the hit reaction animation state
   - States: `empty` (no animation), `hit` (additive hit animation)
@@ -255,7 +255,7 @@ For melee strikes, characters advance physically across the 3D battlefield befor
 ### Auto-Return to Idle
 The `combat_to_idle` transition in `battle_tree_node.tres` uses `advance_mode = 2`
 (AUTO), so any combat animation (attack or cast) automatically returns the battler
-to idle when the clip ends — consistent with `jump_land_to_idle` and
+to idle when the clip ends — consistent with `jump_to_idle` and
 `start_to_idle`. This is what allows card casts (heal, buff) to settle back to
 idle without getting stuck mid-pose.
 

@@ -71,13 +71,8 @@ func _start_freeze(duration: float) -> void:
 	
 	# Freeze all registered nodes
 	for node in frozen_nodes:
-		if node.has_method("set_process_mode"):
-			node.set_process_mode(Node.PROCESS_MODE_DISABLED)
-		elif node is AnimationPlayer:
-			node.pause()
-		elif node is Sprite2D or node is Sprite3D:
-			node.set_process(false)
-	
+		_set_node_frozen(node, true)
+
 	freeze_timer.wait_time = duration
 	freeze_timer.start()
 
@@ -90,13 +85,8 @@ func _unfreeze() -> void:
 	
 	# Unfreeze all registered nodes
 	for node in frozen_nodes:
-		if node.has_method("set_process_mode"):
-			node.set_process_mode(Node.PROCESS_MODE_INHERIT)
-		elif node is AnimationPlayer:
-			node.play()
-		elif node is Sprite2D or node is Sprite3D:
-			node.set_process(true)
-	
+		_set_node_frozen(node, false)
+
 	is_frozen = false
 	impact_frame_finished.emit()
 
@@ -105,9 +95,27 @@ func register_node(node: Node) -> void:
 	if not frozen_nodes.has(node):
 		frozen_nodes.append(node)
 
-# Unregister a node from impact frame freezing
+# Unregister a node from impact frame freezing.
+# A node removed mid-freeze is unfrozen first: _unfreeze() only reaches
+# registered nodes, so it would otherwise stay disabled for good (e.g. a
+# battler defeated by the hit that started the freeze).
 func unregister_node(node: Node) -> void:
+	if is_frozen and frozen_nodes.has(node) and is_instance_valid(node):
+		_set_node_frozen(node, false)
 	frozen_nodes.erase(node)
+
+func _set_node_frozen(node: Node, frozen: bool) -> void:
+	if not is_instance_valid(node):
+		return
+	if node.has_method("set_process_mode"):
+		node.set_process_mode(Node.PROCESS_MODE_DISABLED if frozen else Node.PROCESS_MODE_INHERIT)
+	elif node is AnimationPlayer:
+		if frozen:
+			node.pause()
+		else:
+			node.play()
+	elif node is Sprite2D or node is Sprite3D:
+		node.set_process(not frozen)
 
 # Freeze a specific node immediately
 func freeze_node(node: Node, duration: float) -> void:

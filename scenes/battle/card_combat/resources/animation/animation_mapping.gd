@@ -6,7 +6,7 @@ extends Resource
 ##
 ## ─── CANONICAL SLOTS ───────────────────────────────────────────────────────────
 ##   Locomotion  : IDLE, WALK
-##   Defensive   : DODGE, PARRY, JUMP, JUMP_LAND, HIT, DEATH
+##   Defensive   : DODGE, PARRY, JUMP, HIT, DEATH
 ##   Offensive   : MELEE_COMBO_1, MELEE_COMBO_2, MELEE_COMBO_3,
 ##                 RANGED_CAST_1, RANGED_CAST_2
 
@@ -18,8 +18,8 @@ const WALK          := "walk"
 const WALK_BACK     := "walk_back"
 const DODGE         := "dodge"
 const PARRY         := "parry"
+## One clip covering take-off, air time and landing
 const JUMP          := "jump"
-const JUMP_LAND     := "jump_land"
 const HIT           := "hit"
 const DEATH         := "death"
 const MELEE_COMBO_1 := "melee_combo_1"
@@ -31,7 +31,7 @@ const RANGED_CAST_2 := "ranged_cast_2"
 ## All canonical slots in declaration order — useful for validation.
 const ALL_SLOTS: Array = [
 	IDLE, WALK, WALK_BACK,
-	DODGE, PARRY, JUMP, JUMP_LAND, HIT, DEATH,
+	DODGE, PARRY, JUMP, HIT, DEATH,
 	MELEE_COMBO_1, MELEE_COMBO_2, MELEE_COMBO_3,
 	RANGED_CAST_1, RANGED_CAST_2,
 ]
