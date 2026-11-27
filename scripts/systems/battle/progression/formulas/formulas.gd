@@ -1,13 +1,22 @@
 class_name Formulas
 
-static func physical_damage(attacker, target, damage) -> int:
-	var atk_val = attacker.stats.attack if (attacker and attacker.stats) else (attacker.attack if attacker else 10)
-	var def_val = target.stats.defense if (target and target.stats) else (target.defense if target else 0)
+## Uses the battlers' current stats (level, weapon and vestige bonuses
+## included), never the raw stats resources. The offense stat follows
+## [param damage_type]: magic for "magical" damage, attack otherwise.
+static func damage(attacker, target, damage, damage_type: String = "physical") -> int:
+	var atk_val: int = 10
+	if attacker:
+		atk_val = attacker.magic if damage_type == "magical" else attacker.attack
+	var def_val: int = target.defense if target else 0
 	var offense = atk_val + damage
 	var defense = def_val
 	var total_damage = max(1, offense - int(defense * 0.5))
-	
+
 	return total_damage
+
+
+static func physical_damage(attacker, target, damage) -> int:
+	return Formulas.damage(attacker, target, damage, "physical")
 
 ## Calculates damage based on stats, skill, and designated global damage calculation type.[br]
 ## [br]

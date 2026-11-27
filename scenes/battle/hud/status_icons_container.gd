@@ -10,7 +10,7 @@ var status_info_popup_scene: PackedScene = null
 var active_status_popups: Array[Control] = []  # Array of popup instances for all states
 var popup_container: VBoxContainer = null  # Reference to the PopUpContainer node in the scene
 
-@export var skip_protected: bool = true  # Skip Protected state (has its own UI)
+@export var skip_shield_states: bool = true  ## Skip shield states (Protected): the shield row shows them
 
 func _ready():
 	# Load status info popup scene
@@ -35,12 +35,8 @@ func setup(battler_node: Battler, template: TextureRect) -> void:
 		popup_container = get_parent().get_node_or_null("PopUpContainer")
 	
 	# Connect to state changes
-	if battler.has_signal("state_applied") and not battler.state_applied.is_connected(_on_state_applied):
-		battler.state_applied.connect(_on_state_applied)
-	if battler.has_signal("state_removed") and not battler.state_removed.is_connected(_on_state_removed):
-		battler.state_removed.connect(_on_state_removed)
-	if battler.has_signal("burn_stack_changed") and not battler.burn_stack_changed.is_connected(_on_burn_stack_changed):
-		battler.burn_stack_changed.connect(_on_burn_stack_changed)
+	if not battler.states_changed.is_connected(update_status_icons):
+		battler.states_changed.connect(update_status_icons)
 	
 	# Initial status icons update
 	update_status_icons()
@@ -56,8 +52,8 @@ func update_status_icons() -> void:
 	
 	# Add icons for each active state
 	for state_name in battler.active_states:
-		# Skip Protected state if configured (it has its own shield UI)
-		if skip_protected and state_name == "Protected":
+		# Shield states have their own UI (the shield row)
+		if skip_shield_states and battler.active_states[state_name] is State and battler.active_states[state_name].get_shield_hits() > 0:
 			continue
 			
 		var state = battler.active_states[state_name] as State
@@ -74,27 +70,10 @@ func update_status_icons() -> void:
 			# Show stack count if applicable
 			var count_label = icon.get_node_or_null("StatusCount")
 			if count_label:
-				# For Bleed, show stack count (determined by card applications)
-				if state_name == "Bleed":
-					count_label.text = str(state.stack_count)
-					count_label.visible = state.stack_count > 0
-				# For other states, show stack count
-				elif state.stack_count > 0:
-					count_label.text = str(state.stack_count)
-					count_label.visible = true
-				else:
-					count_label.visible = false
+				count_label.text = str(state.stack_count)
+				count_label.visible = state.uses_stacks() and state.stack_count > 0
 			
 			add_child(icon)
-
-func _on_state_applied(state_name: String) -> void:
-	update_status_icons()
-
-func _on_state_removed(state_name: String) -> void:
-	update_status_icons()
-
-func _on_burn_stack_changed(stack_count: int) -> void:
-	update_status_icons()
 
 func _on_container_hovered() -> void:
 	_show_all_status_effects()

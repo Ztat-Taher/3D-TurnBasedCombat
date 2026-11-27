@@ -1,13 +1,12 @@
 [gd_resource type="Resource" script_class="StateConfig" format=3 uid="uid://chilled_state_config"]
 
 [ext_resource type="Script" uid="uid://cd7tt8brac0qt" path="res://scenes/battle/card_combat/resources/states/state_config.gd" id="1"]
+[ext_resource type="Resource" uid="uid://sbnf76wvb2xt" path="res://database/states/resources/chilled_state.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
-state_id = "Chilled"
-state_name = "Chilled"
+state = ExtResource("2")
 duration = 1
 chance = 1.0
 stacking_behavior = 1
-max_stacks = 1
 can_dispel = true

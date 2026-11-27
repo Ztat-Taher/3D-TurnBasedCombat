@@ -4,12 +4,14 @@ extends Resource
 ## trigger fires. Mirrors the vestige effect-script pattern but stays
 ## data-only so weapons are fully editable in the inspector.
 
+## When the effect runs, and who "the target" is for effects not scoped to
+## self (see [member scope_self]).
 enum Trigger {
-	ON_ATTACK_HIT,     ## Weapon owner's attack lands a hit.
-	ON_CARD_PLAY,      ## Owner plays a card.
-	ON_DAMAGE_TAKEN,   ## Owner takes damage.
-	ON_BATTLE_START,
-	ON_BATTLE_END,
+	ON_ATTACK_HIT,     ## Owner's attack costs an enemy HP (per target, at impact). Target: that enemy.
+	ON_CARD_PLAY,      ## Owner plays a card. Target: the card's target if it is an enemy, else none.
+	ON_DAMAGE_TAKEN,   ## An enemy's attack costs the owner HP. Target: that enemy.
+	ON_BATTLE_START,   ## Combat begins. No target: use scope_self or stack effects.
+	ON_BATTLE_END,     ## Combat ends. No target: use scope_self or stack effects.
 }
 
 enum Kind {
@@ -25,7 +27,8 @@ enum Kind {
 
 @export_group("Values")
 ## Flat amount, or percent when [member value_is_attack_percent] (of owner's
-## attack stat). For APPLY_STATE also used as accumulation_value when
+## attack stat). DAMAGE / CONSUME_STACKS deal exactly this (rounded, min 1) as
+## bonus damage: it is not fed through the attack/defense formula. For APPLY_STATE also used as accumulation_value when
 ## [member state_accumulation] is 0 and the state supports it.
 @export var value: float = 0.0
 @export var value_is_attack_percent: bool = false

@@ -1,165 +1,151 @@
-# Status Effects System - Usage Guide
+# States (status effects): guide
 
-## Overview
-This system implements 8 unique status effects for turn-based combat:
+A **state** is a status effect on a battler: Burning, Protected, Taunt... Every
+state is a `State` resource (`database/states/states_template.gd`). Its rules
+live in its own script, through **hooks** that the battle calls on every state a
+battler holds. The battle, the HUD and the AI never name a state: adding one
+means adding a resource (and, if it needs rules of its own, a script), and
+touching nothing else.
 
-### Core Effects
-1. **Electrocuted** - Takes 50% more damage, deals 50% less damage
-2. **Burning** - Stacking DOT (damage per turn × stack count)
-3. **Bleed** - Accumulation mechanic (invisible bar fills, triggers massive damage when full)
+A battler holds one state per `state_name`, in `battler.active_states`.
 
-### Additional Effects
-4. **Chilled** - Skips turn in the turn queue
-5. **Berserk** - Deals 50% more damage, takes 25% more damage (risk/reward)
-6. **Taunt** - Forces AI to target this battler
-7. **Marked** - Next attack deals bonus damage, then removes
-8. **Protected** - Shield that absorbs damage until broken
+## The states
 
-## How to Apply Status Effects
+| State | Kind | What it does | Ends |
+|---|---|---|---|
+| Burning | DOT, stacks (max 10) | 5 damage per stack each turn start (defense doesn't reduce it), then a stack burns out. Each application adds stacks | When its stacks burn out |
+| Bleed | DOT, bar | Damage taken fills a hidden bar (half of each hit). Full: 20% of max HP and the bar empties. A new application adds its own bar; a full bar procs at once | Cured |
+| Chilled | Debuff | Skips its battler's turns | 1 turn |
+| Stunned | Debuff | Skips its battler's turns (plain resource, no script) | The STUN card effect's value |
+| Electrocuted | Debuff | Takes 1.5x damage, deals 0.5x | 2 turns |
+| Marked | Debuff | The next attack on it deals 1.5x and spends the mark. Bonus damage is neither boosted nor spends it | 3 turns, or spent |
+| Berserk | Buff | Deals 1.5x damage, takes 1.25x | 2 turns |
+| Taunt | Buff | Enemy AI must target its battler. Optionally breaks after enough attack damage | 2 turns |
+| Protected | Buff | Each shield hit blocks one whole hit (damage and on-hit effects). Shown as the shield row | When its hits are used |
+| Counter | Counter | Strikes back at an attacking opponent with a normal attack, up to 2 times per turn | Cured |
 
-### Using Resource Files
+Resources: `database/states/resources/`. Card applications (duration, stacks,
+chance): `database/state_configs/`.
+
+## Applying a state
+
+Every way of applying a state builds its copy with `State.make_instance()`,
+then hands it to `Battler.apply_state()`:
+
 ```gdscript
-# Load a state resource
-var electrocuted_state = load("res://database/states/resources/electrocuted_state.tres")
+# As authored
+target.apply_state(BURNING.make_instance(), source)
 
-# Apply to a battler
-battler.apply_state(electrocuted_state)
+# make_instance(duration, stacks, accumulation):
+#   duration     turns; 0 = as authored, -1 = until something else ends it
+#   stacks       stacks this application adds; -1 = as authored
+#   accumulation bar (Bleed) this application adds; 0 = as authored
+target.apply_state(BURNING.make_instance(0, 3), source)        # 3 stacks
+target.apply_state(BLEED.make_instance(0, -1, 15), source)     # a 15 bar
+target.apply_state(STUNNED.make_instance(2), source)           # 2 turns
 ```
 
-### Using State Classes Directly
+`source` is the battler applying it. It's credited with the state's damage
+(the XP for a Burning kill).
+
+- **Cards:** a `StateConfig` on the card (chance, duration, stacking
+  behaviour, target). `StateConfig.apply_state(target, actor)` does the
+  above. Stacking behaviour: ADDITIVE adds `stacks_per_application`,
+  MULTIPLICATIVE doubles, REFRESH re-applies without adding stacks.
+- **Card effects:** SHIELD (Protected hits), STUN (turns), CURE / DISPEL (see
+  below).
+- **Weapons and orbs:** a `WeaponEffect` / orb with `state`,
+  `state_stack_count`, `state_accumulation`.
+- **Vestiges:** e.g. `gain_shield_on_trigger.gd`.
+
+Re-applying a state the battler already has **merges** it into the one on:
+by default it adds the stacks (up to `stack_max`) and refreshes the duration.
+A state script can merge differently (Protected adds hits, Bleed adds its bar,
+Taunt restarts its damage count).
+
+A defeated battler takes no new states, and loses all of its states.
+
+## Removing a state
+
 ```gdscript
-# Create state instance
-var burning_state = BurningState.new()
-burning_state.apply_stacks(3)  # Start with 3 stacks
-
-# Apply to battler
-battler.apply_state(burning_state)
-```
-
-### Custom State Configuration
-```gdscript
-# Create custom state
-var custom_protected = ProtectedState.new()
-custom_protected.set_shield_amount(50)  # 50 HP shield
-custom_protected.turns_active = 3  # Lasts 3 turns if not broken
-
-battler.apply_state(custom_protected)
-```
-
-## How to Remove Status Effects
-
-```gdscript
-# Remove by state name
 battler.remove_state("Burning")
-
-# Check if state exists
-if battler.active_states.has("Electrocuted"):
-    var state = battler.active_states["Electrocuted"] as ElectrocutedState
-    # Access state properties
-    print("Turns remaining: %d" % state.turns_active)
+battler.clear_states()
+battler.remove_states_if(func(s: State): return s.is_harmful(), 1)  # oldest first; 0 = all
 ```
 
-## State-Specific Methods
+Card effects **CURE** (harmful states) and **DISPEL** (helpful states) remove
+`value` of them, oldest first (0 = all), skipping states with
+`can_be_cured = false`. Harmful = `state_type` DOT or DEBUFF
+(`State.is_harmful()`).
 
-### Burning State
-```gdscript
-# Add stacks
-battler.add_burn_stacks(2)
+## Generic fields (no script needed)
 
-# Get current burn damage
-if battler.active_states.has("Burning"):
-    var burn_state = battler.active_states["Burning"] as BurningState
-    var damage = burn_state.get_burn_damage()
-```
+| Field | Effect |
+|---|---|
+| `turns_active` | Duration: ticks down at the start of its battler's turns (1 = until its battler's next turn starts). -1 = until something else ends it |
+| `skip_turn` | Its battler skips its turns |
+| `is_taunting` | Enemy AI must target its battler |
+| `damage_per_turn` | Damage at the start of its battler's turns, reduced by defense |
+| `heal_per_turn` | HP its battler regains at the start of its turns (a heal: healing multipliers, the HEALED event) |
+| `damage_taken_multiplier` / `damage_dealt_multiplier` | Incoming / outgoing damage |
+| `hit_chance` | Chance (%) its battler's attacks hit. Several multiply: 60 and 80 give 48 |
+| `stack_count` / `stack_max` | Stacks. `stack_max` 1 = doesn't stack (no badge) |
+| `accumulation_value` / `accumulation_max` | A bar that procs when full |
+| `overlay_material` / `aura_effect` | Shown on the battler while the state is on (the aura plays its "open" / "close" animations) |
+| `state_type` / `can_be_cured` | For CURE / DISPEL |
 
-### Bleed State
-```gdscript
-# Add accumulation from damage
-battler.add_bleed_accumulation(10)
+So a simple state is just a `State` resource: a weakness debuff with
+`damage_dealt_multiplier = 0.7` and a duration, a Regen buff with
+`heal_per_turn`, a blinding debuff with `hit_chance = 60`.
 
-# Manually trigger bleed proc
-battler.trigger_bleed_proc()
-```
+## Hooks (a state with rules of its own)
 
-### Protected State
-```gdscript
-# Break shield manually
-battler.break_shield()
+Extend `State` and override what you need. `owner` is the battler holding it.
 
-# Check shield status
-if battler.active_states.has("Protected"):
-    var protected_state = battler.active_states["Protected"] as ProtectedState
-    if protected_state.has_shield():
-        print("Shield remaining: %d" % protected_state.get_remaining_shield())
-```
+| Hook | When | Example |
+|---|---|---|
+| `modify_damage_dealt(damage, owner, hit)` | Its battler deals damage | Electrocuted (default: the multiplier) |
+| `modify_damage_taken(damage, owner, hit)` | Its battler takes damage | Marked |
+| `modify_hit_chance(chance, owner, hit)` | Its battler attacks (default: x `hit_chance`) | |
+| `blocks_hit(owner, hit) -> bool` | Before a hit lands: true stops it outright | Protected |
+| `on_hit_taken(owner, hit)` | After a hit lands (awaitable: the hit waits) | Bleed, Taunt, Counter |
+| `get_turn_damage(owner) -> int` | Its battler's turn starts | Burning |
+| `get_turn_heal(owner) -> int` | After the turn damage (default: `heal_per_turn`) | |
+| `on_turn_tick(owner)` | After the turn damage | Burning (a stack burns out) |
+| `is_expired() -> bool` | After the tick: true removes it | Burning (no stacks) |
+| `on_any_turn_start(owner)` | Any battler's turn starts | Counter (uses reset) |
+| `merge(incoming, owner)` | Re-applied | Protected, Bleed, Taunt |
+| `on_applied(owner)` / `on_removed(owner)` | Put on / taken off | Bleed (procs a full bar) |
+| `get_shield_hits() -> int` | The HUD's shield row | Protected |
 
-## Integration with Card Abilities
+`hit` holds: attacker, target, damage (in `on_hit_taken`: the HP lost),
+damage_type, element, is_attack, is_critical. **`is_attack`** is false for
+bonus damage (weapon and orb procs): Marked, Taunt, Counter and on-hit effects
+only react to attacks.
 
-Example card effect that applies Burning:
-```gdscript
-func apply_card_effect(target: Battler) -> void:
-    var burning_state = load("res://database/states/resources/burning_state.tres")
-    var state_instance = burning_state.duplicate() as BurningState
-    state_instance.apply_stacks(2)  # Apply 2 burn stacks
-    target.apply_state(state_instance)
-```
+Turn damage from states (Burning) is not an attack: nothing blocks it or
+reacts to it, but it is damage taken and dealt (events, revive vestiges), and a
+lethal tick defeats its battler like a hit does.
 
-Example card effect that applies Marked:
-```gdscript
-func apply_card_effect(target: Battler) -> void:
-    var marked_state = MarkedState.new()
-    marked_state.marked_damage_bonus = 2.0  # 100% bonus damage
-    target.apply_state(marked_state)
-```
+## HUD
 
-## Visual Effects
+The battler emits **`states_changed`** whenever a state is applied,
+re-applied, ticked or removed. A state that changes itself mid-turn emits it
+too (Protected using a hit, Bleed's bar filling). The status icons, the
+shield rows (`Battler.get_shield_hits()`) and the bars redraw on it. Stack
+badges show only for stacking states.
 
-Status effects use your existing overlay system:
-- **Electrocuted**: `lightning_overlay.tres` 
-- **Burning**: `fire_overlay.tres`
-- **Other effects**: No VFX currently (can be added later)
+Battle events (vestiges, weapons): `STATE_APPLIED` and `STATE_INFLICTED` (to
+the source) carry the state as it now is on the battler and `reapplied`;
+`STATE_REMOVED` carries the state taken off.
 
-To attach VFX overlays to a battler, use your existing overlay system instead of creating new scenes.
+## Adding a state
 
-## UI Integration
+1. **Only generic fields:** create a `State` resource in
+   `database/states/resources/`, set its name, icon, type and fields.
+2. **Rules of its own:** a script `extends State` with a `class_name`, its
+   defaults in `_init()`, and the hooks it needs; then its resource.
+3. **For cards:** a `StateConfig` in `database/state_configs/` pointing to the
+   resource, on the card.
 
-Status effects automatically display as colored icons on party status cards:
-- Icons appear in the status icons container
-- Color-coded by effect type
-- Hover for state information (basic implementation)
-
-## Testing Checklist
-
-- [ ] Electrocuted: Verify damage multipliers apply correctly
-- [ ] Burning: Test stack accumulation and damage scaling
-- [ ] Bleed: Test accumulation and proc damage trigger
-- [ ] Chilled: Verify turn skipping works
-- [ ] Berserk: Test both damage multipliers
-- [ ] Taunt: Verify AI targets taunting battlers
-- [ ] Marked: Test bonus damage and state removal
-- [ ] Protected: Test shield absorption and break mechanic
-- [ ] Visual effects: Verify VFX scenes work
-- [ ] UI: Check status icons display correctly
-- [ ] State cleanup: Verify states expire correctly
-
-## Balance Considerations
-
-### Default Values (can be adjusted in .tres files):
-- **Electrocuted**: 2 turns, 1.5x damage taken, 0.5x damage dealt
-- **Burning**: 3 turns, 3 damage per stack, max 10 stacks
-- **Bleed**: Infinite duration, 20% max HP proc, 10% accumulation per damage
-- **Chilled**: 1 turn skip
-- **Berserk**: 2 turns, 1.5x damage dealt, 1.25x damage taken
-- **Taunt**: 2 turns, never breaks from damage
-- **Marked**: 3 turns, 1.5x bonus damage, removes after hit
-- **Protected**: 20 HP shield, persists until broken
-
-## Future Enhancements
-
-Potential additions:
-- Status immunity (resistance to specific effects)
-- Status spreading (e.g., burning spreads to adjacent)
-- Status combinations (unique interactions between effects)
-- More sophisticated tooltips with detailed information
-- Status effect priority system
-- Status cure items and abilities
+Nothing else needs to change.

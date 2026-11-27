@@ -12,4 +12,3 @@ func _init():
 	damage_dealt_multiplier = 1.5  # Deal 50% more damage
 	damage_taken_multiplier = 1.25  # Take 25% more damage
 	turns_active = 2  # Lasts 2 turns by default
-	can_be_cured = true

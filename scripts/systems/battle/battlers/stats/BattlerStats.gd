@@ -15,6 +15,8 @@ extends Resource
 @export var attack: int = 10 ## Attack increases the amount of base damage when performing cards/attacks.
 @export var defense: int = 5 ## Defense reduces incoming damage.
 @export var agility: int = 5 ## Agility affects combat speed and turn order.
+@export var magic: int = 5 ## Magic powers magical damage (in place of attack) and magic-scaled card effects.
+@export_range(0, 100) var crit_chance: int = 5 ## Percent chance for a card's damage to crit.
 @export var max_ap: int = 3 ## Maximum Action Points for actions and card play
 @export var ap_regen_per_turn: int = 3 ## AP regenerated at the start of each turn
 
@@ -22,12 +24,13 @@ extends Resource
 ## Growth per level: new_stat = base_stat + (level - 1) * multiplier
 @export var health_multiplier: int = 15 ## Health gain per level
 @export var attack_multiplier: int = 2 ## Attack gain per level
+@export var magic_multiplier: int = 2 ## Magic gain per level
 @export var defense_multiplier: int = 1 ## Defense gain per level
 @export var agility_multiplier: int = 1 ## Agility gain per level
 @export var ap_multiplier: int = 0 ## AP gain per level (default 0)
 
 @export_group("Cards")
-## Card deck this ally fights with.
+## Card deck this ally fights with (no deck: database/decks/player_deck.tres).
 ## Also the default deck for the ally type when the run party has no per-ally
 ## deck assigned (see GameState / AllyPartyMember).
 @export var deck: DeckResource

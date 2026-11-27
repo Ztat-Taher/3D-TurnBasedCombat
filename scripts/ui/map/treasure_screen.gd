@@ -150,48 +150,9 @@ func _generate_random_vestige() -> void:
 		_show_error("Failed to load vestige library")
 		return
 
-	# Get already owned vestiges to avoid duplicates
-	var owned_vestiges: Array = []
-	var global_vestiges = GameState.get_global_vestiges()
-	owned_vestiges.append_array(global_vestiges)
-
-	var party = GameState.get_party()
-	for member in party:
-		owned_vestiges.append_array(member.vestiges)
-
-	# Get random vestige from common/uncommon/rare pools
-	var all_pools: Array = []
-	all_pools.append_array(library.common_vestiges)
-	all_pools.append_array(library.uncommon_vestiges)
-	all_pools.append_array(library.rare_vestiges)
-
-	var available = all_pools.filter(func(v): return not v in owned_vestiges)
-
-	if available.is_empty():
-		_show_no_vestiges_available()
-		return
-
-	# Weighted random selection (rarer vestiges have lower chance)
-	var roll = randf()
-	var selected: Vestige
-
-	if roll < 0.05:
-		# 5% chance for rare
-		var rare_pool = library.rare_vestiges.filter(func(v): return not v in owned_vestiges)
-		if not rare_pool.is_empty():
-			selected = rare_pool.pick_random()
-	elif roll < 0.30:
-		# 25% chance for uncommon
-		var uncommon_pool = library.uncommon_vestiges.filter(func(v): return not v in owned_vestiges)
-		if not uncommon_pool.is_empty():
-			selected = uncommon_pool.pick_random()
-
-	# Fallback to common
-	if selected == null:
-		var common_pool = library.common_vestiges.filter(func(v): return not v in owned_vestiges)
-		if not common_pool.is_empty():
-			selected = common_pool.pick_random()
-
+	# Rarity-weighted roll among the vestiges the run can still gain
+	var selected: Vestige = (library as VestigeLibrary).roll(Vestige.DropSource.TREASURE,
+		func(v: Vestige) -> bool: return GameState.can_gain_vestige(v))
 	if selected == null:
 		_show_no_vestiges_available()
 		return
@@ -246,14 +207,22 @@ func _setup_party_selection() -> void:
 		var button := Button.new()
 		button.text = member.display_name
 		button.toggle_mode = true
+		# Allies that can't take another stack of this vestige can't be picked
+		button.disabled = awarded_vestige != null and not GameState.can_gain_vestige(awarded_vestige, member)
 		button.button_group = party_button_group
 		button.custom_minimum_size = Vector2(96, 34)
 		button.focus_mode = Control.FOCUS_ALL
 		button.pressed.connect(_on_party_member_selected.bind(member))
 		party_buttons.add_child(button)
 
-	selected_party_member = party[0]
-	(party_buttons.get_child(0) as Button).button_pressed = true
+	# Preselect the first ally that can take it
+	selected_party_member = null
+	for i in party.size():
+		var button := party_buttons.get_child(i) as Button
+		if not button.disabled:
+			selected_party_member = party[i]
+			button.button_pressed = true
+			break
 
 
 func _update_party_selection_visibility() -> void:
@@ -281,23 +250,11 @@ func _on_take_button_pressed() -> void:
 		_show_error("No vestige to award")
 		return
 
-	# Award the vestige
-	if awarded_vestige.scope == Vestige.Scope.GLOBAL:
-		GameState.add_global_vestige(awarded_vestige, 1)
-	else:
-		# Award to selected party member
-		if selected_party_member == null:
-			var party = GameState.get_party()
-			if not party.is_empty():
-				selected_party_member = party[0]
-		
-		if selected_party_member:
-			selected_party_member.add_vestige(awarded_vestige, 1)
-		else:
-			_show_error("No party member to award vestige to")
-			return
-	
-	GlobalState.save()
+	# Party-wide vestiges go to the party, per-character ones to the chosen ally
+	var member := selected_party_member if awarded_vestige.scope == Vestige.Scope.PER_CHARACTER else null
+	if not GameState.grant_vestige(awarded_vestige, member):
+		_show_error("No party member can take this vestige")
+		return
 	
 	# Return to map immediately
 	level_changed.emit(MAP_LEVEL_PATH)

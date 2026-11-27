@@ -77,13 +77,9 @@ func setup(ally: Battler) -> void:
 	if ally.has_signal("ap_changed") and not ally.ap_changed.is_connected(update_ap):
 		ally.ap_changed.connect(update_ap)
 	
-	# Connect to ally shield changes if signal exists
-	if ally.has_signal("shield_changed") and not ally.shield_changed.is_connected(_on_shield_changed):
-		ally.shield_changed.connect(_on_shield_changed)
-	
-	# Connect to ally state changes if signal exists (for initial state application)
-	if ally.has_signal("state_applied") and not ally.state_applied.is_connected(_on_state_applied):
-		ally.state_applied.connect(_on_state_applied)
+	# Redraw the shield row when its states change
+	if not ally.states_changed.is_connected(update_shields):
+		ally.states_changed.connect(update_shields)
 	
 	# Connect to ally level up if signal exists
 	if ally.has_signal("level_up") and not ally.level_up.is_connected(_on_level_up):
@@ -199,25 +195,12 @@ func update_shields() -> void:
 		if child != shield_template:
 			child.queue_free()
 	
-	# Check for Protected state
-	if current_ally.active_states.has("Protected"):
-		var protected_state = current_ally.active_states["Protected"] as ProtectedState
-		if protected_state and protected_state.has_shield():
-			var shield_count = protected_state.get_remaining_shields()
-			# Add shield icons for each remaining shield
-			for i in range(shield_count):
-				var shield = shield_template.duplicate()
-				shield.visible = true
-				shield_container.add_child(shield)
+	# One icon per hit its states will block
+	for i in range(current_ally.get_shield_hits()):
+		var shield = shield_template.duplicate()
+		shield.visible = true
+		shield_container.add_child(shield)
 	_relayout_shield_row()
-
-func _on_shield_changed(shield_count: int) -> void:
-	update_shields()
-
-func _on_state_applied(state_name: String) -> void:
-	# Update shields when Protected state is applied
-	if state_name == "Protected":
-		update_shields()
 
 func update_level(level: int) -> void:
 	if level_num_label:

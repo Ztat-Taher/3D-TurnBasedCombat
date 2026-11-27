@@ -23,26 +23,11 @@ enum SelectionMode {
 	AUTO_STRONGEST      # Targets strongest enemy
 }
 
-enum EffectTiming {
-	IMMEDIATE,          # Effect triggers immediately
-	AFTER_ANIMATION,    # Effect triggers after animation completes
-	ON_HIT,             # Effect triggers on hit frame
-	ON_IMPACT,          # Effect triggers on impact with target
-	CHANNEL_START,      # Effect triggers when channeling starts
-	CHANNEL_END         # Effect triggers when channeling ends
-}
-
 enum QTEType {
 	NONE,               # No QTE
 	TIMING,             # Timing-based QTE (press at right moment)
-	BUTTON_MASH,        # Button mash QTE (rapid pressing)
-	SEQUENCE            # Sequence input QTE (specific button order)
-}
-
-enum QTETiming {
-	BEFORE_ATTACK,      # QTE before attack animation
-	ON_HIT_FRAME,       # QTE on hit frame
-	AFTER_ATTACK        # QTE after attack animation
+	BUTTON_MASH,        # Button mash QTE (rapid pressing). Not implemented yet: plays as TIMING
+	SEQUENCE            # Sequence input QTE (specific button order). Not implemented yet: plays as TIMING
 }
 
 enum DamageType {
@@ -82,7 +67,7 @@ enum Element {
 @export var strike_animations: Array[String] = []     ## Animation slot names in order, e.g. ["melee_combo_1", "melee_combo_2", "melee_combo_3"].
 @export var strike_multipliers: Array[float] = []     ## Per-strike damage multiplier on top of effect value. [1.0, 1.2, 1.5] = escalating hits.
 @export var strike_qte_difficulties: Array[float] = [] ## Per-strike QTE difficulty (0.0 = easy, 1.0 = hard).
-@export var strike_qte_windows: Array[float] = []     ## Per-strike QTE window duration in seconds.
+@export var strike_qte_windows: Array[float] = []     ## Per-strike QTE window duration in seconds (0 = no QTE on that strike). Multi-strike cards use these, not qte_type.
 
 ## Unified per-strike timing offset (seconds).
 ##   > 0  →  delay:  pause this many seconds AFTER the previous clip ends before firing.
@@ -98,8 +83,6 @@ enum Element {
 @export_group("Targeting")
 @export var target_type: TargetScope = TargetScope.SINGLE_ENEMY
 @export var target_selection_mode: SelectionMode = SelectionMode.MANUAL
-@export var target_filter: String = ""                ## Filter conditions for valid targets
-@export var requires_los: bool = false                ## Whether line of sight is required
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Effect Configuration
@@ -107,7 +90,6 @@ enum Element {
 @export_group("Effects")
 @export var primary_effect: Resource                 ## Main effect configuration
 @export var secondary_effects: Array[Resource] = [] ## Additional effects
-@export var effect_timing: EffectTiming = EffectTiming.ON_HIT
 @export var effect_conditions: Array[Resource] = [] ## Conditions for effect execution
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -116,7 +98,6 @@ enum Element {
 @export_group("Visual Effects")
 @export var vfx_on_actor: Resource                   ## Visual effects on the actor
 @export var vfx_on_target: Resource                  ## Visual effects on target(s)
-@export var vfx_on_projectile: Resource              ## Projectile visual effects
 @export var camera_effects: Resource        ## Camera shake, zoom, etc.
 @export var screen_effects: Resource        ## Screen flash, time slow, etc.
 
@@ -131,7 +112,6 @@ enum Element {
 @export var projectile_lifetime: float = 5.0           ## Maximum projectile lifetime
 @export var projectile_arc: float = 0.0                ## Arc height for projectile trajectory
 @export var projectile_arc_curve: Curve = null        ## Arc height over time for dynamic curvature
-@export var projectile_spawn_point: String = "actor"  ## Where projectile spawns
 @export var projectile_curve_influence: float = 0.5     ## How much the curve affects path (0=straight, 1=full curve)
 @export var projectile_fire_simultaneously: bool = false  ## Fire all projectiles at once (multi-projectile cards)
 @export var projectile_spawn_spread: float = 0.5        ## Random spread radius in world units (meters) for spawn position (ring facing forward from actor)
@@ -148,8 +128,6 @@ enum Element {
 @export var cast_sound: Resource                    ## Sound when card is cast
 @export var hit_sound: Resource                     ## Sound when effect hits target
 @export var impact_sound: Resource                 ## Sound on impact/damage
-@export var loop_sound: Resource                   ## Looping sound during channel/projectile
-@export var voice_line: String = ""                    ## Character voice line to play
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QTE Configuration
@@ -161,28 +139,19 @@ var qte_type: QTEType = QTEType.NONE:
 		return _parse_qte_type(qte_type_string)
 	set(value):
 		qte_type_string = QTEType.keys()[value]
-@export var qte_difficulty: float = 0.5                ## Difficulty level (0.0-1.0)
-@export var qte_timing_string: String = "before_attack" ## String storage for enum
-var qte_timing: QTETiming = QTETiming.BEFORE_ATTACK:
-	get:
-		return _parse_qte_timing(qte_timing_string)
-	set(value):
-		qte_timing_string = QTETiming.keys()[value]
+@export var qte_difficulty: float = 0.5                ## Difficulty level (0.0-1.0): sets the QTE length only when qte_window_duration is 0
 @export var qte_window_duration: float = 2.0           ## Time window for QTE input
-@export var qte_success_multiplier: float = 1.5        ## Damage/effect multiplier on success
-@export var qte_failure_multiplier: float = 1.0        ## Damage/effect multiplier on failure
+@export var qte_success_multiplier: float = 0.0        ## Damage/effect multiplier on success (0 = the QTE config's)
+@export var qte_failure_multiplier: float = 0.0        ## Damage/effect multiplier on failure (0 = the QTE config's)
 @export var qte_sequence: Array[String] = []          ## Button sequence for sequence QTEs
 @export var qte_mash_count: int = 5                    ## Required button presses for mash QTEs
-@export var qte_mash_window: float = 3.0               ## Time window for mash QTEs
 
 # ─────────────────────────────────────────────────────────────────────────────
 # State and Debuff Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 @export_group("States & Debuffs")
 @export var applies_states: Array[Resource] = []   ## States to apply to targets
-@export var applies_self_states: Array[Resource] = [] ## States to apply to self
-@export var state_chance: float = 1.0                  ## Chance to apply states (0.0-1.0)
-@export var state_duration: int = 1                    ## Duration in turns
+@export var applies_self_states: Array[Resource] = [] ## States to apply to self (chance, duration and stacking live on each StateConfig)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Card Metadata
@@ -208,17 +177,9 @@ var qte_timing: QTETiming = QTETiming.BEFORE_ATTACK:
 @export var type_icon: Texture2D = null                 ## Card type indicator icon
 
 ## Helper function to check if card should trigger QTE
+## (The global switch is [method QTEManager.wants_card_qte].)
 func should_trigger_qte() -> bool:
-	# Primary check: QTE type is not NONE
-	if qte_type != QTEType.NONE:
-		return true
-	
-	# Fallback: Check if card is attack type and has QTE difficulty configured
-	# This handles cases where enum loading fails
-	if card_tags.has("attack") and qte_difficulty > 0.0:
-		return true
-	
-	return false
+	return qte_type != QTEType.NONE
 
 ## Parse QTE type from string
 func _parse_qte_type(type_string: String) -> QTEType:
@@ -230,13 +191,6 @@ func _parse_qte_type(type_string: String) -> QTEType:
 		_: return QTEType.NONE
 
 ## Parse QTE timing from string
-func _parse_qte_timing(timing_string: String) -> QTETiming:
-	match timing_string.to_lower():
-		"before_attack": return QTETiming.BEFORE_ATTACK
-		"on_hit_frame": return QTETiming.ON_HIT_FRAME
-		"after_attack": return QTETiming.AFTER_ATTACK
-		_: return QTETiming.BEFORE_ATTACK
-
 ## Helper function to get target list based on target type
 func get_targets(actor: Node, all_enemies: Array, all_allies: Array) -> Array:
 	match target_type:
@@ -245,19 +199,19 @@ func get_targets(actor: Node, all_enemies: Array, all_allies: Array) -> Array:
 		TargetScope.SINGLE_ENEMY:
 			if target_selection_mode == SelectionMode.MANUAL:
 				return all_enemies
-			return _get_single_target(all_enemies)
+			return _get_single_target(all_enemies, actor)
 		TargetScope.ALL_ENEMIES:
 			return all_enemies
 		TargetScope.SINGLE_ALLY:
 			if target_selection_mode == SelectionMode.MANUAL:
 				return all_allies
-			return _get_single_target(all_allies)
+			return _get_single_target(all_allies, actor)
 		TargetScope.ALL_ALLIES:
 			return all_allies
 		TargetScope.SINGLE_TARGET:
 			if target_selection_mode == SelectionMode.MANUAL:
 				return all_enemies + all_allies
-			return _get_single_target(all_enemies + all_allies)
+			return _get_single_target(all_enemies + all_allies, actor)
 		TargetScope.ALL_UNITS:
 			return all_enemies + all_allies
 		TargetScope.ALL_ALLIES_SELF:
@@ -265,13 +219,13 @@ func get_targets(actor: Node, all_enemies: Array, all_allies: Array) -> Array:
 		_:
 			return []
 
-func _get_single_target(targets: Array) -> Array:
+func _get_single_target(targets: Array, actor: Node = null) -> Array:
 	if targets.is_empty():
 		return []
 	
 	match target_selection_mode:
 		SelectionMode.AUTO_CLOSEST:
-			return [_get_closest_target(targets)]
+			return [_get_closest_target(targets, actor)]
 		SelectionMode.AUTO_RANDOM:
 			return [targets.pick_random()]
 		SelectionMode.AUTO_WEAKEST:
@@ -281,10 +235,20 @@ func _get_single_target(targets: Array) -> Array:
 		_:
 			return [targets[0]] # Default to first target
 
-func _get_closest_target(targets: Array) -> Node:
-	# Implementation would require actor position reference
-	# For now, return first target
-	return targets[0] if not targets.is_empty() else null
+func _get_closest_target(targets: Array, actor: Node = null) -> Node:
+	if targets.is_empty():
+		return null
+	if not actor is Node3D:
+		return targets[0]
+	var closest: Node = targets[0]
+	var best := INF
+	for target in targets:
+		if target is Node3D:
+			var d: float = (target as Node3D).global_position.distance_squared_to((actor as Node3D).global_position)
+			if d < best:
+				best = d
+				closest = target
+	return closest
 
 func _get_weakest_target(targets: Array) -> Node:
 	var weakest = null

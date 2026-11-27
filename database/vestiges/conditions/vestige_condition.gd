@@ -1,12 +1,13 @@
+@abstract
 class_name VestigeCondition
 extends Resource
-## Base class for vestige activation conditions
-## Override should_trigger() to implement custom conditions
+## Base class for when a vestige [TriggerHook] may fire.
+##
+## Conditions are sub-resources of a hook, configured with their own exported
+## fields. Shared by every battler carrying the vestige, so they must never
+## change their own fields at runtime.
 
-## Override to implement activation conditions
-## Returns true if the vestige should trigger
-## vestige: The vestige being checked
-## battler: The battler triggering the effect (may be null for global effects)
-## context: Dictionary with additional context data (varies by trigger type)
-func should_trigger(vestige: Vestige, battler: Battler, context: Dictionary) -> bool:
-	return true  # Default: always trigger
+
+## True if the hook should fire for [param battler]. [param context] is the
+## same dictionary the effect gets (see [method VestigeEffect.execute]).
+@abstract func should_trigger(vestige: Vestige, battler: Battler, context: Dictionary) -> bool

@@ -1,41 +1,28 @@
-@tool
 class_name HealOnTrigger
 extends VestigeEffect
-## Heal when a specific trigger occurs
+## Heals the battler or its allies.
 
 @export var heal_amount: int = 10
-@export var target_type: String = "self"  # self, random_ally, all_allies
-@export var trigger_limit: int = -1  # -1 = unlimited
-
-var _trigger_count: int = 0
+@export_enum("self", "random_ally", "all_allies") var target_type: String = "self"
 
 
-func execute(vestige: Vestige, battler: Battler, context: Dictionary) -> void:
-	if trigger_limit > 0 and _trigger_count >= trigger_limit:
-		return
-	
+func execute(_vestige: Vestige, battler: Battler, context: Dictionary) -> bool:
 	if battler == null:
-		return
-	
-	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	if battle_manager == null:
-		return
-	
-	var targets: Array[Battler] = []
-	
-	match target_type.to_lower():
+		return false
+	var allies: Array = [battler]
+	var battle_manager = context.get("battle_manager")
+	if battle_manager:
+		allies = battle_manager.players.filter(
+			func(p): return is_instance_valid(p) and p.current_health > 0)
+	var targets: Array = []
+	match target_type:
 		"self":
 			targets.append(battler)
 		"random_ally":
-			if battle_manager.players.size() > 0:
-				targets.append(battle_manager.players.pick_random())
+			if not allies.is_empty():
+				targets.append(allies.pick_random())
 		"all_allies":
-			targets = battle_manager.players.duplicate()
-		_:
-			push_warning("HealOnTrigger: Unknown target type '%s'" % target_type)
-	
+			targets = allies
 	for target in targets:
-		if target and target.current_health > 0:
-			target.take_healing(heal_amount)
-	
-	_trigger_count += 1
+		target.take_healing(heal_amount)
+	return not targets.is_empty()

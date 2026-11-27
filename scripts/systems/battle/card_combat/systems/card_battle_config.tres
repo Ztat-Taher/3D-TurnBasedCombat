@@ -4,16 +4,7 @@
 
 [resource]
 script = ExtResource("1_config")
-ap_per_turn = 3
-max_ap = 3
 draw_card_ap_cost = 1
 initial_hand_size = 4
 max_hand_size = 10
-max_board_size = -1
-qte_enabled = true
-default_qte_difficulty = 0.5
-qte_success_multiplier = 1.5
-qte_failure_multiplier = 0.8
-attack_damage_multiplier = 1.0
-heal_multiplier = 1.0
 multi_strike_chain_lead = 0.2

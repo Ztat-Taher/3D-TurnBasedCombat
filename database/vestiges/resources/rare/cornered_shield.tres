@@ -3,12 +3,23 @@
 [ext_resource type="Texture2D" uid="uid://cvofgbw7qa8v3" path="res://assets/images/ui/vestiges/cornered_shield.png" id="1_msh3u"]
 [ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
 [ext_resource type="Script" uid="uid://b0tyiimb82sae" path="res://database/vestiges/trigger_hook.gd" id="3_hook"]
+[ext_resource type="Script" uid="uid://bbwtg0ppqqnbd" path="res://database/vestiges/effects/gain_combat_stat.gd" id="4_effect"]
+[ext_resource type="Script" uid="uid://ctvo1c6cj2s34" path="res://database/vestiges/conditions/hp_threshold_condition.gd" id="5_condition"]
+
+[sub_resource type="Resource" id="Effect_1"]
+script = ExtResource("4_effect")
+stat = "defense"
+amount = 2
+
+[sub_resource type="Resource" id="Condition_1"]
+script = ExtResource("5_condition")
+threshold_percent = 0.5
 
 [sub_resource type="Resource" id="TriggerHook_xyzab"]
 script = ExtResource("3_hook")
 trigger_type = 2
-effect_script_path = "res://database/vestiges/effects/gain_stat_on_combat_start.gd"
-condition_script_path = "res://database/vestiges/conditions/hp_threshold_condition.gd"
+effect = SubResource("Effect_1")
+condition = SubResource("Condition_1")
 
 [resource]
 script = ExtResource("1_vest")
@@ -18,4 +29,4 @@ description = "When at or below 50% HP, gain +2 Defense each turn."
 icon = ExtResource("1_msh3u")
 rarity = 2
 base_price = 250
-trigger_hooks = Array[Resource]([SubResource("TriggerHook_xyzab")])
+trigger_hooks = Array[ExtResource("3_hook")]([SubResource("TriggerHook_xyzab")])

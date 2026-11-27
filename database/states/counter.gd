@@ -1,11 +1,10 @@
 ## CounterState
-## Handles counter attacks for battlers with the Counter state.
-## This state triggers automatically when the afflicted battler takes damage from a non-ally.
+## When an opponent attacks its battler, it strikes back with a normal attack
+## (stat formula, states, hit chance). Bonus damage (weapon and orb procs)
+## and states' damage don't trigger it. Limited uses per turn.
 ##
-## Usage:
-## - Apply this state to a battler to enable counter attacks
-## - Set interrupt_attacker to true for dramatic immediate counters (Like a Dragon style)
-## - Set interrupt_attacker to false to let attacker return first before counter (safer, less code)
+## interrupt_attacker: true counters while the attacker is still close; false
+## waits for it to return first.
 
 class_name CounterState
 extends State
@@ -19,17 +18,21 @@ var counters_used_this_turn: int = 0  ## Track usage this turn
 func _init():
 	state_name = "Counter"
 	state_type = StateType.COUNTER
-	damage_taken_multiplier = 0.0  # Not used for counter damage
+	# (A countering battler takes normal damage)
 	turns_active = -1  # Infinite until cured
-	can_be_cured = true
+
+## Uses reset each time any battler's turn starts.
+func on_any_turn_start(_owner: Node) -> void:
 	counters_used_this_turn = 0
 
-## Reset counter usage at start of battler's turn (call from BattleManager)
-func reset_turn_usage() -> void:
-	counters_used_this_turn = 0
+## Being attacked by an opponent triggers the counter (the hit waits for it).
+## Bonus damage (weapon and orb procs) and states' damage don't.
+func on_hit_taken(owner: Node, hit: Dictionary) -> void:
+	await super(owner, hit)
+	var attacker = hit.get("attacker")
+	if hit.get("is_attack", false) and attacker is Battler and is_instance_valid(attacker) and not owner.is_defeated():
+		await perform_counter(owner, attacker)
 
-## Called when this battler is attacked while having Counter state
-## Only triggers against non-allies
 func perform_counter(defender: Battler, attacker: Battler) -> void:
 	# Only trigger if counter is still active
 	if not defender.active_states.has(state_name):
@@ -60,19 +63,19 @@ func perform_counter(defender: Battler, attacker: Battler) -> void:
 func _execute_counter_attack(defender: Battler, attacker: Battler) -> void:
 	# Default counter attack (basic attack with multiplier)
 	attacker.is_counter_stunned = true  # Stun attacker
+	# The swing's hit frame (hit_moment) resolves against current_target
+	defender.current_target = attacker
 
 	defender._try_animation(AnimationMapping.MELEE_COMBO_1)
 	await defender.get_tree().create_timer(0.5).timeout
 
-	var counter_damage = Formulas.physical_damage(
-		defender,
-		attacker,
-		int(defender.attack * counter_damage_multiplier)
-	)
-	attacker.take_damage(counter_damage, defender)
+	# A normal attack: stat formula, states (Marked, Electrocuted...), hit
+	# chance, then the attacker's own on-hit reactions
+	var battle_manager = defender.get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager:
+		battle_manager.damage_calculation(defender, attacker, int(defender.attack * counter_damage_multiplier), null, "physical", "none", true)
 
 	# Trigger camera shake for counter attack
-	var battle_manager = defender.get_tree().get_first_node_in_group("battle_manager")
 	if battle_manager and battle_manager.effect_manager:
 		battle_manager.effect_manager.apply_camera_shake(0.25, 0.35)  # Strong shake for counter
 

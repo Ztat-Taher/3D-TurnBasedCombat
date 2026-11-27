@@ -11,8 +11,9 @@ extends WeaponModule
 ## Seconds between the original hit and the ghost replica.
 @export var echo_delay: float = 0.35
 ## Fraction of damage dealt by EACH instance of the hit — the live hit and
-## every ghost replay (e.g. 0.3333 => each deals 1/3, 2/3 total).
-@export var echo_damage_fraction: float = 0.3333
+## every ghost replay (0.5 => each deals half: one echo per hit, so the pair
+## adds up to the full hit).
+@export var echo_damage_fraction: float = 0.5
 
 
 func create_runtime(weapon_system: WeaponSystem) -> Node:

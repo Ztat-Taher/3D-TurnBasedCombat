@@ -1,12 +1,24 @@
+@abstract
 class_name VestigeEffect
 extends Resource
-## Base class for vestige effects
-## Override execute() to implement custom vestige behavior
+## Base class for what a vestige [TriggerHook] does when it fires.
+##
+## Effects are sub-resources of a hook, configured with their own exported
+## fields in the inspector. One effect instance is shared by every battler
+## carrying the vestige, so it must never change its own fields at runtime:
+## keep per-battler, per-combat state in [method memory].
+## A new effect is a new subclass; nothing else needs to know about it.
 
-## Override to implement custom vestige behavior
-## Called when the trigger fires
-## vestige: The vestige that owns this effect
-## battler: The battler triggering the effect (may be null for global effects)
-## context: Dictionary with additional context data (varies by trigger type)
-func execute(vestige: Vestige, battler: Battler, context: Dictionary) -> void:
-	push_error("VestigeEffect.execute() not implemented for: %s" % vestige.vestige_name)
+
+## Does the effect for [param battler]. [param context] holds the battle event's
+## data (see [BattleEvents]) plus "battle_manager" and "vestige_holder".
+## Return true when the effect actually happened; only then does it count
+## toward the hook's trigger limit.
+@abstract func execute(vestige: Vestige, battler: Battler, context: Dictionary) -> bool
+
+
+## This effect's scratch state for the battler being handled, for the current
+## combat (empty at each combat start).
+func memory(context: Dictionary) -> Dictionary:
+	var holder: VestigeHolder = context.get("vestige_holder")
+	return holder.get_combat_memory(self) if holder else {}

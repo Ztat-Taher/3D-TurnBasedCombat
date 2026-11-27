@@ -1,34 +1,37 @@
 ## ProtectedState
-## Hit-based shielding - each shield ignores one hit (damage and effects)
-## Shield mechanic that protects the battler
+## Each shield hit blocks one whole hit (damage and on-hit effects); the last
+## one ends the state. Shielding a shielded battler adds the hits. Its hits
+## show as the battler's shield row, not a status icon.
 
 class_name ProtectedState
 extends State
 
-@export var shield_hits: int = 1  # Number of hits the shield can absorb
+@export var shield_hits: int = 1  ## Hits it blocks
 
 func _init():
-	icon_texture = null 
 	state_name = "Protected"
 	state_type = StateType.BUFF
 	state_description = "Ignores the next hit (damage and effects)"
-	shield_hits = 1  # Default: 1 shield hit
-	turns_active = -1  # Persists until shield breaks or cured
-	can_be_cured = true
+	turns_active = -1  # Persists until its hits are used or cured
 
-## Initialize shield with specific number of hits
 func set_shield_hits(amount: int) -> void:
 	shield_hits = amount
 
-## Check if shield is still active
-func has_shield() -> bool:
-	return shield_hits > 0
-
-## Consume one shield hit
-func consume_shield() -> void:
-	if shield_hits > 0:
-		shield_hits -= 1
-
-## Get remaining shield hits
-func get_remaining_shields() -> int:
+func get_shield_hits() -> int:
 	return shield_hits
+
+func blocks_hit(owner: Node, _hit: Dictionary) -> bool:
+	if shield_hits <= 0:
+		return false
+	shield_hits -= 1
+	if owner.number_indicator:
+		owner.number_indicator.show_shield_break()
+	owner.states_changed.emit()
+	if shield_hits <= 0:
+		owner.remove_state(state_name)
+	return true
+
+func merge(incoming: State, owner: Node) -> void:
+	super(incoming, owner)
+	if incoming is ProtectedState:
+		shield_hits += incoming.shield_hits

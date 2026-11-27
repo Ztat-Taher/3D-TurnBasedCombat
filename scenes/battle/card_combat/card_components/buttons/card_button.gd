@@ -10,7 +10,6 @@ var card_config: CardConfig
 var is_hovered: bool = false
 var is_mouse_hovered: bool = false
 var is_controller_hovered: bool = false
-var is_selected: bool = false
 var is_highlighted: bool = false
 var is_dragging: bool = false
 var is_returning: bool = false
@@ -29,9 +28,6 @@ var last_mouse_pos: Vector2 = Vector2.ZERO
 var drag_velocity: Vector2 = Vector2.ZERO
 
 var hand_bounds_provider: Callable = Callable()
-var _original_parent: Node = null
-var _original_index: int = -1
-var _card_type_color: Color = Color.WHITE
 
 var card_3d_container: SubViewportContainer
 var card_viewport: SubViewport
@@ -62,7 +58,6 @@ var card_shader_material: ShaderMaterial
 @export var fov: float = 90.0
 @export var cull_back: bool = true
 @export var max_tilt: float = 9.0
-@export var tilt_sensitivity: float = 0.5
 @export var tilt_inertia: float = 0.85
 
 var current_y_rot: float = 0.0
@@ -77,6 +72,10 @@ var _default_main_image_texture: Texture2D
 var _default_type_icon_texture: Texture2D
 var _default_attack_icon_texture: Texture2D
 var _default_effect_icon_texture: Texture2D
+
+## AP cost shown on the badge; -1 = the card's own cost (set before setup).
+var display_ap_cost: int = -1
+
 
 func setup(card: CardConfig) -> void:
 	card_config = card
@@ -101,7 +100,7 @@ func setup(card: CardConfig) -> void:
 		card_name.text = card_config.card_name
 	
 	if ap_cost:
-		ap_cost.text = str(card.ap_cost)
+		ap_cost.text = str(display_ap_cost if display_ap_cost >= 0 else card.ap_cost)
 	
 	if card_frame:
 		card_frame.texture = card.card_frame_texture if card.card_frame_texture else _default_card_frame_texture
@@ -138,43 +137,12 @@ func setup(card: CardConfig) -> void:
 		_setup_description_popup()
 
 func _get_card_status_effects() -> Array[State]:
-	## Get status effects that this card applies
+	## The states this card applies (to targets and to the caster)
 	var status_effects: Array[State] = []
-	
-	# Check if card has applies_states
-	if card_config.applies_states:
-		for state_config in card_config.applies_states:
-			if state_config and state_config.has_method("get"):
-				var state_id = state_config.get("state_id")
-				if not state_id.is_empty():
-					# Load the state resource
-					var state = _load_state_from_id(state_id)
-					if state:
-						status_effects.append(state)
-	
+	for state_config in card_config.applies_states + card_config.applies_self_states:
+		if state_config is StateConfig and state_config.state and not status_effects.has(state_config.state):
+			status_effects.append(state_config.state)
 	return status_effects
-
-func _load_state_from_id(state_id: String) -> State:
-	## Load a state resource from its ID
-	var state_paths = {
-		"Burning": "res://database/states/resources/burning_state.tres",
-		"Electrocuted": "res://database/states/resources/electrocuted_state.tres",
-		"Bleed": "res://database/states/resources/bleed_state.tres",
-		"Chilled": "res://database/states/resources/chilled_state.tres",
-		"Berserk": "res://database/states/resources/berserk_state.tres",
-		"Taunt": "res://database/states/resources/taunt_state.tres",
-		"Marked": "res://database/states/resources/marked_state.tres",
-		"Protected": "res://database/states/resources/protected_state.tres"
-	}
-	
-	var state_path = state_paths.get(state_id, "")
-	if state_path.is_empty():
-		return null
-	
-	if ResourceLoader.exists(state_path):
-		return ResourceLoader.load(state_path) as State
-	
-	return null
 
 func set_fan_parameters(rot_deg: float, y_offset: float, z_idx: int) -> void:
 	base_rotation = rot_deg
@@ -443,10 +411,32 @@ func _decay_tilt(delta: float) -> void:
 		card_shader_material.set_shader_parameter("y_rot", current_y_rot)
 		card_shader_material.set_shader_parameter("x_rot", current_x_rot)
 	else:
+		current_y_rot = 0.0
+		current_x_rot = 0.0
 		card_shader_material.set_shader_parameter("y_rot", 0.0)
 		card_shader_material.set_shader_parameter("x_rot", 0.0)
 
+## Per-frame easing weight: 0.25 per frame at 60 fps, the same feel at any
+## frame rate.
+func _ease(delta: float) -> float:
+	return 1.0 - pow(0.75, delta * 60.0)
+
+
+## Nothing to animate: resting in its fan slot, flat, unhovered, popup hidden.
+## (A frame would only rewrite the same values.)
+func _is_at_rest() -> bool:
+	return not is_hovered and not is_dragging and not is_highlighted \
+		and not is_draw_animating and not is_returning and hover_timer == 0.0 \
+		and current_x_rot == 0.0 and current_y_rot == 0.0 \
+		and (description_popup == null or not description_popup.visible) \
+		and card_3d_container != null and card_3d_container.scale == Vector2.ONE \
+		and card_3d_container.position.is_equal_approx(Vector2(0.0, base_y_offset)) \
+		and is_equal_approx(card_3d_container.rotation_degrees, base_rotation)
+
+
 func _process(delta: float) -> void:
+	if _is_at_rest():
+		return
 	var mouse_pos = get_viewport().get_mouse_position()
 	
 	# Handle description popup hover timer
@@ -505,7 +495,7 @@ func _process(delta: float) -> void:
 			_decay_tilt(delta)
 		
 		if card_3d_container:
-			card_3d_container.scale = lerp(card_3d_container.scale, Vector2(1.2, 1.2), 0.25)
+			card_3d_container.scale = lerp(card_3d_container.scale, Vector2(1.2, 1.2), _ease(delta))
 	else:
 		# Normal state - respect fanning parameters
 		_decay_tilt(delta)
@@ -516,7 +506,9 @@ func _process(delta: float) -> void:
 				card_3d_container.position = Vector2(0.0, -45.0 + base_y_offset)
 				card_3d_container.rotation_degrees = 0.0
 			else:
-				card_3d_container.scale = lerp(card_3d_container.scale, Vector2.ONE, 0.25)
+				card_3d_container.scale = lerp(card_3d_container.scale, Vector2.ONE, _ease(delta))
+				if card_3d_container.scale.distance_squared_to(Vector2.ONE) < 0.000001:
+					card_3d_container.scale = Vector2.ONE
 				card_3d_container.position = Vector2(0.0, base_y_offset)
 				card_3d_container.rotation_degrees = base_rotation
 
@@ -642,11 +634,3 @@ func is_point_over_visual(global_point: Vector2) -> bool:
 	
 	return expanded_rect.has_point(global_point)
 
-# Returns true if the cursor is touching the card (Balatro-style detection)
-func is_cursor_touching() -> bool:
-	var mouse_pos: Vector2 = get_global_mouse_position()
-	var start = card_3d_container.global_position if card_3d_container else global_position
-	var end = start + (card_3d_container.size if card_3d_container else size)
-	var starty = mouse_pos.x >= start.x and mouse_pos.y >= start.y
-	var endy = mouse_pos.x <= end.x and mouse_pos.y <= end.y
-	return starty and endy

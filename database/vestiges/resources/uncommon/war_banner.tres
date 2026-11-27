@@ -3,10 +3,17 @@
 [ext_resource type="Texture2D" uid="uid://0wq7lmd1xw8u" path="res://assets/images/ui/vestiges/war_banner.png" id="1_06y3c"]
 [ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
 [ext_resource type="Script" uid="uid://b0tyiimb82sae" path="res://database/vestiges/trigger_hook.gd" id="3_hook"]
+[ext_resource type="Script" uid="uid://bbwtg0ppqqnbd" path="res://database/vestiges/effects/gain_combat_stat.gd" id="4_effect"]
+
+[sub_resource type="Resource" id="Effect_1"]
+script = ExtResource("4_effect")
+stat = "attack"
+amount = 2
 
 [sub_resource type="Resource" id="TriggerHook_stuvw"]
 script = ExtResource("3_hook")
-effect_script_path = "res://database/vestiges/effects/gain_stat_on_combat_start.gd"
+trigger_type = 0
+effect = SubResource("Effect_1")
 
 [resource]
 script = ExtResource("1_vest")
@@ -16,4 +23,4 @@ description = "Start each combat with +2 Attack."
 icon = ExtResource("1_06y3c")
 rarity = 1
 base_price = 150
-trigger_hooks = Array[Resource]([SubResource("TriggerHook_stuvw")])
+trigger_hooks = Array[ExtResource("3_hook")]([SubResource("TriggerHook_stuvw")])

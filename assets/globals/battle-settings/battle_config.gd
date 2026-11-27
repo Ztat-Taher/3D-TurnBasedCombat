@@ -40,11 +40,11 @@ func apply_config_to_battlers(allies: Array, enemies: Array) -> void:
 		if ally is Battler:
 			for state in initial_ally_states:
 				if state:
-					BattlerCombatHelper.apply_state(ally, state)
+					ally.apply_state(state)
 	
 	# Apply starting states to enemies
 	for enemy in enemies:
 		if enemy is Battler:
 			for state in initial_enemy_states:
 				if state:
-					BattlerCombatHelper.apply_state(enemy, state)
+					enemy.apply_state(state)

@@ -1,9 +1,14 @@
 class_name SimplifiedDeck
 extends Resource
 ## Simplified deck management for card-based combat
-## Replaces the addon's CombatDeck with a simpler Resource-based approach
+## Replaces the addon's CombatDeck with a simpler Resource-based approach.
+## Every card in the deck is its own instance (a copy of the authored
+## CardConfig), so two copies of the same card are two distinct objects: the
+## hand, discards and the hand UI can always tell which copy is meant.
 
 signal card_drawn(card: CardConfig)
+## A card was drawn into a full hand and went straight to the graveyard.
+signal card_overdrawn(card: CardConfig)
 signal deck_exhausted
 
 var draw_pile: Array[CardConfig] = []
@@ -20,7 +25,7 @@ func setup(cards: Array[CardConfig], p_max_hand_size: int = -1) -> void:
 	
 	for card in cards:
 		if card:
-			draw_pile.append(card)
+			draw_pile.append(card.duplicate() as CardConfig)
 	
 	shuffle()
 
@@ -31,13 +36,6 @@ func shuffle() -> void:
 		var tmp: CardConfig = draw_pile[i]
 		draw_pile[i] = draw_pile[j]
 		draw_pile[j] = tmp
-
-## Draw initial hand
-func draw_initial_hand(count: int = 3) -> void:
-	for i in count:
-		var card := draw_card()
-		if card != null:
-			hand.append(card)
 
 ## Draw a single card from the pile
 func draw_card() -> CardConfig:
@@ -50,6 +48,7 @@ func draw_card() -> CardConfig:
 	if is_hand_full():
 		# Overdraw: discard the card instead of holding it
 		graveyard.append(card)
+		card_overdrawn.emit(card)
 	else:
 		hand.append(card)
 	

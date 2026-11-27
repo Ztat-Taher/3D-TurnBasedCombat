@@ -99,9 +99,9 @@ func _execute_effect_trigger(actor: Node, target: Node, context: Dictionary) -> 
 	
 	# Trigger the card's primary effect
 	if card_config.primary_effect:
-		var effect_result = card_config.primary_effect.apply_effect(actor, target, context.get("enemies", []), context.get("allies", []))
-		result["success"] = effect_result["success"]
-		result["event_data"] = effect_result
+		var effect: CardEffect = card_config.primary_effect
+		effect.apply_to(actor, target, effect._calculate_value(actor), actor.get_tree().get_first_node_in_group("battle_manager"))
+		result["success"] = true
 		result["message"] = "Effect triggered successfully"
 	
 	return result

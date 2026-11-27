@@ -1,12 +1,16 @@
 ## BleedState
-## Accumulation mechanic - invisible bleed bar fills up, triggers devastating damage when full
-## Based on Elden Ring's bleed mechanic
+## A hidden bar fills with the damage its battler takes; when full it procs
+## for a share of max HP and empties. Each application adds its own bar
+## (weapons apply it with some), and a full bar procs at once.
 
 class_name BleedState
 extends State
 
-@export var bleed_proc_damage_percent: float = 0.2  # 20% of max HP when proc triggers
-@export var accumulation_per_damage_taken: float = 0.5  # 50% of damage taken adds to accumulation
+@export var bleed_proc_damage_percent: float = 0.2  ## Proc damage, as a share of max HP
+@export var accumulation_per_damage_taken: float = 0.5  ## Share of damage taken that fills the bar
+
+## True while the proc deals its damage (that damage builds no Bleed).
+var _procing := false
 
 func _init():
 	state_name = "Bleed"
@@ -14,24 +18,35 @@ func _init():
 	state_description = "Accumulates bleed from damage taken. Triggers massive damage when full."
 	icon_texture = preload("res://assets/images/ui/status_effects/bleeding.png")
 	accumulation_max = 100  # Threshold for bleed proc
-	turns_active = -1  # Persists until proc or cured
-	can_be_cured = true
+	turns_active = -1  # Persists until cured
 
-## Add accumulation based on damage taken
-func add_accumulation_from_damage(damage_taken: int) -> void:
-	var accumulation_add = int(damage_taken * accumulation_per_damage_taken)
-	add_accumulation(accumulation_add)
+## Damage taken builds the bar (once per hit); a full bar procs.
+func on_hit_taken(owner: Node, hit: Dictionary) -> void:
+	await super(owner, hit)
+	var damage := int(hit.get("damage", 0))
+	if _procing or damage <= 0 or owner.is_defeated():
+		return
+	add_accumulation(int(damage * accumulation_per_damage_taken))
+	owner.states_changed.emit()
+	await _proc_if_full(owner)
 
-## Check if bleed should proc and calculate proc damage
-func should_proc_bleed() -> bool:
-	return should_proc()
+## Applied with a bar already (a weapon's bleed): it may be full at once.
+func on_applied(owner: Node) -> void:
+	_proc_if_full(owner)
 
-## Calculate the devastating bleed proc damage
-func get_proc_damage(max_hp: int) -> int:
-	return int(max_hp * bleed_proc_damage_percent)
+## Re-applying adds the new application's bar.
+func merge(incoming: State, owner: Node) -> void:
+	super(incoming, owner)
+	if incoming.accumulation_value > 0:
+		add_accumulation(incoming.accumulation_value)
+		_proc_if_full(owner)
 
-## Process the bleed proc - reset accumulation and return damage
-func trigger_bleed_proc(max_hp: int) -> int:
-	var proc_damage = get_proc_damage(max_hp)
+## A full bar procs and empties (the proc's own damage builds no bar).
+func _proc_if_full(owner: Node) -> void:
+	if _procing or not should_proc() or owner.is_defeated():
+		return
+	_procing = true
 	reset_accumulation()
-	return proc_damage
+	owner.states_changed.emit()
+	await owner.take_damage(int(owner.max_health * bleed_proc_damage_percent), null)
+	_procing = false

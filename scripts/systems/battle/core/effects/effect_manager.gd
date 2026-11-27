@@ -10,7 +10,6 @@ signal all_effects_finished
 var screen_flash: ScreenFlash
 var time_slow: TimeSlow
 var impact_frame: ImpactFrame
-var camera_shake_tween: Tween
 
 var active_effects: Array[String] = []
 var effect_queue: Array[Dictionary] = []
@@ -49,46 +48,12 @@ func setup_screen_flash(flash: ScreenFlash) -> void:
 		screen_flash.flash_started.connect(_on_effect_started.bind("screen_flash"))
 		screen_flash.flash_finished.connect(_on_effect_finished.bind("screen_flash"))
 
-# Apply camera shake to the battle camera
+# Apply camera shake to the battle camera (the camera controller layers it on
+# top of the current shot, so it never fights shot changes)
 func apply_camera_shake(duration: float, intensity: float) -> void:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	if not battle_manager or not battle_manager.battle_camera:
-		return
-
-	var camera = battle_manager.battle_camera.get_camera()
-	if not camera:
-		return
-
-	# Cancel existing shake
-	if camera_shake_tween and camera_shake_tween.is_valid():
-		camera_shake_tween.kill()
-
-	var original_position = camera.global_position
-	camera_shake_tween = camera.create_tween()
-	camera_shake_tween.set_parallel(true)
-
-	var shake_timer = 0.0
-	var update_func = func(delta):
-		shake_timer += delta
-		if shake_timer >= duration:
-			camera.global_position = original_position
-			return
-
-		var decay = 1.0 - (shake_timer / duration)
-		var current_intensity = intensity * decay
-
-		var shake_offset = Vector3(
-			randf_range(-current_intensity, current_intensity),
-			randf_range(-current_intensity, current_intensity),
-			randf_range(-current_intensity, current_intensity)
-		)
-
-		camera.global_position = original_position + shake_offset
-
-	camera_shake_tween.tween_method(update_func, 0.0, duration, duration)
-	camera_shake_tween.tween_callback(func():
-		camera.global_position = original_position
-	)
+	if battle_manager and battle_manager.battle_camera:
+		battle_manager.battle_camera.shake(duration, intensity)
 
 # Combined effect presets for common combat events
 
@@ -228,8 +193,9 @@ func stop_all_effects() -> void:
 	screen_flash.stop_flash()
 	time_slow.stop_slow()
 	impact_frame.stop_freeze()
-	if camera_shake_tween and camera_shake_tween.is_valid():
-		camera_shake_tween.kill()
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	if battle_manager and battle_manager.battle_camera:
+		battle_manager.battle_camera.shake_stop()
 	active_effects.clear()
 	effect_queue.clear()
 	is_processing_queue = false

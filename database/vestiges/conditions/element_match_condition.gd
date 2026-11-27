@@ -1,26 +1,23 @@
-@tool
 class_name ElementMatchCondition
 extends VestigeCondition
-## Condition that triggers only with specific elements
+## Passes when the event's element matches. The element is the context's
+## "element" (e.g. the element of damage taken), else the played card's.
 
-@export var required_element: GlobalBattleSettings.Elements = GlobalBattleSettings.Elements.NONE
-@export var check_card_element: bool = true  # If true, check card element; if false, check attacker element
+## Element name as damage reports it ("fire", "ice", ...); empty/"none" = any.
+@export var required_element: String = ""
 
 
-func should_trigger(vestige: Vestige, battler: Battler, context: Dictionary) -> bool:
-	if required_element == GlobalBattleSettings.Elements.NONE:
-		return true  # No element restriction
-	
-	var element_to_check: int = GlobalBattleSettings.Elements.NONE
-	
-	# Check context for element information
-	if check_card_element and context.has("card"):
-		var card = context["card"]
-		if card and card.has_property("element"):
-			element_to_check = card.element
-	elif context.has("element"):
-		element_to_check = context["element"]
-	elif battler and battler.stats and battler.stats.has_property("element"):
-		element_to_check = battler.stats.element
-	
-	return element_to_check == required_element
+func should_trigger(_vestige: Vestige, _battler: Battler, context: Dictionary) -> bool:
+	var required := required_element.to_lower()
+	if required.is_empty() or required == "none":
+		return true
+	return _event_element(context) == required
+
+
+static func _event_element(context: Dictionary) -> String:
+	if context.has("element"):
+		return str(context["element"]).to_lower()
+	var card = context.get("card")
+	if card and "element" in card:
+		return str(card.element).to_lower()
+	return "none"

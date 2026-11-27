@@ -2,9 +2,9 @@ class_name OrbDefinition
 extends Resource
 ## One orb inside an ORB weapon's cycle. The Attuned orb (the one the circuit
 ## is currently pointing at) detonates on each landed hit — applying its
-## state/damage — then the circuit advances. Every detonation after the first
-## is empowered by Overcharge: the detonating orb's own
-## [member overcharge_multiplier] applies once.
+## state/damage — then the circuit advances. A detonation that procs
+## empowers the next one with Overcharge (the next orb's own
+## [member overcharge_multiplier]); a failed proc breaks the chain.
 
 @export var orb_name: String = "Orb"
 @export var color: Color = Color.WHITE
@@ -14,13 +14,15 @@ extends Resource
 @export var state: State = null
 ## Stacks applied to state.stack_count on detonation (0 = leave as authored).
 @export var stack_count: int = 0
+## Bonus damage dealt exactly (rounded, min 1); not fed through the
+## attack/defense formula.
 @export var damage: int = 0
 @export var damage_is_attack_percent: bool = false  ## damage = owner.attack * damage / 100
 @export var chance: float = 1.0
 @export var element: String = "none"
-## Overcharge potency: applied once to THIS orb's detonation when it is the
-## "next" orb after a previous detonation (every detonation after the first
-## in a battle). 1.0 = no overcharge.
+## Overcharge potency: scales THIS orb's detonation damage and state stacks
+## when the previous detonation procced (never its [member chance]).
+## 1.0 = no overcharge.
 @export var overcharge_multiplier: float = 1.5
 
 @export_group("Attuned Passive")

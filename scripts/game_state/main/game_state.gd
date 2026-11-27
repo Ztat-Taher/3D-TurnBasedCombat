@@ -421,27 +421,53 @@ static func has_global_vestige(vestige_id: String) -> bool:
 	return false
 
 
-## Add a global vestige (affects entire party)
-static func add_global_vestige(vestige: Vestige, stacks: int = 1) -> void:
-	if vestige == null:
-		return
-	
+## Gives the party [param stacks] more of a party-wide [param vestige], up to
+## its [member Vestige.max_stacks]. Returns false (and changes nothing) for a
+## per-character vestige or when no more stacks fit.
+static func add_global_vestige(vestige: Vestige, stacks: int = 1) -> bool:
+	if vestige == null or vestige.scope != Vestige.Scope.GLOBAL \
+			or not vestige.can_gain_stack(get_global_vestige_stack_count(vestige.vestige_id)):
+		return false
 	var game_state := get_or_create_state()
-	
-	# Check if already owned
-	for existing in game_state.global_vestiges:
-		if existing and existing.vestige_id == vestige.vestige_id:
-			# Update stack count if stacking is allowed
-			if vestige.can_stack_with(get_global_vestige_stack_count(vestige.vestige_id)):
-				game_state.global_vestige_stacks[vestige.vestige_id] = \
-					mini(get_global_vestige_stack_count(vestige.vestige_id) + stacks, vestige.max_stacks)
-				GlobalState.save()
-			return
-	
-	# Add new vestige
-	game_state.global_vestiges.append(vestige)
-	game_state.global_vestige_stacks[vestige.vestige_id] = stacks
+	var current := get_global_vestige_stack_count(vestige.vestige_id)
+	if current == 0:
+		game_state.global_vestiges.append(vestige)
+	var total := current + stacks
+	game_state.global_vestige_stacks[vestige.vestige_id] = total if vestige.max_stacks <= 0 else mini(total, vestige.max_stacks)
 	GlobalState.save()
+	return true
+
+
+## True if the run can still gain [param vestige]: a party-wide one while the
+## party can stack it; a per-character one while [param member] (or, if null,
+## any ally) can.
+static func can_gain_vestige(vestige: Vestige, member: AllyPartyMember = null) -> bool:
+	if vestige == null:
+		return false
+	if vestige.scope == Vestige.Scope.GLOBAL:
+		return vestige.can_gain_stack(get_global_vestige_stack_count(vestige.vestige_id))
+	if member:
+		return member.can_gain_vestige(vestige)
+	return get_party().any(func(m): return m.can_gain_vestige(vestige))
+
+
+## Awards [param vestige] where its scope says: party-wide ones to the party,
+## per-character ones to [param member] (or the first ally that can take it).
+## The single entry point for rewards; returns false if nothing was gained.
+static func grant_vestige(vestige: Vestige, member: AllyPartyMember = null) -> bool:
+	if vestige == null:
+		return false
+	if vestige.scope == Vestige.Scope.GLOBAL:
+		return add_global_vestige(vestige)
+	if member == null:
+		for candidate in get_party():
+			if candidate.can_gain_vestige(vestige):
+				member = candidate
+				break
+	if member == null or not member.add_vestige(vestige):
+		return false
+	GlobalState.save()
+	return true
 
 
 ## Remove a global vestige

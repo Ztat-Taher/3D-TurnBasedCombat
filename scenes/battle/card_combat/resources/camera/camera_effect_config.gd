@@ -12,6 +12,7 @@ enum TrackingMode {
 	CUSTOM              # Custom tracking
 }
 
+## Same order as BattleCamera.ShakeStyle
 enum ShakeStyle {
 	RANDOM,             # Random shake direction
 	DIRECTIONAL,        # Directional shake
@@ -43,153 +44,54 @@ enum ShakeStyle {
 @export var camera_fov: float = -1.0                  ## FOV override (-1 = no change)
 @export var fov_duration: float = 0.5                 ## FOV change duration
 
-## Apply camera effects to the current camera
-func apply_camera_effects(camera: Camera3D, actor: Node, target: Node, projectile: Node = null):
-	if not camera:
-		push_warning("CameraEffectConfig: No camera provided")
+## Plays these effects on the battle camera rig ([BattleCamera], which
+## card_battle_manager and AnimationEvent pass in as the context "camera").
+## Everything is a layer on top of the current shot, so effects return to
+## exactly where the camera was and can't fight shot changes.
+##   shake    - shake_decay is the fade-out exponent (1 = linear)
+##   zoom     - zoom_amount multiplies the zoom (>1 in), held for nothing,
+##              returned after zoom_duration if zoom_return
+##   tracking - aims at the actor / target / both (midpoint) / projectile for
+##              tracking_duration; tracking_speed smooths the aim (0 = exact)
+##   tilt     - camera_tilt is a local rotation offset in degrees
+##   fov      - blends to camera_fov and back
+func apply_camera_effects(rig: Node, actor: Node, target: Node, projectile: Node = null):
+	if not rig is BattleCamera:
+		push_warning("CameraEffectConfig: expected the BattleCamera rig, got %s" % rig)
 		return
+	var cam := rig as BattleCamera
 
 	if camera_shake_enabled:
-		_apply_shake(camera)
+		cam.shake(shake_duration, shake_intensity, shake_style as BattleCamera.ShakeStyle,
+				shake_frequency, shake_decay)
 
 	if camera_zoom_enabled:
-		_apply_zoom(camera)
+		cam.zoom(zoom_amount, zoom_duration, 0.0, zoom_return, zoom_delay)
 
 	if tracking_mode != TrackingMode.NONE:
-		_apply_tracking(camera, actor, target, projectile)
+		var nodes := _get_tracking_nodes(actor, target, projectile)
+		if not nodes.is_empty():
+			cam.track(nodes, tracking_duration, tracking_offset, tracking_speed)
 
 	if camera_tilt != Vector3.ZERO:
-		_apply_tilt(camera)
+		cam.tilt(camera_tilt, tilt_duration, 0.0, tilt_return)
 
 	if camera_fov >= 0:
-		_apply_fov(camera)
+		cam.set_fov_override(camera_fov, fov_duration)
 
-## Apply camera shake
-func _apply_shake(camera: Camera3D):
-	var original_position = camera.global_position
-	var shake_tween = camera.create_tween()
-	shake_tween.set_parallel(true)
-
-	# Create a custom shake tween that updates position each frame
-	var shake_timer = 0.0
-	var update_func = func(delta):
-		shake_timer += delta
-		if shake_timer >= shake_duration:
-			camera.global_position = original_position
-			return
-
-		var decay = 1.0 - (shake_timer / shake_duration) * shake_decay
-		var current_intensity = shake_intensity * decay
-
-		var shake_offset = Vector3.ZERO
-		match shake_style:
-			ShakeStyle.RANDOM:
-				shake_offset = Vector3(
-					randf_range(-current_intensity, current_intensity),
-					randf_range(-current_intensity, current_intensity),
-					randf_range(-current_intensity, current_intensity)
-				)
-			ShakeStyle.DIRECTIONAL:
-				shake_offset = Vector3(current_intensity, 0, 0)
-			ShakeStyle.ROTATIONAL:
-				var angle = shake_timer * shake_frequency
-				shake_offset = Vector3(
-					cos(angle) * current_intensity,
-					sin(angle) * current_intensity,
-					0
-				)
-
-		camera.global_position = original_position + shake_offset
-
-	# Use tween_method for smooth updates
-	shake_tween.tween_method(update_func, 0.0, shake_duration, shake_duration)
-	shake_tween.tween_callback(func():
-		camera.global_position = original_position
-	)
-
-## Apply camera zoom
-func _apply_zoom(camera: Camera3D):
-	if not camera is Camera3D:
-		return
-	
-	var original_fov = camera.fov
-	var target_fov = original_fov / zoom_amount
-	
-	var zoom_tween = camera.create_tween()
-	
-	if zoom_delay > 0:
-		zoom_tween.tween_interval(zoom_delay)
-	
-	zoom_tween.tween_property(camera, "fov", target_fov, zoom_duration)
-	
-	if zoom_return:
-		zoom_tween.tween_property(camera, "fov", original_fov, zoom_duration)
-
-## Apply camera tracking
-func _apply_tracking(camera: Node3D, actor: Node, target: Node, projectile: Node):
-	var track_target = _get_tracking_target(actor, target, projectile)
-	if not track_target:
-		return
-
-	var original_position = camera.global_position
-	var tracking_tween = camera.create_tween()
-
-	# Use tween to smoothly track the target
-	var update_func = func(progress):
-		var target_position = track_target.global_position + tracking_offset
-		var direction = (target_position - original_position).normalized()
-		var distance = original_position.distance_to(target_position)
-
-		if distance > 0.1:
-			var move_amount = min(distance * progress, tracking_speed * 0.016)
-			camera.global_position = original_position + direction * move_amount
-
-	tracking_tween.tween_method(update_func, 0.0, 1.0, tracking_duration)
-
-	# Return to original position if configured
-	if tracking_mode == TrackingMode.NONE:
-		tracking_tween.tween_property(camera, "global_position", original_position, 0.5)
-
-## Get target to track based on tracking mode
-func _get_tracking_target(actor: Node, target: Node, projectile: Node) -> Node:
+## Nodes to aim at for the tracking mode (BOTH = their midpoint)
+func _get_tracking_nodes(actor: Node, target: Node, projectile: Node) -> Array:
+	var nodes: Array = []
 	match tracking_mode:
 		TrackingMode.ACTOR:
-			return actor
-		TrackingMode.TARGET:
-			return target
+			nodes = [actor]
+		TrackingMode.TARGET, TrackingMode.CUSTOM:
+			nodes = [target]
 		TrackingMode.BOTH:
-			# Return midpoint between actor and target
-			if actor and target:
-				return null # Would need a temporary midpoint node
-			return actor if actor else target
+			nodes = [actor, target]
 		TrackingMode.PROJECTILE:
-			return projectile
-		TrackingMode.CUSTOM:
-			# Would need custom implementation
-			return target
-		_:
-			return null
-
-## Apply camera tilt
-func _apply_tilt(camera: Node3D):
-	var original_rotation = camera.rotation_degrees
-	
-	var tilt_tween = camera.create_tween()
-	tilt_tween.tween_property(camera, "rotation_degrees", camera_tilt, tilt_duration)
-	
-	if tilt_return:
-		tilt_tween.tween_property(camera, "rotation_degrees", original_rotation, tilt_duration)
-
-## Apply FOV change
-func _apply_fov(camera: Camera3D):
-	if not camera is Camera3D:
-		return
-	
-	var original_fov = camera.fov
-	
-	var fov_tween = camera.create_tween()
-	fov_tween.tween_property(camera, "fov", camera_fov, fov_duration)
-	fov_tween.tween_property(camera, "fov", original_fov, fov_duration)
+			nodes = [projectile]
+	return nodes.filter(func(n): return is_instance_valid(n))
 
 ## Create preset camera effects
 static func create_impact_shake() -> CameraEffectConfig:

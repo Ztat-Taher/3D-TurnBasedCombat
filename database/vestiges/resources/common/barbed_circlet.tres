@@ -3,11 +3,17 @@
 [ext_resource type="Texture2D" uid="uid://dmajic12pawle" path="res://assets/images/ui/vestiges/barbed_circlet.png" id="1_2eidf"]
 [ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
 [ext_resource type="Script" uid="uid://b0tyiimb82sae" path="res://database/vestiges/trigger_hook.gd" id="3_hook"]
+[ext_resource type="Script" uid="uid://iifwfosyr5oi" path="res://database/vestiges/effects/deal_damage_on_trigger.gd" id="4_effect"]
+
+[sub_resource type="Resource" id="Effect_1"]
+script = ExtResource("4_effect")
+damage_amount = 3
+target_type = "random_enemy"
 
 [sub_resource type="Resource" id="TriggerHook_burn"]
 script = ExtResource("3_hook")
 trigger_type = 6
-effect_script_path = "res://database/vestiges/effects/deal_damage_on_trigger.gd"
+effect = SubResource("Effect_1")
 
 [resource]
 script = ExtResource("1_vest")
@@ -15,4 +21,4 @@ vestige_id = "barbed_circlet"
 vestige_name = "Barbed Circlet"
 description = "Deal 3 damage to a random enemy when you take damage."
 icon = ExtResource("1_2eidf")
-trigger_hooks = Array[Resource]([SubResource("TriggerHook_burn")])
+trigger_hooks = Array[ExtResource("3_hook")]([SubResource("TriggerHook_burn")])

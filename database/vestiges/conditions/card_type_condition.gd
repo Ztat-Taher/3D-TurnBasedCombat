@@ -1,37 +1,20 @@
-@tool
 class_name CardTypeCondition
 extends VestigeCondition
-## Condition that triggers only for specific card types
+## Passes when the played card ("card" in the context) has the required tags.
 
-@export var required_tags: Array[String] = []  # Card tags to match
-@export var require_all_tags: bool = false  # If true, all tags must match; if false, any tag can match
+## Card tags to look for; empty = any card.
+@export var required_tags: Array[String] = []
+## All tags must be present (otherwise any one is enough).
+@export var require_all_tags: bool = false
 
 
-func should_trigger(vestige: Vestige, battler: Battler, context: Dictionary) -> bool:
+func should_trigger(_vestige: Vestige, _battler: Battler, context: Dictionary) -> bool:
 	if required_tags.is_empty():
-		return true  # No tag restriction
-	
-	if not context.has("card"):
-		return false
-	
-	var card = context["card"]
-	if card == null:
-		return false
-	
-	if not card.has_property("card_tags"):
-		return false
-	
-	var card_tags: Array[String] = card.card_tags
-	
-	if require_all_tags:
-		# All required tags must be present
-		for tag in required_tags:
-			if not tag in card_tags:
-				return false
 		return true
-	else:
-		# Any required tag can match
-		for tag in required_tags:
-			if tag in card_tags:
-				return true
+	var card = context.get("card")
+	if card == null or not "card_tags" in card:
 		return false
+	var card_tags: Array = card.card_tags
+	if require_all_tags:
+		return required_tags.all(func(tag): return tag in card_tags)
+	return required_tags.any(func(tag): return tag in card_tags)

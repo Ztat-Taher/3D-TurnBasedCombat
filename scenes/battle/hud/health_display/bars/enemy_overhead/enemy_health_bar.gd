@@ -33,9 +33,9 @@ func setup(battler: Battler) -> void:
 	if not battler.health_changed.is_connected(_on_health_changed):
 		battler.health_changed.connect(_on_health_changed)
 	
-	# Connect to shield changes
-	if battler.has_signal("shield_changed") and not battler.shield_changed.is_connected(_on_shield_changed):
-		battler.shield_changed.connect(_on_shield_changed)
+	# Redraw the shield row when its states change
+	if not battler.states_changed.is_connected(update_shields):
+		battler.states_changed.connect(update_shields)
 	
 	# Setup status icons container with the reusable component
 	if status_icons_container and status_icon_template:
@@ -101,17 +101,9 @@ func update_shields() -> void:
 		if child != shield_template:
 			child.queue_free()
 	
-	# Check for Protected state
-	if enemy_battler.active_states.has("Protected"):
-		var protected_state = enemy_battler.active_states["Protected"] as ProtectedState
-		if protected_state and protected_state.has_shield():
-			var shield_count = protected_state.get_remaining_shields()
-			# Add shield icons for each remaining shield
-			for i in range(shield_count):
-				var shield = shield_template.duplicate()
-				shield.visible = true
-				shield_container.add_child(shield)
+	# One icon per hit its states will block
+	for i in range(enemy_battler.get_shield_hits()):
+		var shield = shield_template.duplicate()
+		shield.visible = true
+		shield_container.add_child(shield)
 	_relayout_shield_row()
-
-func _on_shield_changed(shield_count: int) -> void:
-	update_shields()

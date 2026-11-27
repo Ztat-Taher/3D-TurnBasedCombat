@@ -144,14 +144,5 @@ static func _attach_weapon(model : Node3D, socket_path : NodePath, weapon : Weap
 	var socket := model.get_node_or_null(socket_path)
 	if socket == null:
 		return
-	var existing := socket.get_node_or_null("Weapon")
-	if existing:
-		socket.remove_child(existing)
-		existing.free()
-	var instance := weapon.model_scene.instantiate()
-	instance.name = "Weapon"
-	socket.add_child(instance)
-	var marker := socket.get_node_or_null("WeaponSocket") as Node3D
-	if marker and instance is Node3D:
-		(instance as Node3D).transform = marker.transform
+	WeaponSystem.attach_model_to_socket(socket, weapon.model_scene)
 

@@ -14,11 +14,6 @@ var qte_result: bool = false
 
 var qte_overlay_scene: PackedScene = preload("res://scenes/battle/hud/qte_system/overlay/qte_overlay.tscn")
 
-# Public property to access the last QTE result
-var last_qte_result: bool = false:
-	get:
-		return qte_result
-
 # QTE types
 enum QTEType {
 	NONE,
@@ -41,18 +36,27 @@ func load_qte_config() -> QTEConfig:
 # CARD ATTACK QTE
 # ============================================================================
 
-func start_card_qte(card: CardConfig) -> bool:
-	if not qte_config or not qte_config.card_qte_enabled:
+## Whether card QTEs are on at all ([member QTEConfig.card_qte_enabled]).
+func is_enabled() -> bool:
+	return qte_config == null or qte_config.card_qte_enabled
+
+
+## Whether playing [param card] runs a QTE: card QTEs are enabled and the
+## card's qte_type isn't NONE. (Multi-strike cards set a QTE per strike
+## instead, through strike_qte_windows.)
+func wants_card_qte(card: CardConfig) -> bool:
+	return card != null and is_enabled() and card.should_trigger_qte()
+
+
+## Starts [param card]'s QTE (when [method wants_card_qte]), lasting
+## [param window] seconds (the card's qte_window_duration when 0). Returns
+## whether one started.
+func start_card_qte(card: CardConfig, window: float = 0.0) -> bool:
+	if not wants_card_qte(card):
 		return false
-	
-	# Check CardConfig for QTE settings
-	if not card.should_trigger_qte():
-		return false
-	var card_cfg_diff = card.qte_difficulty
-	return start_qte(QTEType.CARD_ATTACK, card_cfg_diff)
-	
-	var metadata_diff = card.metadata.get("qte_difficulty", qte_config.default_card_qte_difficulty)
-	return start_qte(QTEType.CARD_ATTACK, metadata_diff)
+	if card.qte_type in [CardConfig.QTEType.BUTTON_MASH, CardConfig.QTEType.SEQUENCE]:
+		push_warning("%s: %s QTEs aren't implemented yet, playing a timing QTE" % [card.card_name, CardConfig.QTEType.keys()[card.qte_type]])
+	return start_qte(QTEType.CARD_ATTACK, card.qte_difficulty, window if window > 0.0 else card.qte_window_duration)
 
 # ============================================================================
 # GENERIC QTE ENGINE
@@ -60,10 +64,14 @@ func start_card_qte(card: CardConfig) -> bool:
 
 var qte_ui_panel: Control = null
 
+## Starts a QTE. A QTE still running (one whose hit never came to resolve it)
+## is dropped first, and the previous result is cleared: an outcome only ever
+## belongs to the QTE that produced it. [param difficulty] sets the duration
+## only when no [param custom_time_limit] is given.
 func start_qte(qte_type: QTEType, difficulty: float, custom_time_limit: float = 0.0) -> bool:
 	if is_qte_active:
-		return false
-	
+		cancel_qte()
+	qte_result = false
 	is_qte_active = true
 	current_qte_type = QTEType.keys()[qte_type]
 	
@@ -169,10 +177,30 @@ func get_damage_multiplier(qte_type: String, success: bool) -> float:
 		_:
 			return 1.0
 
+## Multiplier a QTE result gives [param card]: the card's own success /
+## failure multiplier when it sets one (above 0), else the QTE config's.
+func get_card_multiplier(card: CardConfig, success: bool) -> float:
+	var own := 0.0
+	if card:
+		own = card.qte_success_multiplier if success else card.qte_failure_multiplier
+	return own if own > 0.0 else get_damage_multiplier("CARD_ATTACK", success)
+
 func cancel_qte() -> void:
 	if is_qte_active:
 		_remove_qte_ui()
 		is_qte_active = false
+		qte_result = false
+
+
+## Ends the current QTE and returns whether it succeeded. Call it when the
+## outcome is needed (the hit): a QTE still running had no press in time, so
+## it fails. The result is consumed, so it can't carry over to a later hit.
+func resolve_qte() -> bool:
+	if is_qte_active:
+		cancel_qte()
+	var success := qte_result
+	qte_result = false
+	return success
 
 func is_active() -> bool:
 	return is_qte_active

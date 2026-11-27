@@ -5,7 +5,8 @@ extends WeaponModule
 ## detonates it, and drives the weapon visual's orb rig.
 
 ## Orb roster. The Attuned orb (cycle index) detonates on each landed hit,
-## then the circuit advances and the next orb is empowered by Overcharge.
+## then the circuit advances. A detonation that procs empowers the next orb
+## with Overcharge; a failed proc breaks the chain.
 @export var orbs: Array[OrbDefinition] = []
 
 

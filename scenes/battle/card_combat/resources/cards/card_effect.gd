@@ -3,116 +3,109 @@ extends Resource
 ## Encapsulates individual card effects for modular configuration
 ## Each effect can be independently configured and combined
 
+## (Values are explicit so saved effects keep their type.)
 enum EffectType {
-	DAMAGE,             # Deal damage to target(s)
-	HEAL,               # Heal target(s)
-	SHIELD,             # Apply shield/defense to target(s)
-	BUFF,               # Apply buff to target(s)
-	DEBUFF,             # Apply debuff to target(s)
-	SUMMON,             # Summon a unit
-	KNOCKBACK,          # Knock target back
-	STUN,               # Stun target(s)
-	DRAIN,              # Drain health from target
-	LETHAL,             # Instant kill if target below threshold
-	CUSTOM              # Custom effect (requires script implementation)
+	DAMAGE = 0,         # Deal damage to the target
+	HEAL = 1,           # Heal the target
+	SHIELD = 2,         # Grant the target `value` Protected hits (each blocks one whole hit)
+	STUN = 7,           # The target skips its next `value` turns
+	DRAIN = 8,          # Damage the target; the caster heals the HP it lost
+	LETHAL = 9,         # Defeat the target outright if its HP is at or below `value` (a percent of max HP with is_percentage)
+	CURE = 10,          # Remove `value` of the target's harmful states (0 = all) that can be cured
+	DISPEL = 11,        # Remove `value` of the target's helpful states (0 = all) that can be cured
 }
 
+## Who the effect lands on. Who a card hits is its target_type: an effect lands
+## on that target, or on the caster with ACTOR. The other values are kept for
+## saved effects and act as TARGET.
 enum EffectTargeting {
 	ACTOR,              # Effect applied to actor
-	TARGET,              # Effect applied to primary target
-	ALL_ENEMIES,        # Effect applied to all enemies
-	ALL_ALLIES,         # Effect applied to all allies
-	ALL_UNITS,          # Effect applied to all units
-	RANDOM_ENEMY,       # Effect applied to random enemy
-	RANDOM_ALLY,        # Effect applied to random ally
-	CUSTOM_SELECTION    # Custom targeting logic
+	TARGET,             # Effect applied to primary target
+	ALL_ENEMIES,        # (as TARGET)
+	ALL_ALLIES,         # (as TARGET)
+	ALL_UNITS,          # (as TARGET)
+	RANDOM_ENEMY,       # (as TARGET)
+	RANDOM_ALLY,        # (as TARGET)
+	CUSTOM_SELECTION    # (as TARGET)
 }
 
-@export var effect_type: EffectType = EffectType.DAMAGE
-@export var value: int = 0                          ## Base effect value
-@export var targeting: EffectTargeting = EffectTargeting.TARGET
-@export var scaling: Dictionary = {}                ## Stat scaling configuration
-@export var conditions: Array[Resource] = [] ## Conditions for effect execution
-@export var is_percentage: bool = false             ## If true, value is percentage (0-100)
-@export var delay: float = 0.0                      ## Delay before effect triggers (seconds)
-@export var duration: float = 0.0                   ## Effect duration for temporary effects (seconds)
-@export var stack_count: int = 1                    ## Number of stacks for stacking effects
-@export var can_crit: bool = true                   ## Whether effect can critical hit
-@export var crit_multiplier: float = 2.0            ## Critical hit multiplier
+const STUNNED_STATE := preload("res://database/states/resources/stunned_state.tres")
+const PROTECTED_STATE := preload("res://database/states/resources/protected_state.tres")
 
-@export var damage_type: String = "physical"        # physical, magical, true_damage
+@export var effect_type: EffectType = EffectType.DAMAGE
+@export var value: int = 0                          ## Base effect value (damage, heal, shield hits, stun turns, lethal threshold, states cured / dispelled: 0 = all)
+@export var targeting: EffectTargeting = EffectTargeting.TARGET
+@export var scaling: Dictionary = {}                ## Stat scaling: stat name -> factor added to value (e.g. {"magic": 0.5})
+@export var conditions: Array[Resource] = [] ## Conditions for effect execution
+@export var is_percentage: bool = false             ## LETHAL: value is a percent of the target's max HP
+@export var can_crit: bool = true                   ## Whether this effect's damage can crit (chance: the caster's crit_chance stat)
+@export var crit_multiplier: float = 2.0            ## Damage multiplier of a crit
+
+@export var damage_type: String = "physical"        # physical, magical (uses the magic stat), true_damage
 @export var element: String = "none"                # fire, ice, lightning, earth, air, magic, none
 @export var consume_hand_cards: bool = false        ## If true, damage/value scales with cards consumed from hand
 
-## Apply this effect to the given context
-func apply_effect(actor: Node, target: Node, all_enemies: Array, all_allies: Array) -> Dictionary:
-	var result = {
-		"success": false,
-		"targets_hit": [],
-		"total_value": 0,
-		"crit": false,
-		"effects_applied": []
-	}
-	
-	# Check conditions
-	if not _check_conditions(actor, target):
-		return result
-	
-	# Get targets based on targeting mode
-	var targets = _get_targets(actor, target, all_enemies, all_allies)
-	if targets.is_empty():
-		return result
-	
-	# Calculate value with scaling
-	var calculated_value = _calculate_value(actor)
-	
-	# Check for critical hit
-	var is_critical = can_crit and _roll_critical()
-	if is_critical:
-		calculated_value = int(calculated_value * crit_multiplier)
-	
-	# Apply effect to each target
-	for single_target in targets:
-		var target_result = _apply_to_target(single_target, calculated_value, is_critical, actor)
-		result["targets_hit"].append(single_target)
-		result["total_value"] += target_result.get("value", 0)
-		result["effects_applied"].append(target_result)
-	
-	result["success"] = true
-	result["crit"] = is_critical
-	
-	return result
+## The battler this effect lands on: the caster for ACTOR, else the cast's
+## [param target].
+func get_recipient(actor: Node, target: Node) -> Node:
+	return actor if targeting == EffectTargeting.ACTOR else target
 
-## Get targets based on targeting configuration
-func _get_targets(actor: Node, primary_target: Node, all_enemies: Array, all_allies: Array) -> Array:
-	match targeting:
-		EffectTargeting.ACTOR:
-			return [actor] if actor else []
-		EffectTargeting.TARGET:
-			return [primary_target] if primary_target else []
-		EffectTargeting.ALL_ENEMIES:
-			return all_enemies
-		EffectTargeting.ALL_ALLIES:
-			return all_allies
-		EffectTargeting.ALL_UNITS:
-			return all_enemies + all_allies
-		EffectTargeting.RANDOM_ENEMY:
-			return [all_enemies.pick_random()] if not all_enemies.is_empty() else []
-		EffectTargeting.RANDOM_ALLY:
-			return [all_allies.pick_random()] if not all_allies.is_empty() else []
-		EffectTargeting.CUSTOM_SELECTION:
-			# Would need custom logic implementation
-			return [primary_target] if primary_target else []
-		_:
-			return []
+## Damage multiplier of one hit by [param actor]: [member crit_multiplier] when
+## it crits (a roll against the actor's crit_chance percent), else 1.
+func roll_crit_multiplier(actor: Node) -> float:
+	if not can_crit or actor == null or not "crit_chance" in actor:
+		return 1.0
+	return crit_multiplier if randf() * 100.0 < float(actor.crit_chance) else 1.0
+
+## Applies this effect from [param actor] to [param recipient] with
+## [param amount] (scaling and QTE already in). Damage and healing go through
+## [param battle_manager] (formula, hit chance, multipliers, battle events).
+## Awaitable: it returns once the effect has resolved.
+func apply_to(actor: Battler, recipient: Battler, amount: int, battle_manager) -> void:
+	if recipient == null or not is_instance_valid(recipient) or battle_manager == null:
+		return
+	match effect_type:
+		EffectType.DAMAGE:
+			await battle_manager.damage_calculation(actor, recipient, amount, null, damage_type, element, true, roll_crit_multiplier(actor))
+		EffectType.HEAL:
+			battle_manager.heal_calculation(actor, recipient, amount)
+		EffectType.SHIELD:
+			var shield: State = PROTECTED_STATE.make_instance()
+			shield.set_shield_hits(maxi(1, amount))
+			recipient.apply_state(shield, actor)
+		EffectType.STUN:
+			recipient.apply_state(STUNNED_STATE.make_instance(maxi(1, amount)), actor)
+		EffectType.DRAIN:
+			var health_before := recipient.current_health
+			await battle_manager.damage_calculation(actor, recipient, amount, null, damage_type, element, true, roll_crit_multiplier(actor))
+			var drained := health_before - recipient.current_health
+			if drained > 0 and actor and is_instance_valid(actor) and not actor.is_defeated():
+				battle_manager.heal_calculation(actor, actor, drained)
+		EffectType.LETHAL:
+			if recipient.is_defeated():
+				return
+			var threshold := amount
+			if is_percentage:
+				threshold = roundi(recipient.max_health * amount / 100.0)
+			if recipient.current_health <= threshold:
+				# The whole remaining HP as one attack (a Protected hit still blocks it)
+				await recipient.take_damage(recipient.current_health, actor, damage_type, element, true)
+				if battle_manager.hud:
+					battle_manager.hud.update_health_bars()
+		EffectType.CURE, EffectType.DISPEL:
+			# A count, not a strength: the authored value, unscaled (a QTE's 0.8
+			# would turn 1 into 0 = all). The state decides whether it's harmful
+			# and whether it can be removed
+			var harmful := effect_type == EffectType.CURE
+			recipient.remove_states_if(func(s: State): return s.can_be_cured and s.is_harmful() == harmful, maxi(value, 0))
 
 ## Calculate final value with scaling
 func _calculate_value(actor: Node, multiplier_from_hand: int = 1) -> int:
 	var final_value = value
-	
+
 	if scaling.is_empty():
 		return final_value * multiplier_from_hand
-	
+
 	# Apply stat scaling
 	for stat_name in scaling:
 		var scaling_value = scaling[stat_name]
@@ -123,98 +116,8 @@ func _calculate_value(actor: Node, multiplier_from_hand: int = 1) -> int:
 			# Try direct property access as fallback
 			var stat_value = actor.get(stat_name)
 			final_value += int(stat_value * scaling_value)
-	
+
 	return final_value * multiplier_from_hand
-
-## Apply effect to a single target
-func _apply_to_target(target: Node, calculated_value: int, is_critical: bool, actor: Node = null) -> Dictionary:
-	var result = {
-		"target": target,
-		"value": 0,
-		"effect_type": EffectType.keys()[effect_type]
-	}
-	
-	if not target:
-		return result
-	
-	match effect_type:
-		EffectType.DAMAGE:
-			result["value"] = _apply_damage(target, calculated_value, is_critical, actor)
-		EffectType.HEAL:
-			result["value"] = _apply_heal(target, calculated_value)
-		EffectType.SHIELD:
-			result["value"] = _apply_shield(target, calculated_value)
-		EffectType.BUFF:
-			result["value"] = _apply_buff(target, calculated_value)
-		EffectType.DEBUFF:
-			result["value"] = _apply_debuff(target, calculated_value)
-		EffectType.STUN:
-			result["value"] = _apply_stun(target, calculated_value)
-		EffectType.DRAIN:
-			result["value"] = _apply_drain(target, calculated_value)
-		EffectType.KNOCKBACK:
-			result["value"] = _apply_knockback(target, calculated_value)
-		EffectType.LETHAL:
-			result["value"] = _apply_lethal(target, calculated_value)
-		_:
-			# Custom effects would need script implementation
-			pass
-	
-	return result
-
-func _apply_damage(target: Node, damage: int, _is_critical: bool, attacker: Node = null) -> int:
-	if target.has_method("take_damage"):
-		target.take_damage(damage, attacker, damage_type, element)
-		return damage
-	return 0
-
-func _apply_heal(target: Node, heal_amount: int) -> int:
-	if target.has_method("take_healing"):
-		target.take_healing(heal_amount)
-		return heal_amount
-	return 0
-
-func _apply_shield(target: Node, shield_amount: int) -> int:
-	if target.has_method("add_shield"):
-		target.add_shield(shield_amount)
-		return shield_amount
-	return 0
-
-func _apply_buff(_target: Node, buff_amount: int) -> int:
-	# Would need buff system integration
-	return buff_amount
-
-func _apply_debuff(_target: Node, debuff_amount: int) -> int:
-	# Would need debuff system integration
-	return debuff_amount
-
-func _apply_stun(target: Node, stun_duration: int) -> int:
-	if target.has_method("apply_stun"):
-		target.apply_stun(stun_duration)
-		return stun_duration
-	return 0
-
-func _apply_drain(target: Node, drain_amount: int) -> int:
-	if target.has_method("take_damage"):
-		var actual_drain = target.take_damage(drain_amount)
-		# Would need to heal actor by drain amount
-		return actual_drain
-	return 0
-
-func _apply_knockback(target: Node, knockback_force: int) -> int:
-	if target.has_method("apply_knockback"):
-		target.apply_knockback(knockback_force)
-		return knockback_force
-	return 0
-
-func _apply_lethal(target: Node, threshold: int) -> int:
-	if target.has_method("get_current_health") and target.has_method("is_defeated"):
-		var current_health = target.get_current_health()
-		if current_health <= threshold and not target.is_defeated():
-			if target.has_method("instant_kill"):
-				target.instant_kill()
-				return current_health
-	return 0
 
 ## Check if conditions are met
 func _check_conditions(actor: Node, target: Node) -> bool:
@@ -223,42 +126,25 @@ func _check_conditions(actor: Node, target: Node) -> bool:
 			return false
 	return true
 
-## Roll for critical hit
-func _roll_critical() -> bool:
-	# Would need crit chance from actor stats
-	# For now, assume 5% crit chance
-	return randf() < 0.05
-
 ## Get effect description for UI
 func get_description() -> String:
-	var description = ""
-	
 	match effect_type:
 		EffectType.DAMAGE:
 			if consume_hand_cards:
-				description = "Deal %d damage per card discarded" % value
-			else:
-				description = "Deal %d damage" % value
+				return "Deal %d damage per card discarded" % value
+			return "Deal %d damage" % value
 		EffectType.HEAL:
-			description = "Heal for %d HP" % value
+			return "Heal for %d HP" % value
 		EffectType.SHIELD:
-			description = "Grant %d shield" % value
-		EffectType.BUFF:
-			description = "Buff target"
-		EffectType.DEBUFF:
-			description = "Debuff target"
+			return "Block the next %d hit%s" % [value, "" if value == 1 else "s"]
 		EffectType.STUN:
-			description = "Stun target"
+			return "Stun for %d turn%s" % [value, "" if value == 1 else "s"]
 		EffectType.DRAIN:
-			description = "Drain %d HP" % value
-		EffectType.KNOCKBACK:
-			description = "Knockback target"
+			return "Drain %d HP" % value
 		EffectType.LETHAL:
-			description = "Instant kill if below %d HP" % value
-		_:
-			description = "Custom effect"
-	
-	if is_percentage:
-		description += " (%d%%)" % value
-	
-	return description
+			return "Defeat the target if below %d%s HP" % [value, "%" if is_percentage else ""]
+		EffectType.CURE:
+			return "Cure all harmful effects" if value <= 0 else "Cure %d harmful effect%s" % [value, "" if value == 1 else "s"]
+		EffectType.DISPEL:
+			return "Remove all buffs" if value <= 0 else "Remove %d buff%s" % [value, "" if value == 1 else "s"]
+	return ""

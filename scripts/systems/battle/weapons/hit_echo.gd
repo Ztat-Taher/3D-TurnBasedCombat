@@ -13,9 +13,9 @@ extends Node
 ##   matching session.
 ## - After [member HitEchoModule.echo_delay], spawns a translucent clone of the weapon
 ##   model that plays back the recorded transforms; when playback reaches the
-##   recorded hit offset it fires the replay — weapon procs via
-##   [method WeaponSystem.notify_attack_hit] (is_replay) plus each queued card
-##   resolution via [method CardBattleManager.replay_card_resolution].
+##   recorded hit offset it fires the replay — each queued card resolution
+##   via [method CardBattleManager.replay_card_resolution] (its damage procs
+##   the weapon like any attack), or the weapon procs alone for a non-card hit.
 ##
 ## Damage splitting is NOT handled here: [method WeaponSystem
 ## .get_damage_dealt_multiplier] already returns the module's
@@ -176,7 +176,7 @@ func _on_attack_end() -> void:
 ## resolutions like projectile impacts).
 func _schedule_session(target: Battler, hit_time: float = -1.0) -> void:
 	if _sessions.size() >= MAX_SESSIONS:
-		_sessions.pop_front()
+		_evict_session()
 	var now := Time.get_ticks_msec() / 1000.0
 	var ht := hit_time if hit_time > 0.0 else now
 	# Prefer the recorded slash (trail) window; fall back to attack signals.
@@ -195,6 +195,21 @@ func _schedule_session(target: Battler, hit_time: float = -1.0) -> void:
 	})
 	_current_session = _sessions[_sessions.size() - 1]
 	_arm_session_timer(_current_session, module.echo_delay if module else 0.35)
+
+
+## Makes room for a new session: drops the oldest fired one, or, when every
+## session is still waiting, replays the oldest right away (without its ghost)
+## so its hit is never lost.
+func _evict_session() -> void:
+	for i in _sessions.size():
+		if _sessions[i].get("fired", false):
+			_sessions.remove_at(i)
+			return
+	var oldest: Dictionary = _sessions.pop_front()
+	oldest["fired"] = true
+	if _current_session == oldest:
+		_current_session = {}
+	_fire_session_replay(oldest)
 
 
 func _arm_session_timer(session: Dictionary, delay: float) -> void:
@@ -254,12 +269,15 @@ func _fire_session(session: Dictionary) -> void:
 	owner_battler.add_child(ghost)
 	ghost.top_level = true
 	ghost.global_transform = frames[0].get("xf")
+	var duration := maxf(0.01, frames[frames.size() - 1]["t"] - float(session["swing_start"]))
 	var entry := {
 		"node": ghost,
 		"frames": frames,
 		"t0": float(session["swing_start"]),
-		"hit_offset": maxf(0.0, float(session["hit_time"]) - float(session["swing_start"])),
-		"duration": maxf(0.01, frames[frames.size() - 1]["t"] - float(session["swing_start"])),
+		# Clamped to the recorded swing: a hit timed after the recording ends
+		# still replays, at the end of the ghost's swing at the latest.
+		"hit_offset": clampf(float(session["hit_time"]) - float(session["swing_start"]), 0.0, duration),
+		"duration": duration,
 		"elapsed": 0.0,
 		"idx": 0,
 		"fired": false,
@@ -271,16 +289,16 @@ func _fire_session(session: Dictionary) -> void:
 	_playbacks.append(entry)
 
 
-## Replays the hit through the real pipelines: weapon procs first (mirroring
-## the original hit_moment ordering), then each queued card resolution.
+## Replays the hit through the real pipelines: each queued card resolution
+## (whose replayed damage procs the weapon like any attack), or, for a hit
+## with no card behind it (a counter), the weapon procs alone.
 func _fire_session_replay(session: Dictionary) -> void:
 	var target: Battler = session.get("target")
 	if target == null or not is_instance_valid(target):
 		return
-	# Weapon procs (orb detonation / WeaponEffects) — once per echoed hit.
-	weapon_system.notify_attack_hit(target, {}, true)
 	var queue: Array = session.get("replay_queue", [])
 	if queue.is_empty():
+		weapon_system.notify_attack_hit(target, {}, true)
 		return
 	# Merge projectile resolutions of the same card into a single replay
 	# carrying every target — the original was one projectile (possibly AOE

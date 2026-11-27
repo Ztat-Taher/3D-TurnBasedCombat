@@ -138,13 +138,15 @@ func execute_perfect_parry_counter(defender: Battler, attacker: Battler) -> void
 		return
 
 	attacker.is_counter_stunned = true
+	# The swing's hit frame (hit_moment) resolves against current_target
+	defender.current_target = attacker
 	defender._try_animation("melee_combo_1")
 	await defender.hit_moment
 
 	var multiplier := 1.5
 	var base_counter_dmg := int(defender.attack * multiplier)
 	var final_counter_dmg := Formulas.physical_damage(defender, attacker, max(1, base_counter_dmg))
-	await attacker.take_damage(final_counter_dmg, defender)
+	await attacker.take_damage(final_counter_dmg, defender, "physical", "none", true)
 
 	# Trigger camera shake for perfect parry counter
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")

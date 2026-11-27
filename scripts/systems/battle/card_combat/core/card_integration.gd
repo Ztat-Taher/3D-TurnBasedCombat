@@ -3,6 +3,9 @@ extends Node
 ## Integration script that ties the card combat system into the existing battle system
 ## This should be added to the BattleManager scene
 
+## Deck for a battler without one of its own.
+const DEFAULT_DECK_PATH := "res://database/decks/player_deck.tres"
+
 var card_battle_manager: CardBattleManager
 var card_ui: CardUI
 var battle_manager: BattleManager
@@ -26,48 +29,26 @@ func _ready():
 	if battle_manager and battle_manager.hud:
 		battle_manager.hud.card_selected.connect(_on_card_selected)
 		battle_manager.hud.end_turn_pressed.connect(_on_end_turn_pressed)
-	
-	# Connect to battle manager turn system
-	if battle_manager:
-		# We'll need to hook into the turn system
-		# For now, this is a placeholder for integration
-		pass
-
-func get_deck_cards(deck_resources: Array[CardConfig] = []) -> Array[CardConfig]:
-	if deck_resources.is_empty():
-		return []
-	
-	var deck_cards: Array[CardConfig] = []
-	for card in deck_resources:
-		if card:
-			deck_cards.append(card)
-	
-	return deck_cards
 
 func initialize_for_player(player_battler: Battler, deck_resources: Array[CardConfig] = []):
 	if not card_battle_manager or not player_battler:
 		return
 	
-	# If no deck resources provided, load from default player deck
+	# No cards given: the battler's own deck (a party ally's is their party
+	# member's, card rewards included), else the default player deck
 	if deck_resources.is_empty():
-		var deck_path = "res://database/decks/player_deck.tres"
-		if ResourceLoader.exists(deck_path):
-			var deck_resource = load(deck_path)
-			if deck_resource:
-				# Try to get cards from the deck resource
-				if deck_resource.get("cards") != null:
-					deck_resources = deck_resource.cards
-					var deck_name = deck_resource.get("deck_name")
-					if deck_name == null:
-						deck_name = "Unknown Deck"
-				else:
-					pass
-			else:
-				pass
+		var deck_resource: DeckResource = null
+		if player_battler.stats and player_battler.stats.deck:
+			deck_resource = player_battler.stats.deck
 		else:
-			pass
-	
-	var deck_cards = get_deck_cards(deck_resources)
+			deck_resource = load(DEFAULT_DECK_PATH) as DeckResource
+		if deck_resource:
+			deck_resources = deck_resource.cards
+
+	var deck_cards: Array[CardConfig] = []
+	for card in deck_resources:
+		if card:
+			deck_cards.append(card)
 	card_battle_manager.setup_card_combat(player_battler, deck_cards)
 
 func get_alive_enemies() -> Array[Battler]:
@@ -179,11 +160,10 @@ func start_targeting_mode(card: CardConfig, target_type: String = "enemy", provi
 	# Set camera based on target type
 	if battle_manager.battle_camera:
 		if target_type == "enemy":
-			battle_manager.battle_camera.set_enemy_overview(available_targets)
+			battle_manager.battle_camera.request_shot(&"targeting", BattleCamera.ShotPriority.TARGETING, BattleCamera.CameraMode.ENEMY_OVERVIEW, available_targets)
 		else:
-			# For ally targeting, we'll use target focus when a specific ally is selected
-			# Start with default camera until ally is selected
-			battle_manager.battle_camera.set_default_camera()
+			# Wide until a specific ally is highlighted (which focuses it)
+			battle_manager.battle_camera.request_shot(&"targeting", BattleCamera.ShotPriority.TARGETING, BattleCamera.CameraMode.DEFAULT)
 	
 	battle_manager.mouse_input_toggle = true
 	battle_manager.in_target_selection = true

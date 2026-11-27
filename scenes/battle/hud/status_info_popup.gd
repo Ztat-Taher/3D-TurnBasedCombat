@@ -39,34 +39,38 @@ func _process(delta: float) -> void:
 			hide_popup()
 
 func setup(control: Control, state: State, index: int = 0) -> void:
-	target_control = control
 	state_data = state
+	if state_data == null:
+		setup_info(control, "", "", null, index)
+		return
+	var description_text = state_data.state_description
+
+	# Add stack count if applicable
+	if state_data.uses_stacks() and state_data.stack_count > 0:
+		description_text += "\nStacks: " + str(state_data.stack_count)
+
+	# Add accumulation for Bleed state
+	if state_data.state_name == "Bleed" and "accumulation_value" in state_data:
+		var accumulation = state_data.accumulation_value
+		var max_accumulation = state_data.accumulation_max if state_data.accumulation_max > 0 else 100
+		var percentage = int((float(accumulation) / float(max_accumulation)) * 100) if max_accumulation > 0 else 0
+		description_text += "\nAccumulation: " + str(accumulation) + "/" + str(max_accumulation) + " (" + str(percentage) + "%)"
+
+	setup_info(control, state_data.state_name, description_text, state_data.icon_texture, index)
+
+
+## Shows any titled entry (a state, a vestige, ...) next to [param control].
+func setup_info(control: Control, title: String, description: String, icon: Texture2D = null, index: int = 0) -> void:
+	target_control = control
 	popup_index = index
-	
-	if state_data:
-		if name_label:
-			name_label.text = state_data.state_name
-		if description_label:
-			var description_text = state_data.state_description
-			
-			# Add stack count if applicable
-			if state_data.stack_count > 0:
-				description_text += "\nStacks: " + str(state_data.stack_count)
-			
-			# Add accumulation for Bleed state
-			if state_data.state_name == "Bleed" and "accumulation_value" in state_data:
-				var accumulation = state_data.accumulation_value
-				var max_accumulation = state_data.accumulation_max if state_data.accumulation_max > 0 else 100
-				var percentage = int((float(accumulation) / float(max_accumulation)) * 100) if max_accumulation > 0 else 0
-				description_text += "\nAccumulation: " + str(accumulation) + "/" + str(max_accumulation) + " (" + str(percentage) + "%)"
-			
-			description_label.text = description_text
-		if icon_texture and state_data.icon_texture:
-			icon_texture.texture = state_data.icon_texture
-			icon_texture.visible = true
-		elif icon_texture:
-			icon_texture.visible = false
-	
+	if name_label:
+		name_label.text = title
+	if description_label:
+		description_label.text = description
+	if icon_texture:
+		icon_texture.texture = icon
+		icon_texture.visible = icon != null
+
 	if not (get_parent() is VBoxContainer):
 		update_position()
 

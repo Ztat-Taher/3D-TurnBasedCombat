@@ -8,10 +8,9 @@ signal health_changed(current_health: int, max_health: int)
 signal ap_changed(current_ap: int, max_ap: int)
 signal state_applied(state_name: String)
 signal state_removed(state_name: String)
-signal bleed_proc_triggered(damage: int)
-signal shield_broken()
-signal shield_changed(shield_count: int)
-signal burn_stack_changed(stack_count: int)
+## Any state on this battler changed: applied, re-applied, ticked, removed,
+## or changed itself (a shield hit used, a bar filled). The HUD redraws on it.
+signal states_changed
 signal level_up(new_level: int)
 signal exp_gained(amount: int, current_exp: int, exp_needed: int)
 enum TEAM {ALLY, ENEMY}
@@ -28,8 +27,6 @@ var weapon_system: WeaponSystem = null
 ## Scene-authored socket node (e.g. a BoneAttachment3D) that handheld weapon
 ## models instance into. Empty = no socket (ORB/root-space weapons unaffected).
 @export var weapon_socket_path: NodePath = NodePath("")
-## Stat deltas currently applied by the equipped weapon (for clean re-equip).
-var _applied_weapon_mods: Dictionary = {}
 ## Last canonical combat animation slot played ("melee_combo_1", "ranged_cast_1", ...)
 ## Exposed for the weapon system to distinguish melee vs ranged hits.
 var _last_combat_slot: String = ""
@@ -50,6 +47,8 @@ var max_health: int
 var attack: int
 var defense: int
 var agility: int
+var magic: int
+var crit_chance: int  ## Percent chance for a card's damage to crit
 var max_ap: int = 3
 var current_ap: int = 3
 var ap_regen_per_turn: int = 3
@@ -76,6 +75,7 @@ var current_health: int:
 			var old_value = _current_health_internal
 			_current_health_internal = value
 			health_changed.emit(_current_health_internal, max_health)
+			notify_battle_event(BattleEvents.HEALTH_CHANGED, {"old_health": old_value, "new_health": value, "max_health": max_health})
 			
 			# Play healing effect if health increased (but not during initialization)
 			if value > old_value and _is_initialized:
@@ -85,10 +85,13 @@ var current_target = null
 var is_counter_stunned: bool = false  # Stunned by being hit with a counter attack
 var _is_despawning: bool = false
 
-# Vestiges system
-var active_vestiges: Array[Vestige] = []
-var vestige_stacks: Dictionary = {}  # vestige_id -> stack_count
-var _party_member_id: String = ""  # Link to AllyPartyMember for per-character vestiges
+## The vestiges this battler carries (allies; enemies carry none). The
+## battler's single link to the vestige system.
+var vestiges: VestigeHolder = VestigeHolder.new(self)
+
+## Stats before any modifier source (level progression for allies, the enemy
+## stats for enemies); see [method refresh_stats].
+var _base_stats: Dictionary = {}
 
 # Walking animation system
 var is_advancing: bool = false
@@ -236,6 +239,11 @@ var mouse_hover: bool = false:
 	set(value):
 		mouse_hover = value
 		_update_highlight()
+		# AOE targeting: every target shows the hover together
+		if _in_aoe_targeting():
+			for b in _aoe_group():
+				if b != self:
+					b._update_highlight()
 
 var is_valid_target: bool = false
 var is_default_target: bool = false
@@ -265,14 +273,14 @@ func _update_highlight() -> void:
 			select_ring_scene = load("res://assets/effects/ground/vfx_battler_select.tscn") as PackedScene
 		
 		if select_ring_scene:
-			if mouse_hover and is_selectable:
+			if _shows_hover() and is_selectable:
 				_spawn_selection_ring(Color.WHITE)
 			elif is_targeted or is_mouse_selected or is_keyboard_selected or is_default_target:
 				_spawn_selection_ring(Color.CYAN)
 			return
 	
 	# Fallback to shader overlay system
-	if mouse_hover and is_selectable:
+	if _shows_hover() and is_selectable:
 		var hover_mat = ShaderMaterial.new()
 		hover_mat.shader = select_outline
 		hover_mat.set_shader_parameter("color", Color.WHITE)
@@ -373,11 +381,15 @@ func _ready():
 	if enemy_stats:
 		team = TEAM.ENEMY
 		character_name = enemy_stats.enemy_name
-		max_health = enemy_stats.max_health
+		_base_stats = {
+			"max_health": enemy_stats.max_health,
+			"attack": enemy_stats.attack,
+			"defense": enemy_stats.defense,
+			"agility": enemy_stats.agility,
+			"magic": enemy_stats.magic,
+		}
+		refresh_stats()
 		current_health = max_health
-		attack = enemy_stats.attack
-		defense = enemy_stats.defense
-		agility = enemy_stats.agility
 		_is_initialized = true
 	elif stats:
 		# Basic stats for ally
@@ -400,9 +412,11 @@ func _ready():
 	# Initialize attack indicator for enemies
 	_initialize_attack_indicator()
 	
-	# Initialize vestiges for allies
+	# Vestiges the run gives this ally (re-read at combat start, which also
+	# fires their combat-start triggers)
 	if team == TEAM.ALLY:
-		_initialize_vestiges()
+		vestiges.reload()
+		refresh_stats()
 
 	# Spawn the weapon system for the equipped weapon (if any).
 	if weapon != null:
@@ -416,7 +430,7 @@ func set_weapon(p_weapon: Weapon) -> void:
 		weapon_system.queue_free()
 		weapon_system = null
 	if weapon == null:
-		apply_weapon_stat_modifiers(null)
+		refresh_stats()
 		_hide_socket_weapon()
 		return
 	if not is_inside_tree():
@@ -503,8 +517,36 @@ func _clear_default_selection() -> void:
 		is_default_target = false
 		_update_highlight()
 
+## True while the player is picking an AOE card's targets: every valid
+## target is picked together, never one alone.
+func _in_aoe_targeting() -> bool:
+	if not is_inside_tree():
+		return false
+	var bm = get_tree().get_first_node_in_group("battle_manager")
+	return bm != null and bm.in_target_selection and bool(bm.get_meta("is_aoe_mode", false))
+
+
+## The targets an AOE card is being aimed at.
+func _aoe_group() -> Array:
+	var bm = get_tree().get_first_node_in_group("battle_manager")
+	return bm.valid_targets.filter(func(b): return is_instance_valid(b) and b is Battler) if bm else []
+
+
+## Draw the hover highlight: this battler is hovered, or (AOE targeting) any
+## of the AOE's targets is.
+func _shows_hover() -> bool:
+	if mouse_hover:
+		return true
+	if not _in_aoe_targeting() or not is_valid_target:
+		return false
+	return _aoe_group().any(func(b): return b.mouse_hover)
+
+
 func select_target() -> void:
-	# Will probably want to also add logic that prevents selecting invalid targets
+	# AOE: clicking any target confirms the whole group; don't single it out
+	if _in_aoe_targeting():
+		SignalBus.select_target.emit(self)
+		return
 	# Clear all other selection states first
 	is_keyboard_selected = false
 	is_default_target = false
@@ -594,88 +636,89 @@ func get_hit_effect_library() -> HitEffectLibrary:
 	
 	return null
 
-func take_damage(amount: int, attacker: Battler = null, damage_type: String = "physical", element: String = "none") -> void:
+## [param is_attack]: true for an attack (card or enemy attack, counter), false
+## for bonus damage (weapon procs, vestiges, DOTs). Rides on DAMAGE_TAKEN /
+## DAMAGE_DEALT so on-hit effects react to attacks only.
+## [param is_critical]: the hit was a crit (shown as such, and in the events).
+func take_damage(amount: int, attacker: Battler = null, damage_type: String = "physical", element: String = "none", is_attack: bool = false, is_critical: bool = false) -> void:
 	# Get battle manager once for use throughout the function
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	
-	# Trigger vestige hooks for ON_DAMAGE_TAKEN (before damage is applied)
-	trigger_vestige_hooks(TriggerHook.TriggerType.ON_DAMAGE_TAKEN, {"attacker": attacker, "damage": amount, "damage_amount": amount, "damage_type": damage_type, "element": element, "battle_manager": battle_manager})
-
-	# Weapon procs (e.g. sword riposte stacks)
-	if weapon_system:
-		weapon_system.notify_damage_taken(attacker, amount)
-	
-	# Apply vestige damage taken multiplier
-	var multiplier = get_vestige_damage_taken_multiplier()
-	# Apply weapon damage taken multiplier (e.g. defensive weapon bonuses)
-	if weapon_system:
-		multiplier *= weapon_system.get_damage_taken_multiplier()
-	amount = int(float(amount) * multiplier)
+	amount = int(float(amount) * get_multiplier(&"damage_taken"))
 	
 	# Play hit effects before damage calculation
 	play_hit_effects(damage_type, element, attacker)
 	
-	# Check for Protected state (shield) - ignores hit entirely
-	if active_states.has("Protected"):
-		var protected_state = active_states["Protected"] as ProtectedState
-		if protected_state and protected_state.has_shield():
-			# Consume one shield hit
-			protected_state.consume_shield()
-			# Show shield break visual
-			if number_indicator:
-				number_indicator.show_shield_break()
-			# Emit signal for UI update
-			shield_changed.emit(protected_state.get_remaining_shields())
-			# Remove state if no shields left
-			if not protected_state.has_shield():
-				remove_state("Protected")
-			# Return early - no damage taken, no effects applied
+	var hit := {"attacker": attacker, "damage": 0, "damage_type": damage_type, "element": element, "is_attack": is_attack, "is_critical": is_critical, "battle_manager": battle_manager}
+
+	# A state may stop the hit outright (Protected): no damage, no effects
+	for state in active_states.values():
+		if state is State and state.blocks_hit(self, hit):
 			return
-	
+
 	var damage_taken = max(1, amount) if amount > 0 else 0
 	if is_defending:
 		damage_taken = max(1, int(damage_taken * 0.5))
 		is_defending = false
 	
-	# Check for weakness state BEFORE applying damage
-	var weakness_multiplier = 1.0
-	var is_weakness = false
-	if active_states.has("Weakness"):
-		weakness_multiplier = 1.5  # Takes 50% more damage
-		is_weakness = true
-	
-	damage_taken = int(float(damage_taken) * weakness_multiplier)
-	
-	# Add bleed accumulation when taking damage
-	add_bleed_accumulation(damage_taken)
-	
 	# Show damage number
 	if number_indicator:
-		number_indicator.show_damage(damage_taken, false, is_weakness)
+		number_indicator.show_damage(damage_taken, is_critical)
+
+	hit["damage"] = damage_taken
+	_lose_health(hit)
 	
-	current_health -= damage_taken
-	if current_health < 0:
-		current_health = 0
-	
-	# WAKE UP FROM SLEEP WHEN ATTACKED
-	if active_states.has("Sleep"):
-		remove_state("Sleep")
-	
-	# PLAY HIT REACTION FLINCH — skipped when fully avoided (0 damage) or defeated
+	# PLAY HIT REACTION FLINCH— skipped when fully avoided (0 damage) or defeated
 	if damage_taken > 0 and current_health > 0:
 		await play_hit_reaction()
 	
-	# TRIGGER COUNTER IF ACTIVE - await so attacker stays in place during counter
-	if attacker and active_states.has("Counter"):
-		var counter_state = active_states["Counter"] as CounterState
-		if counter_state:
-			await counter_state.perform_counter(self, attacker)
+	# The states react to the hit (Bleed builds, Marked is spent, counters...).
+	# Awaited, so an attacker stays in place during a counter
+	for state in active_states.values().duplicate():
+		if state is State and active_states.values().has(state):
+			await state.on_hit_taken(self, hit)
 	
-	# Check if this battler is defeated and should be removed
+	if current_health <= 0:
+		await _handle_defeat(attacker)
+
+
+## Takes [code]hit["damage"][/code] off this battler's health (a lethal amount
+## first gives revive effects their chance) and tells the battle about it.
+## [param hit]: attacker, damage, damage_type, element, is_attack,
+## is_critical, battle_manager. Shared by hits and by states' turn damage.
+func _lose_health(hit: Dictionary) -> void:
+	var damage_taken := int(hit.get("damage", 0))
+	var attacker = hit.get("attacker")
+	var new_health := maxi(current_health - damage_taken, 0)
+	if new_health == 0 and damage_taken > 0:
+		# Passive systems may save the battler (e.g. a revive vestige)
+		notify_battle_event(BattleEvents.LETHAL_DAMAGE, hit)
+		new_health = maxi(int(hit.get("revive_health", 0)), 0)
+		hit.erase("revive_health")
+	current_health = new_health
+	if damage_taken > 0:
+		notify_battle_event(BattleEvents.DAMAGE_TAKEN, hit.duplicate())
+		if is_instance_valid(attacker) and attacker != self:
+			var dealt := hit.duplicate()
+			dealt.erase("attacker")
+			dealt["target"] = self
+			attacker.notify_battle_event(BattleEvents.DAMAGE_DEALT, dealt)
+
+
+## This battler just fell (to [param killer]'s hit, or a state's damage):
+## defeat events, XP and rewards, then off the field. If it was the acting
+## battler, the battle moves on to the next turn. Runs once per defeat.
+func _handle_defeat(killer: Node) -> void:
+	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
+	var attacker: Battler = killer as Battler if is_instance_valid(killer) else null
 	if current_health <= 0:
 		if _is_despawning:
 			return
 		_is_despawning = true
+		# The fallen keep no states (or their overlays and auras)
+		clear_states()
+		if battle_manager:
+			battle_manager.notify_opponents_of(self, BattleEvents.ENEMY_DEFEATED, {"defeated": self, "attacker": attacker})
 
 		# Unregister from impact frame system when defeated
 		if battle_manager and battle_manager.effect_manager:
@@ -727,17 +770,14 @@ func take_damage(amount: int, attacker: Battler = null, damage_type: String = "p
 func take_healing(amount: int):
 	# Get battle manager for vestige hooks
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	
-	# Trigger vestige hooks for ON_HEAL
-	trigger_vestige_hooks(TriggerHook.TriggerType.ON_HEAL, {"heal_amount": amount, "battle_manager": battle_manager})
-	
-	# Apply vestige healing multiplier
-	var multiplier = get_vestige_healing_multiplier()
-	amount = int(float(amount) * multiplier)
-	
-	var healing = min(amount, max_health - current_health)
+
+	amount = int(float(amount) * get_multiplier(&"healing"))
+
+	var healing = maxi(mini(amount, max_health - current_health), 0)
 
 	current_health += healing
+	if healing > 0:
+		notify_battle_event(BattleEvents.HEALED, {"heal_amount": healing, "battle_manager": battle_manager})
 	return healing
 
 func defend():
@@ -763,6 +803,7 @@ func battle_item(item: Item, target: Battler) -> void:
 
 ## XP and Leveling System
 func add_experience(amount: int) -> void:
+	amount = roundi(amount * get_multiplier(&"xp"))
 	current_exp += amount
 	if number_indicator:
 		number_indicator.show_xp(amount)
@@ -817,106 +858,96 @@ func _initialize_attack_indicator() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Vestiges System
+# Stats and passive systems
 # ---------------------------------------------------------------------------
 
-## Initialize vestiges for this battler (ally only)
-func _initialize_vestiges() -> void:
-	if team != TEAM.ALLY:
+## Recomputes the stats: base stats plus the deltas of every modifier source
+## (see [method _stat_modifier_sources]). Idempotent - call it whenever the
+## base or a source changes; nothing ever adds to a stat directly.
+func refresh_stats() -> void:
+	if _base_stats.is_empty():
 		return
-	
-	# Get party member ID from meta
-	_party_member_id = str(get_meta(AllyPartyMember.META_PARTY_MEMBER_ID, ""))
-	if _party_member_id.is_empty():
-		return
-	
-	# Load per-character vestiges from AllyPartyMember
-	var member = GameState.get_party_member(_party_member_id)
-	if member == null:
-		return
-	
-	# Copy per-character vestiges
-	for vestige in member.vestiges:
-		if vestige and vestige.scope == Vestige.Scope.PER_CHARACTER:
-			active_vestiges.append(vestige)
-			vestige_stacks[vestige.vestige_id] = member.get_vestige_stack_count(vestige.vestige_id)
-	
-	# Load global vestiges from GameState
-	var global_vestiges = GameState.get_global_vestiges()
-	for vestige in global_vestiges:
-		if vestige and vestige.scope == Vestige.Scope.GLOBAL:
-			# Check if not already added
-			var already_added = false
-			for existing in active_vestiges:
-				if existing and existing.vestige_id == vestige.vestige_id:
-					already_added = true
-					break
-			if not already_added:
-				active_vestiges.append(vestige)
-				vestige_stacks[vestige.vestige_id] = GameState.get_global_vestige_stack_count(vestige.vestige_id)
-	
-	# Apply stat modifiers from vestiges
-	apply_vestige_modifiers()
-	
-	# Trigger ON_COMBAT_START hooks
-	var combat_battle_manager = get_tree().get_first_node_in_group("battle_manager")
-	trigger_vestige_hooks(TriggerHook.TriggerType.ON_COMBAT_START, {"battle_manager": combat_battle_manager})
-
-
-## Apply stat modifiers from all active vestiges
-func apply_vestige_modifiers() -> void:
-	for vestige in active_vestiges:
-		if vestige == null:
-			continue
-		
-		var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-		
-		# Apply flat stat bonuses (multiplied by stack count)
-		max_health += vestige.max_health_bonus * stack_count
-		attack += vestige.attack_bonus * stack_count
-		defense += vestige.defense_bonus * stack_count
-		agility += vestige.agility_bonus * stack_count
-		max_ap += vestige.max_ap_bonus * stack_count
-		ap_regen_per_turn += vestige.ap_regen_bonus * stack_count
-		
-		# Apply percentage stat bonuses (multiplied by stack count)
-		max_health += int(max_health * vestige.max_health_percent * stack_count)
-		attack += int(attack * vestige.attack_percent * stack_count)
-		defense += int(defense * vestige.defense_percent * stack_count)
-		agility += int(agility * vestige.agility_percent * stack_count)
-
-
-## Apply stat modifiers from the equipped weapon. Previously-applied weapon
-## mods are subtracted first so re-equipping or unequipping never
-## double-applies. Pass null to clear.
-func apply_weapon_stat_modifiers(p_weapon: Weapon) -> void:
-	# Revert the last weapon's mods.
-	for stat_name in _applied_weapon_mods:
-		set(stat_name, get(stat_name) - _applied_weapon_mods[stat_name])
-	_applied_weapon_mods.clear()
-	if p_weapon == null:
-		return
-	var mods := {}
-	# Flat bonuses.
-	mods["max_health"] = p_weapon.max_health_bonus
-	mods["attack"] = p_weapon.attack_bonus
-	mods["defense"] = p_weapon.defense_bonus
-	mods["agility"] = p_weapon.agility_bonus
-	mods["max_ap"] = p_weapon.max_ap_bonus
-	mods["ap_regen_per_turn"] = p_weapon.ap_regen_bonus
-	# Percent bonuses (of the current — post-vestige — value, same as vestiges).
-	mods["max_health"] += int(max_health * p_weapon.max_health_percent)
-	mods["attack"] += int(attack * p_weapon.attack_percent)
-	mods["defense"] += int(defense * p_weapon.defense_percent)
-	mods["agility"] += int(agility * p_weapon.agility_percent)
-	for stat_name in mods:
-		var delta: int = mods[stat_name]
-		if delta != 0:
-			set(stat_name, get(stat_name) + delta)
-			_applied_weapon_mods[stat_name] = delta
-	# Keep current_health consistent if max_health changed.
+	var totals := {}
+	for source in _stat_modifier_sources():
+		var mods: Dictionary = source.get_stat_modifiers(_base_stats)
+		for stat in mods:
+			totals[stat] = int(totals.get(stat, 0)) + int(mods[stat])
+	for stat in _base_stats:
+		set(stat, int(_base_stats[stat]) + int(totals.get(stat, 0)))
 	if max_health > 0 and current_health > max_health:
 		current_health = max_health
+	if current_ap > max_ap:
+		current_ap = max_ap
+
+
+## Everything that modifies this battler's stats. Each answers
+## [code]get_stat_modifiers(base: Dictionary) -> Dictionary[/code] (stat ->
+## delta); a new kind of source only needs adding here.
+func _stat_modifier_sources() -> Array:
+	var sources: Array = []
+	if weapon:
+		sources.append(weapon)
+	if vestiges:
+		sources.append(vestiges)
+	return sources
+
+
+## Tells this battler's passive systems about a battle event (one of
+## [BattleEvents]). Battle and card code call only this; each system maps the
+## event to its own behaviour.
+func notify_battle_event(event: StringName, context: Dictionary = {}) -> void:
+	for listener in _event_listeners():
+		listener.handle_event(event, context)
+
+
+## Everything that reacts to battle events; each answers
+## [code]handle_event(event, context)[/code]. A new kind only needs adding here.
+func _event_listeners() -> Array:
+	var listeners: Array = []
+	if vestiges:
+		listeners.append(vestiges)
+	if weapon_system and is_instance_valid(weapon_system) and not weapon_system.is_queued_for_deletion():
+		listeners.append(weapon_system)
+	return listeners
+
+
+## Everything that adjusts this battler's combat numbers beyond its stats.
+## Each may answer [code]get_multiplier(name) -> float[/code] and
+## [code]get_bonus(name) -> int[/code]; a new kind only needs adding here.
+func _passive_sources() -> Array:
+	var sources: Array = []
+	if vestiges:
+		sources.append(vestiges)
+	if weapon_system:
+		sources.append(weapon_system)
+	return sources
+
+
+## Combined multiplier [param name] of every passive source, e.g.
+## [code]&"damage_dealt"[/code], [code]&"damage_taken"[/code],
+## [code]&"healing"[/code], [code]&"xp"[/code].
+func get_multiplier(name: StringName) -> float:
+	var multiplier := 1.0
+	for source in _passive_sources():
+		if source.has_method("get_multiplier"):
+			multiplier *= source.get_multiplier(name)
+	return multiplier
+
+
+## Summed bonus [param name] of every passive source, e.g.
+## [code]&"ap_cost_reduction"[/code], [code]&"cards_drawn_per_turn"[/code],
+## [code]&"starting_hand_size"[/code].
+func get_bonus(name: StringName) -> int:
+	var total := 0
+	for source in _passive_sources():
+		if source.has_method("get_bonus"):
+			total += int(source.get_bonus(name))
+	return total
+
+
+## AP this battler pays to play [param card] (never below 0).
+func get_card_ap_cost(card: CardConfig) -> int:
+	return maxi(card.ap_cost - get_bonus(&"ap_cost_reduction"), 0)
 
 
 ## Hides the socket's placeholder "Weapon" child (unarmed state). The node
@@ -931,109 +962,6 @@ func _hide_socket_weapon() -> void:
 	if weapon_node:
 		weapon_node.visible = false
 
-
-## Trigger all vestige hooks for a specific trigger type
-func trigger_vestige_hooks(trigger_type: TriggerHook.TriggerType, context: Dictionary = {}) -> void:
-	print("DEBUG: trigger_vestige_hooks called for ", character_name, " with trigger_type: ", trigger_type, " and ", active_vestiges.size(), " vestiges")
-	for vestige in active_vestiges:
-		if vestige == null:
-			continue
-		
-		print("DEBUG: Checking vestige: ", vestige.vestige_name, " with ", vestige.trigger_hooks.size(), " hooks")
-		for hook in vestige.trigger_hooks:
-			if hook == null or not (hook is TriggerHook):
-				print("DEBUG: Invalid hook in ", vestige.vestige_name)
-				continue
-			
-			print("DEBUG: Hook trigger_type: ", hook.trigger_type, " vs requested: ", trigger_type)
-			if hook.trigger_type == trigger_type:
-				print("DEBUG: Hook matches! Checking if should_trigger...")
-				if hook.should_trigger(vestige, self, context):
-					print("DEBUG: Should trigger! Executing effect...")
-					hook.execute(vestige, self, context)
-					print("DEBUG: Effect executed")
-				else:
-					print("DEBUG: Should_trigger returned false")
-
-
-## Get damage dealt multiplier from vestiges
-func get_vestige_damage_dealt_multiplier() -> float:
-	var multiplier: float = 1.0
-	for vestige in active_vestiges:
-		if vestige:
-			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-			multiplier *= vestige.damage_dealt_multiplier * stack_count
-	return multiplier
-
-
-## Get damage taken multiplier from vestiges
-func get_vestige_damage_taken_multiplier() -> float:
-	var multiplier: float = 1.0
-	for vestige in active_vestiges:
-		if vestige:
-			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-			multiplier *= vestige.damage_taken_multiplier * stack_count
-	return multiplier
-
-
-## Get healing multiplier from vestiges
-func get_vestige_healing_multiplier() -> float:
-	var multiplier: float = 1.0
-	for vestige in active_vestiges:
-		if vestige:
-			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-			multiplier *= vestige.healing_multiplier * stack_count
-	return multiplier
-
-
-## Get XP multiplier from vestiges
-func get_vestige_xp_multiplier() -> float:
-	var multiplier: float = 1.0
-	for vestige in active_vestiges:
-		if vestige:
-			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-			multiplier *= vestige.xp_multiplier * stack_count
-	return multiplier
-
-
-## Get gold multiplier from vestiges
-func get_vestige_gold_multiplier() -> float:
-	var multiplier: float = 1.0
-	for vestige in active_vestiges:
-		if vestige:
-			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-			multiplier *= vestige.gold_multiplier * stack_count
-	return multiplier
-
-
-## Get additional cards drawn per turn from vestiges
-func get_vestige_cards_drawn_bonus() -> int:
-	var bonus: int = 0
-	for vestige in active_vestiges:
-		if vestige:
-			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-			bonus += vestige.cards_drawn_per_turn * stack_count
-	return bonus
-
-
-## Get starting hand size bonus from vestiges
-func get_vestige_hand_size_bonus() -> int:
-	var bonus: int = 0
-	for vestige in active_vestiges:
-		if vestige:
-			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-			bonus += vestige.starting_hand_size * stack_count
-	return bonus
-
-
-## Get AP cost reduction from vestiges
-func get_vestige_ap_cost_reduction() -> int:
-	var reduction: int = 0
-	for vestige in active_vestiges:
-		if vestige:
-			var stack_count = vestige_stacks.get(vestige.vestige_id, 1)
-			reduction += vestige.ap_cost_reduction * stack_count
-	return reduction
 
 ## Determine indicator type from attack config
 func _get_indicator_type(attack_config: EnemyAttackConfig) -> AttackIndicator3D.AttackType:
@@ -1253,7 +1181,6 @@ func advance_to_target(target: Battler) -> bool:
 	await get_tree().process_frame
 
 	var tween = create_tween().set_parallel(true)
-	tween.set_speed_scale(battle_manager.speed_multiplier)
 	tween.tween_property(self, "global_position", advance_target_position, movement_duration)
 	tween.tween_property(self, "rotation:y", target_yaw, minf(movement_duration, 0.2))
 	tween.chain().tween_callback(_on_advance_complete)
@@ -1262,7 +1189,7 @@ func advance_to_target(target: Battler) -> bool:
 	if anim_tree:
 		var playback = anim_tree.get("parameters/BaseSM/playback") as AnimationNodeStateMachinePlayback
 		if playback:
-			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale * battle_manager.speed_multiplier)
+			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale)
 
 	# Start movement timeout timer
 	_start_movement_timeout()
@@ -1544,7 +1471,6 @@ func return_to_original_position():
 	return_yaw = rotation.y + wrapf(return_yaw - rotation.y, -PI, PI)
 
 	var tween = create_tween().set_parallel(true)
-	tween.set_speed_scale(battle_manager.speed_multiplier)
 	tween.tween_property(self, "global_position", original_position, movement_duration)
 	tween.tween_property(self, "rotation:y", return_yaw, movement_duration)
 	tween.chain().tween_callback(_on_return_complete)
@@ -1553,7 +1479,7 @@ func return_to_original_position():
 	if anim_tree:
 		var playback = anim_tree.get("parameters/BaseSM/playback") as AnimationNodeStateMachinePlayback
 		if playback:
-			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale * battle_manager.speed_multiplier)
+			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale)
 
 ## Performs a backwards evasion dash with the dedicated dodge animation.
 ## Falls back to walk if no dodge state exists on this character's AnimationTree.
@@ -1602,7 +1528,6 @@ func perform_dodge_dash() -> void:
 	await get_tree().process_frame
 
 	var tween = create_tween()
-	tween.set_speed_scale(battle_manager.speed_multiplier)
 	tween.tween_property(self, "global_position", dodge_target_position, movement_duration)
 	tween.tween_callback(_on_dodge_dash_complete.bind(dodge_start_position))
 
@@ -1610,7 +1535,7 @@ func perform_dodge_dash() -> void:
 	if anim_tree:
 		var playback = anim_tree.get("parameters/BaseSM/playback") as AnimationNodeStateMachinePlayback
 		if playback:
-			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale * battle_manager.speed_multiplier)
+			anim_tree.set("parameters/BaseSM/time_scale", anim_speed_scale)
 
 func _on_dodge_dash_complete(p_original_position: Vector3):
 	# Reset animation time_scale to normal after dodge
@@ -1636,7 +1561,6 @@ func _on_dodge_dash_complete(p_original_position: Vector3):
 		anim_tree.set("parameters/BaseSM/combat_actions/conditions/is_walking", true)
 
 	var tween = create_tween()
-	tween.set_speed_scale(battle_manager.speed_multiplier)
 	tween.tween_property(self, "global_position", p_original_position,
 		global_position.distance_to(p_original_position) / movement_speed)
 	tween.tween_callback(_on_return_complete)
@@ -1770,9 +1694,20 @@ func on_load_game(load_data):
 
 var active_states: Dictionary = {}  # {state_name: State}
 
+## Current HP as a fraction of max HP (0 when max HP is 0).
+func get_health_ratio() -> float:
+	return float(current_health) / float(max_health) if max_health > 0 else 0.0
+
+## Whether a state named [param state_name] is on this battler.
+func has_state(state_name: String) -> bool:
+	return active_states.has(state_name)
+
 # And add these helper functions for state management
-func apply_state(state: State) -> void:
-	if state == null:
+## Puts [param state] on this battler. [param source] is the battler that
+## applied it (null for environment/system states).
+func apply_state(state: State, source: Node = null) -> void:
+	# A defeated battler takes no new states
+	if state == null or is_defeated():
 		return
 	
 	var key = state.state_name
@@ -1782,109 +1717,71 @@ func apply_state(state: State) -> void:
 	var battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	
 	if existing_state:
-		# State already exists - handle stacking/refreshing
-		if "stack_count" in state and existing_state.has_method("add_stacks"):
-			# For stacking states like Burning
-			# The incoming state has the NEW stack count to add, not the total
-			if state.stack_count > 0:
-				existing_state.add_stacks(state.stack_count)
-				# Emit signal for UI update
-				if key == "Burning":
-					burn_stack_changed.emit(existing_state.stack_count)
-		# For Protected state, add shield hits (stacking)
-		if key == "Protected" and existing_state.has_method("set_shield_hits"):
-			if "shield_hits" in state:
-				var current_shields = existing_state.get_remaining_shields()
-				var new_shields = current_shields + state.shield_hits
-				existing_state.set_shield_hits(new_shields)
-				shield_changed.emit(existing_state.get_remaining_shields())
-			# Also emit if shield state is refreshed without adding shields
-			elif existing_state.has_method("get_remaining_shields"):
-				shield_changed.emit(existing_state.get_remaining_shields())
-		# Refresh duration
-		if state.turns_active > 0:
-			existing_state.turns_active = state.turns_active
-		# Preserve icon texture
-		if state.icon_texture and not existing_state.icon_texture:
-			existing_state.icon_texture = state.icon_texture
+		# Already on: the state folds the new application in (stacks, shield
+		# hits, a refreshed duration...)
+		existing_state.merge(state, self)
+		if is_instance_valid(source):
+			existing_state.source = source
 	else:
 		# New state - apply directly
 		var state_copy = state.duplicate()
 		# Force state_name to be set properly after duplication
 		state_copy.state_name = state.state_name
-		# Preserve stack_count from incoming state
-		if "stack_count" in state and "stack_count" in state_copy:
-			state_copy.stack_count = state.stack_count
+		# A stacking state starts with 1 to its cap; others carry no stacks
+		state_copy.stack_count = clampi(state.stack_count, 1, state.stack_max) if state_copy.uses_stacks() else 0
+		state_copy.source = source
 		active_states[key] = state_copy
 		
-		# Apply visual overlay if the state supports it
-		if state_copy.has_method("apply_overlay_to_battler"):
-			state_copy.apply_overlay_to_battler(self)
-		
-		# Apply aura effect if the state supports it
-		if state_copy.has_method("apply_aura_effect"):
-			state_copy.apply_aura_effect(self)
-		
-		# Emit shield_changed signal for new Protected state
-		if key == "Protected" and state_copy.has_method("get_remaining_shields"):
-			shield_changed.emit(state_copy.get_remaining_shields())
-	
+		state_copy.show_visuals(self)
+		state_copy.on_applied(self)
+
 	state_applied.emit(key)
-	
-	# Trigger vestige hooks for ON_STATE_APPLIED
-	trigger_vestige_hooks(TriggerHook.TriggerType.ON_STATE_APPLIED, {"state": state, "state_name": key, "target": self, "battle_manager": battle_manager})
+	states_changed.emit()
+
+	# The events carry the state as it now is on this battler
+	var live: State = active_states.get(key)
+	var reapplied := existing_state != null
+	notify_battle_event(BattleEvents.STATE_APPLIED, {"state": live, "state_name": key, "target": self, "source": source, "reapplied": reapplied, "battle_manager": battle_manager})
+	if source is Battler and source != self and is_instance_valid(source):
+		source.notify_battle_event(BattleEvents.STATE_INFLICTED, {"target": self, "state": live, "state_name": key, "reapplied": reapplied, "battle_manager": battle_manager})
+
+## Hits this battler's states will block (the shield row).
+func get_shield_hits() -> int:
+	var hits := 0
+	for state in active_states.values():
+		if state is State:
+			hits += state.get_shield_hits()
+	return hits
+
+## Takes every state off this battler.
+func clear_states() -> void:
+	for state_name in active_states.keys():
+		remove_state(state_name)
+
+## Takes off the states [param predicate] (a [code]func(state) -> bool[/code])
+## accepts, oldest first, at most [param max_count] of them (0 = all).
+## Returns the names of those removed.
+func remove_states_if(predicate: Callable, max_count: int = 0) -> Array[String]:
+	var removed: Array[String] = []
+	for state_name in active_states.keys():
+		if max_count > 0 and removed.size() >= max_count:
+			break
+		var state = active_states.get(state_name)
+		if state is State and predicate.call(state):
+			remove_state(state_name)
+			removed.append(state_name)
+	return removed
 
 func remove_state(state_name: String) -> void:
 	if active_states.has(state_name):
 		var state = active_states[state_name]
-		
-		# Remove visual overlay if the state supports it
-		if state.has_method("remove_overlay_from_battler"):
-			state.remove_overlay_from_battler(self)
-		
-		# Remove aura effect if the state supports it
-		if state.has_method("remove_aura_effect"):
-			state.remove_aura_effect(self)
-		
 		active_states.erase(state_name)
+		if state is State:
+			state.hide_visuals(self)
+			state.on_removed(self)
 		state_removed.emit(state_name)
-
-# Helper methods for specific state types
-func add_burn_stacks(amount: int) -> void:
-	if active_states.has("Burning"):
-		var burning_state = active_states["Burning"] as BurningState
-		if burning_state:
-			burning_state.add_stacks(amount)
-			burn_stack_changed.emit(burning_state.stack_count)
-
-func add_bleed_accumulation(amount: int) -> void:
-	if active_states.has("Bleed"):
-		var bleed_state = active_states["Bleed"] as BleedState
-		if bleed_state:
-			bleed_state.add_accumulation_from_damage(amount)
-
-func trigger_bleed_proc() -> void:
-	if active_states.has("Bleed"):
-		var bleed_state = active_states["Bleed"] as BleedState
-		if bleed_state and bleed_state.should_proc_bleed():
-			# Play bleed aura effect when proc triggers
-			if bleed_state.has_method("load_aura_effect"):
-				var aura = bleed_state.load_aura_effect()
-				if aura:
-					var aura_instance = apply_aura_effect(aura)
-					# Bleed aura is one-shot, it auto-cleans
-					# No need to store reference or play animation
-			
-			var proc_damage = bleed_state.trigger_bleed_proc(max_health)
-			current_health -= proc_damage
-			if current_health < 0:
-				current_health = 0
-			bleed_proc_triggered.emit(proc_damage)
-
-func break_shield() -> void:
-	if active_states.has("Protected"):
-		remove_state("Protected")
-		shield_broken.emit()
+		states_changed.emit()
+		notify_battle_event(BattleEvents.STATE_REMOVED, {"state": state, "state_name": state_name})
 
 enum EffectPosition { CENTER, TOP, BOTTOM }
 
@@ -1910,32 +1807,12 @@ func get_effect_position(position_type: EffectPosition = EffectPosition.CENTER) 
 
 ## Calculate and cache all effect positions
 func _calculate_effect_positions() -> void:
-	var combined_aabb = AABB()
-	var has_mesh = false
-	
-	# Combine AABBs of all MeshInstance3D children
-	for child in find_children("*", "MeshInstance3D", true, false):
-		if child is MeshInstance3D:
-			var mesh_aabb = child.get_aabb()
-			if mesh_aabb != AABB():
-				if not has_mesh:
-					combined_aabb = mesh_aabb
-					has_mesh = true
-				else:
-					combined_aabb = combined_aabb.merge(mesh_aabb)
-	
-	# If no meshes found, use default height
-	if not has_mesh:
-		_cached_effect_center = Vector3(0, 0.75, 0)  # Default center for 1.5 height
-		_cached_effect_top = Vector3(0, 1.5, 0)
-		_cached_effect_bottom = Vector3(0, 0.0, 0)
-		_cached_effect_depth = 1.0  # Default depth
-	else:
-		# Calculate positions from combined AABB
-		_cached_effect_center = Vector3(0, combined_aabb.position.y + combined_aabb.size.y / 2.0, 0)
-		_cached_effect_top = Vector3(0, combined_aabb.position.y + combined_aabb.size.y, 0)
-		_cached_effect_bottom = Vector3(0, combined_aabb.position.y, 0)
-		_cached_effect_depth = combined_aabb.size.z  # Cache the depth (Z size)
+	# Battler-local, like the children (auras, indicators) placed with them
+	var box := get_combined_aabb()
+	_cached_effect_center = Vector3(0, box.position.y + box.size.y / 2.0, 0)
+	_cached_effect_top = Vector3(0, box.position.y + box.size.y, 0)
+	_cached_effect_bottom = Vector3(0, box.position.y, 0)
+	_cached_effect_depth = box.size.z
 	
 	_effect_center_cached = true
 
@@ -1952,51 +1829,31 @@ func get_effect_depth() -> float:
 func invalidate_effect_cache() -> void:
 	_effect_center_cached = false
 
-## Calculate the target's AABB size for dynamic movement distance
-## Returns the combined AABB size of all MeshInstance3D children
+## The target's bounding box size in world units (its scale included), for
+## the attack stop distance
 func _get_target_aabb_size(target: Battler) -> Vector3:
-	var combined_aabb = AABB()
-	var has_mesh = false
+	return target.get_combined_aabb().size * target.global_transform.basis.get_scale().abs()
 
-	# Combine AABBs of all MeshInstance3D children
-	for child in target.find_children("*", "MeshInstance3D", true, false):
-		if child is MeshInstance3D:
-			var mesh_aabb = child.get_aabb()
-			if mesh_aabb != AABB():
-				if not has_mesh:
-					combined_aabb = mesh_aabb
-					has_mesh = true
-				else:
-					combined_aabb = combined_aabb.merge(mesh_aabb)
-
-	# If no meshes found, return default size
-	if not has_mesh:
-		return Vector3(1.0, 1.5, 1.0)
-
-	return combined_aabb.size
-
-## Get the battler's combined AABB for camera FOV calculations
-## Returns the combined AABB of all MeshInstance3D children
+## Bounding box of every visible mesh, in this battler's local space (its own
+## rotation and scale excluded), so global_transform * get_combined_aabb() is
+## the box in the world. Each mesh's box is moved by the mesh's offset from the
+## battler, so offset, rotated or scaled meshes (weapons, props, imported rigs)
+## land where they really are. Rigged meshes report their rest pose. Falls
+## back to a 1 x 1.5 x 1 box standing on the origin.
 func get_combined_aabb() -> AABB:
-	var combined_aabb = AABB()
-	var has_mesh = false
-
-	# Combine AABBs of all MeshInstance3D children
+	var to_local := global_transform.affine_inverse()
+	var combined := AABB()
+	var has_mesh := false
 	for child in find_children("*", "MeshInstance3D", true, false):
-		if child is MeshInstance3D:
-			var mesh_aabb = child.get_aabb()
-			if mesh_aabb != AABB():
-				if not has_mesh:
-					combined_aabb = mesh_aabb
-					has_mesh = true
-				else:
-					combined_aabb = combined_aabb.merge(mesh_aabb)
-
-	# If no meshes found, return default AABB
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance.mesh == null or not mesh_instance.is_visible_in_tree():
+			continue
+		var box := (to_local * mesh_instance.global_transform) * mesh_instance.get_aabb()
+		combined = box if not has_mesh else combined.merge(box)
+		has_mesh = true
 	if not has_mesh:
 		return AABB(Vector3(-0.5, 0, -0.5), Vector3(1.0, 1.5, 1.0))
-
-	return combined_aabb
+	return combined
 
 ## Calculate the dynamic stop distance based on target's AABB
 ## Returns the distance to stop at the edge of target's hit zone
@@ -2083,67 +1940,61 @@ func _play_healing_effect() -> void:
 					remove_aura_effect(healing_instance)
 			)
 
+## Start of this battler's turn: each state deals its turn damage (Burning,
+## poison; negative heals) and does its upkeep, then durations tick down.
+## Expired and used-up states are removed.
 func process_states() -> void:
 	var states_to_remove = []
-	
-	for state_name in active_states:
-		var state = active_states[state_name]
-		
-		# Handle Burning state (stack-based damage)
-		if state_name == "Burning":
-			var burning_state = state as BurningState
-			if burning_state and burning_state.stack_count > 0:
-				var burn_damage = burning_state.get_burn_damage()
-				if burn_damage > 0:
-					if number_indicator:
-						number_indicator.show_damage(burn_damage)
-					current_health -= burn_damage
-					if current_health < 0:
-						current_health = 0
-				# Decay stacks by 1 each turn
-				if burning_state.has_method("process_turn_end"):
-					var old_stacks = burning_state.stack_count
-					burning_state.process_turn_end()
-					# Emit signal if stacks changed
-					if burning_state.stack_count != old_stacks:
-						burn_stack_changed.emit(burning_state.stack_count)
-		
-		# Handle other DOT/HOT effects with damage multiplier based on target defense
-		elif state.damage_per_turn != 0:
-			# Apply power multiplier and defense reduction: base_damage * power_mult * (1 - (defense / 100))
-			var defense_multiplier = max(0.1, 1.0 - (float(defense) / 100.0))
-			var actual_damage = int(state.damage_per_turn * state.power_multiplier * defense_multiplier)
-			actual_damage = max(1, actual_damage)  # Minimum 1 damage
-			
-			# Only show damage popup for positive damage (DOT)
-			if actual_damage > 0:
-				if number_indicator:
-					number_indicator.show_damage(actual_damage)
-				current_health -= actual_damage
-				if current_health < 0:
-					current_health = 0
-			else:
-				# Healing state (negative damage)
-				var healing = abs(actual_damage)
-				if number_indicator:
-					number_indicator.show_heal(healing)
-				current_health = min(current_health + healing, max_health)
-		
+	var killer: Node = null
+
+	for state_name in active_states.keys():
+		var state = active_states.get(state_name) as State
+		if state == null:
+			continue
+
+		var turn_damage := state.get_turn_damage(self)
+		if turn_damage > 0 and current_health > 0:
+			if number_indicator:
+				number_indicator.show_damage(turn_damage)
+			# Not an attack: nothing blocks or reacts to it, but it's damage
+			# taken (and dealt, by whoever put the state on) like any other
+			_lose_health({"attacker": _state_source(state), "damage": turn_damage,
+					"damage_type": "state", "element": "none", "is_attack": false,
+					"is_critical": false, "battle_manager": get_tree().get_first_node_in_group("battle_manager"),
+					"state": state})
+			if current_health <= 0 and killer == null:
+				killer = _state_source(state)
+		# Regen: a heal like any other (healing multipliers, the HEALED event)
+		var turn_heal := state.get_turn_heal(self)
+		if turn_heal > 0 and current_health > 0:
+			var healed: int = take_healing(turn_heal)
+			if healed > 0 and number_indicator:
+				number_indicator.show_heal(healed)
+		state.on_turn_tick(self)
+
 		# Handle duration
 		if state.turns_active > 0:
 			state.turns_active -= 1
 			if state.turns_active <= 0:
 				states_to_remove.append(state_name)
-		
-		# For Burning, also remove if stacks reach 0
-		if state_name == "Burning":
-			var burning_state = state as BurningState
-			if burning_state and burning_state.stack_count <= 0:
-				states_to_remove.append(state_name)
-	
+		if state.is_expired() and not states_to_remove.has(state_name):
+			states_to_remove.append(state_name)
+
 	# Remove expired states
 	for state_name in states_to_remove:
 		remove_state(state_name)
+	# Durations and stacks ticked
+	states_changed.emit()
+
+	# A state's damage defeated this battler: the same defeat as a hit
+	if current_health <= 0:
+		await _handle_defeat(killer)
+
+
+## Whoever put [param state] on, if they're still around.
+func _state_source(state: State) -> Node:
+	return state.source if is_instance_valid(state.source) else null
+
 
 func set_advancing(value: bool):
 	is_advancing = value
@@ -2175,6 +2026,7 @@ func apply_level_progression() -> void:
 		"attack": stats.attack,
 		"defense": stats.defense,
 		"agility": stats.agility,
+		"magic": stats.magic,
 		"max_ap": stats.max_ap
 	}
 	
@@ -2183,19 +2035,25 @@ func apply_level_progression() -> void:
 		"attack": stats.attack_multiplier,
 		"defense": stats.defense_multiplier,
 		"agility": stats.agility_multiplier,
+		"magic": stats.magic_multiplier,
 		"max_ap": stats.ap_multiplier
 	}
 	
 	# Get calculated stats at current level
 	var calculated = LevelProgression.get_stats_at_level(base_stats, stat_multipliers, current_level)
 	
-	# Apply to battler
-	max_health = calculated["max_health"]
-	attack = calculated["attack"]
-	defense = calculated["defense"]
-	agility = calculated["agility"]
-	max_ap = calculated.get("max_ap", stats.max_ap)
-	ap_regen_per_turn = stats.ap_regen_per_turn
+	# Base stats, then every modifier source (weapon, vestiges) on top
+	_base_stats = {
+		"max_health": calculated["max_health"],
+		"attack": calculated["attack"],
+		"defense": calculated["defense"],
+		"agility": calculated["agility"],
+		"magic": calculated["magic"],
+		"crit_chance": stats.crit_chance,
+		"max_ap": calculated.get("max_ap", stats.max_ap),
+		"ap_regen_per_turn": stats.ap_regen_per_turn,
+	}
+	refresh_stats()
 	
 	# Set current health to max if first time initialization
 	if current_health == 0:
@@ -2249,6 +2107,10 @@ func get_stat(stat_name: String) -> int:
 			return defense
 		"agility", "agi", "speed":
 			return agility
+		"magic", "mag":
+			return magic
+		"crit_chance", "crit":
+			return crit_chance
 		"max_health", "max_hp":
 			return max_health
 		"current_health", "health", "hp":

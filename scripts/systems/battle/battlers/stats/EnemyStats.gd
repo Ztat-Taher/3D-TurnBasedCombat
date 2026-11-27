@@ -13,6 +13,7 @@ extends Resource
 @export var attack: int = 10
 @export var defense: int = 5
 @export var agility: int = 5
+@export var magic: int = 10 ## Offense of magical attacks (attack is used for the rest)
 
 @export_group("Attacks & Skills")
 ## Available attacks the AI can select from in combat

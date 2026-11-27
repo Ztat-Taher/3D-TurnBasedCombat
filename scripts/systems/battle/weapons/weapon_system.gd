@@ -40,7 +40,6 @@ func _ready() -> void:
 	if weapon == null or owner_battler == null:
 		push_warning("WeaponSystem on '%s' missing weapon or owner." % name)
 		return
-	_battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	# Resolve the weapon's model scene. Socketed (handheld) weapons instance
 	# into the battler's authored socket; root-space weapons (ORB rigs) reuse
 	# a scene-baked visual or instance under this node.
@@ -61,10 +60,8 @@ func _ready() -> void:
 			weapon_visual = existing
 	if weapon_visual:
 		_wire_trail_fallback(weapon_visual)
-	# Apply the weapon's stat modifiers to the battler.
-	owner_battler.apply_weapon_stat_modifiers(weapon)
-	if owner_battler.has_signal("hit_moment"):
-		owner_battler.hit_moment.connect(_on_hit_moment)
+	# The weapon is one of the battler's stat modifier sources
+	owner_battler.refresh_stats()
 	# Composed mechanics: each WeaponModule spawns its own runtime child
 	# (OrbSystem, HitEcho, ...). New mechanics are new module subclasses —
 	# no edits here or in the card/battle pipelines.
@@ -76,28 +73,48 @@ func _ready() -> void:
 			add_child(runtime)
 			if runtime is OrbSystem:
 				_orb_system = runtime
-	_run_trigger(WeaponEffect.Trigger.ON_BATTLE_START, owner_battler, {})
 
 
-func _exit_tree() -> void:
-	if owner_battler and is_instance_valid(owner_battler):
-		_run_trigger(WeaponEffect.Trigger.ON_BATTLE_END, owner_battler, {})
+## Battle events from [method Battler.notify_battle_event] (one of
+## [BattleEvents]), mapped to this weapon's effect triggers. Each trigger's
+## target is the hostile battler involved (null when there is none), so
+## effects not scoped to self only ever land on enemies.
+func handle_event(event: StringName, context: Dictionary) -> void:
+	match event:
+		BattleEvents.COMBAT_START:
+			_stacks.clear()
+			_run_trigger(WeaponEffect.Trigger.ON_BATTLE_START, null, context)
+		BattleEvents.COMBAT_END:
+			_run_trigger(WeaponEffect.Trigger.ON_BATTLE_END, null, context)
+		BattleEvents.CARD_PLAYED:
+			_run_trigger(WeaponEffect.Trigger.ON_CARD_PLAY, _hostile(context.get("target")), context)
+		BattleEvents.DAMAGE_DEALT:
+			# An attack (not bonus damage: weapon procs, vestiges, DOTs) cost an
+			# enemy HP. Sent per target and at impact, so misses, blocked hits
+			# and projectiles still in flight never proc. A killing blow still
+			# counts (stacks, XP); effects skip the fallen target.
+			var target = context.get("target")
+			if context.get("is_attack", false) and target is Battler and is_instance_valid(target):
+				notify_attack_hit(target, {"slot": owner_battler._last_combat_slot, "damage": context.get("damage", 0)})
+		BattleEvents.DAMAGE_TAKEN:
+			# Only an enemy's attack that cost HP counts as being struck:
+			# blocked hits, DOTs and bonus damage (e.g. the enemy's own thorns,
+			# which would otherwise bounce back and forth) don't
+			var attacker := _hostile(context.get("attacker"))
+			if attacker and context.get("is_attack", false):
+				_run_trigger(WeaponEffect.Trigger.ON_DAMAGE_TAKEN, attacker, context)
 
 
-## Called by the battler's hit_moment signal (emitted at the hit frame of any
-## attack animation). [param attacker] is the battler itself.
-func _on_hit_moment(attacker: Battler) -> void:
-	if attacker != owner_battler:
-		return
-	var target: Battler = owner_battler.current_target
-	if target == null or target == owner_battler or not is_instance_valid(target):
-		return
-	var context := {"slot": owner_battler._last_combat_slot}
-	notify_attack_hit(target, context)
+## [param who] when it is a living battler on the other team, else null.
+func _hostile(who) -> Battler:
+	if who is Battler and is_instance_valid(who) and owner_battler and who.team != owner_battler.team and not who.is_defeated():
+		return who
+	return null
 
 
-## A hit landed. [param context] may carry "slot" (the canonical animation
-## slot, e.g. "ranged_cast_1") for weapons that care about melee vs ranged.
+## An attack of the owner's hit [param target]. [param context] carries
+## "slot" (the canonical animation slot, e.g. "ranged_cast_1", for weapons
+## that care about melee vs ranged) and "damage" (HP lost).
 func notify_attack_hit(target: Battler, context: Dictionary = {}, is_replay: bool = false) -> void:
 	if weapon == null:
 		return
@@ -112,16 +129,6 @@ func notify_attack_hit(target: Battler, context: Dictionary = {}, is_replay: boo
 	if _orb_system:
 		_orb_system.detonate(target, context)
 	_run_trigger(WeaponEffect.Trigger.ON_ATTACK_HIT, target, context)
-
-
-## The owner played a card (wired from the card battle manager).
-func notify_card_play(_card) -> void:
-	_run_trigger(WeaponEffect.Trigger.ON_CARD_PLAY, owner_battler, {})
-
-
-## The owner took damage.
-func notify_damage_taken(attacker: Battler, _damage: int) -> void:
-	_run_trigger(WeaponEffect.Trigger.ON_DAMAGE_TAKEN, owner_battler, {"attacker": attacker})
 
 
 func get_weapon() -> Weapon:
@@ -163,15 +170,22 @@ func _instance_model_into_socket() -> Node:
 	if socket == null:
 		push_warning("WeaponSystem: weapon_socket_path '%s' did not resolve on '%s'." % [owner_battler.weapon_socket_path, owner_battler.name])
 		return null
+	return attach_model_to_socket(socket, weapon.model_scene)
+
+
+## Instances [param model_scene] as the `"Weapon"` child of [param socket]
+## (battlers and UI preview models share this placement rule), replacing any
+## other `"Weapon"` child and reusing one already showing this scene.
+static func attach_model_to_socket(socket: Node, model_scene: PackedScene) -> Node:
 	var existing := socket.get_node_or_null("Weapon")
-	if existing is Node and existing.scene_file_path == weapon.model_scene.resource_path:
+	if existing and existing.scene_file_path == model_scene.resource_path:
 		return existing
 	if existing:
 		# Detach immediately so the "Weapon" name is free for the instance
 		# (queue_free alone would defer removal past this frame).
 		socket.remove_child(existing)
 		existing.queue_free()
-	var instance := weapon.model_scene.instantiate()
+	var instance := model_scene.instantiate()
 	instance.name = "Weapon"
 	socket.add_child(instance)
 	# Authored grip offset: a "WeaponSocket" marker child of the socket carries
@@ -229,7 +243,11 @@ func get_damage_dealt_multiplier() -> float:
 
 
 ## The battle manager node (group lookup), exposed for module runtimes.
+## Looked up on use: battlers (and so this node) are ready before the
+## battle manager joins its group, so it can't be cached in _ready.
 func get_battle_manager() -> Node:
+	if not is_instance_valid(_battle_manager) and is_inside_tree():
+		_battle_manager = get_tree().get_first_node_in_group("battle_manager")
 	return _battle_manager
 
 
@@ -243,12 +261,18 @@ func effect_amount(fx: WeaponEffect, recipient: Battler) -> float:
 	return _effect_amount(fx, recipient)
 
 
-func make_state(base: State, stack_count: int, accumulation: int) -> State:
-	return _state_for(base, stack_count, accumulation)
-
-
 func get_damage_taken_multiplier() -> float:
 	return weapon.damage_taken_multiplier if weapon else 1.0
+
+
+## Passive-source query for [method Battler.get_multiplier].
+func get_multiplier(name: StringName) -> float:
+	match name:
+		&"damage_dealt":
+			return get_damage_dealt_multiplier()
+		&"damage_taken":
+			return get_damage_taken_multiplier()
+	return 1.0
 
 
 func get_weapon_stack(stack_id: StringName) -> int:
@@ -274,14 +298,19 @@ func _execute_effect(fx: WeaponEffect, target: Battler, context: Dictionary) -> 
 	if fx.requires_stacks > 0 and get_weapon_stack(fx.stack_id) < fx.requires_stacks:
 		return
 	var recipient: Battler = owner_battler if fx.scope_self else target
+	# Only stack gains work without someone to act on (e.g. a battle-start
+	# effect not scoped to self, or a target the hit just defeated): never
+	# spend stacks on nobody
+	if (recipient == null or recipient.is_defeated()) and fx.kind != WeaponEffect.Kind.GAIN_STACK:
+		return
 	match fx.kind:
 		WeaponEffect.Kind.DAMAGE:
 			var amount := _effect_amount(fx, recipient)
-			if amount > 0 and recipient and _battle_manager:
-				_battle_manager.damage_calculation(owner_battler, recipient, amount, null, "physical", "none")
+			if amount > 0 and get_battle_manager():
+				get_battle_manager().damage_calculation(owner_battler, recipient, amount, null, "physical", "none", false)
 		WeaponEffect.Kind.APPLY_STATE:
 			if fx.state and recipient:
-				recipient.apply_state(_state_for(fx.state, fx.state_stack_count, fx.state_accumulation))
+				recipient.apply_state(_fx_state(fx), owner_battler)
 		WeaponEffect.Kind.HEAL:
 			var amount := _effect_amount(fx, recipient)
 			if amount > 0 and recipient:
@@ -298,10 +327,10 @@ func _execute_effect(fx: WeaponEffect, target: Battler, context: Dictionary) -> 
 				return
 			_stacks.erase(fx.stack_id)
 			var amount := _effect_amount(fx, recipient) * consumed
-			if amount > 0 and recipient and _battle_manager:
-				_battle_manager.damage_calculation(owner_battler, recipient, int(amount), null, "physical", "none")
+			if amount > 0 and get_battle_manager():
+				get_battle_manager().damage_calculation(owner_battler, recipient, amount, null, "physical", "none", false)
 			if fx.state and recipient:
-				recipient.apply_state(_state_for(fx.state, fx.state_stack_count, fx.state_accumulation))
+				recipient.apply_state(_fx_state(fx), owner_battler)
 
 
 ## Resolves an effect's numeric value: flat, or percent of the owner's attack
@@ -316,14 +345,8 @@ func _effect_amount(fx: WeaponEffect, _recipient: Battler) -> float:
 	return amount
 
 
-func _state_for(base: State, stack_count: int, accumulation: int) -> State:
-	var dup := base.duplicate() as State
-	if dup == null:
-		return base
-	if stack_count > 0 and "stack_count" in dup:
-		dup.stack_count = stack_count
-	if accumulation > 0 and "accumulation_value" in dup:
-		dup.accumulation_value = accumulation
-	return dup
+## One application of [param fx]'s state (0 stacks / bar = as authored).
+func _fx_state(fx: WeaponEffect) -> State:
+	return fx.state.make_instance(0, fx.state_stack_count if fx.state_stack_count > 0 else -1, fx.state_accumulation)
 
 

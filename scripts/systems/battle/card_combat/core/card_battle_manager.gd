@@ -6,32 +6,37 @@ extends Node
 signal card_played(card: CardConfig, target: Variant)
 signal turn_ended()
 signal ap_changed(current_ap: int, max_ap: int)
-signal player_attacked(attacker: Battler, damage: int)
+## A card drawn for [param battler] found their hand full and went straight to
+## the graveyard.
+signal card_overdrawn(battler: Battler, card: CardConfig)
 
 ## Per-battler decks (keyed by Battler object)
 var decks_by_battler: Dictionary = {}     # Battler -> SimplifiedDeck
 
-var ap_system: APSystem
-
 var battle_manager: BattleManager
-var current_player_battler: Battler
+## The acting battler. Its AP is the one AP store: its ap_changed is relayed
+## as this manager's [signal ap_changed] (spending, regen, passive gains).
+var current_player_battler: Battler:
+	set(value):
+		if is_instance_valid(current_player_battler) and current_player_battler.ap_changed.is_connected(_relay_ap_changed):
+			current_player_battler.ap_changed.disconnect(_relay_ap_changed)
+		current_player_battler = value
+		if is_instance_valid(value) and not value.ap_changed.is_connected(_relay_ap_changed):
+			value.ap_changed.connect(_relay_ap_changed)
 var card_battle_config: CardBattleConfig
 var qte_manager: QTEManager
-
-## Execution context for AOE projectiles (keyed by CardConfig)
-var _aoe_execution_context: Dictionary = {}
-
-# Cards played this turn (to be executed when turn ends)
-var queued_cards: Array = []
 
 # Projectile scene cache to avoid repeated load() calls
 var _projectile_cache: Dictionary = {}  # scene_path -> PackedScene
 # Background preload task for projectile scenes
 var _preload_task: Dictionary = {}  # scene_path -> bool (loading status)
 # Projectile object pool to avoid repeated node instantiation
-var _projectile_pool: Array[BattleProjectile] = []
-const _POOL_SIZE = 20
-const _GRID_CELL_SIZE = 0.5  # Spatial grid cell size for spread calculation
+## Projectiles launched whose impact hasn't resolved yet. A card doesn't
+## finish until this is back to 0 (see _await_projectiles_landed).
+var _projectiles_in_flight: int = 0
+## Spread spawns try to stay at least this far apart (metres, and at least a
+## fifth of the card's spawn spread)
+const _MIN_SPAWN_SEPARATION = 0.4
 
 func _ready():
 	# Add to group for easy access
@@ -43,22 +48,14 @@ func _ready():
 		push_error("CardBattleManager: Could not find BattleManager")
 		return
 	
-	# Create AP system
-	ap_system = APSystem.new()
-	add_child(ap_system)
-	
-	# Create QTE manager
+# Create QTE manager
 	qte_manager = QTEManager.new()
 	add_child(qte_manager)
 	
 	# Load configuration
 	card_battle_config = load_card_config()
-	if card_battle_config:
-		ap_system.setup(card_battle_config.ap_per_turn, card_battle_config.max_ap)
-		ap_system.ap_changed.connect(_on_ap_changed)
-	
+
 	# Initialize projectile pool
-	_initialize_projectile_pool()
 
 func load_card_config() -> CardBattleConfig:
 	# Try to load from project settings or create default
@@ -83,13 +80,45 @@ func setup_card_combat(player_battler: Battler, card_configs: Array[CardConfig])
 	
 	# Store by battler reference
 	decks_by_battler[player_battler] = deck
+	_opening_hand_pending[player_battler] = true
 	
-	# Connect deck signals
-	if not deck.card_drawn.is_connected(_on_card_drawn):
-		deck.card_drawn.connect(_on_card_drawn)
+	# A card drawn into a full hand is burned: tell the UI
+	deck.card_overdrawn.connect(func(card: CardConfig): card_overdrawn.emit(player_battler, card))
 	
 	# Preload all projectile scenes for performance
 	preload_all_projectile_scenes()
+
+## Battlers whose first hand of the combat hasn't been dealt yet (it gets
+## their "starting_hand_size" bonus).
+var _opening_hand_pending: Dictionary = {}
+
+
+## AP the current player pays to play [param card] (after passive reductions).
+func get_card_ap_cost(card: CardConfig) -> int:
+	if current_player_battler:
+		return current_player_battler.get_card_ap_cost(card)
+	return card.ap_cost
+
+
+## Draws [param count] extra cards into [param battler]'s hand (e.g. from a
+## passive effect) and refreshes the hand display. Returns how many were drawn.
+func draw_cards(battler: Battler, count: int) -> int:
+	var deck: SimplifiedDeck = decks_by_battler.get(battler)
+	if deck == null or count <= 0:
+		return 0
+	# Only cards that reach the hand count: one drawn into a full hand burns
+	# (the deck's card_overdrawn) and isn't a card drawn
+	var drawn := 0
+	for _i in count:
+		var card := draw_card_for_deck(deck)
+		if card and deck.hand.has(card):
+			drawn += 1
+	if drawn > 0 and battler == current_player_battler and battle_manager and battle_manager.hud:
+		var card_ui = battle_manager.hud.get_node_or_null("Control/CardUI")
+		if card_ui and card_ui.has_method("update_hand_display"):
+			card_ui.update_hand_display()
+	return drawn
+
 
 ## Returns the current player's active deck. Null if not set up.
 func _get_current_deck() -> SimplifiedDeck:
@@ -103,21 +132,40 @@ func get_hand() -> Array[CardConfig]:
 		return deck.get_hand()
 	return []
 
+## Whether the acting battler can play [param card] now: it's in their hand
+## and they can pay its AP cost.
 func can_play_card(card: CardConfig) -> bool:
-	if not _get_current_deck():
+	var deck := _get_current_deck()
+	if deck == null or card == null or not deck.hand.has(card):
 		return false
+	return current_player_battler.can_spend_ap(get_card_ap_cost(card))
 
-	# Check AP on active player battler first, fallback to ap_system
-	if current_player_battler:
-		return current_player_battler.can_spend_ap(card.ap_cost)
-	elif ap_system:
-		return ap_system.can_spend_ap(card.ap_cost)
 
-	# Preload projectile scene in background if this is a projectile card
-	if card.projectile_enabled and not card.projectile_scene.is_empty():
-		_preload_projectile_scene(card.projectile_scene)
+## AP the draw pile asks for one extra card.
+func get_draw_ap_cost() -> int:
+	return card_battle_config.draw_card_ap_cost if card_battle_config else 1
 
-	return true
+
+## Whether the acting battler can buy a card from the draw pile: a card to draw
+## (the draw pile, or a graveyard to recycle), room in hand and the AP.
+func can_buy_card_draw() -> bool:
+	var deck := _get_current_deck()
+	if deck == null or is_executing_card or deck.is_hand_full():
+		return false
+	if deck.draw_pile.is_empty() and deck.graveyard.is_empty():
+		return false
+	return current_player_battler.can_spend_ap(get_draw_ap_cost())
+
+
+## Buys one card from the draw pile. The AP is only spent once a card was
+## actually drawn. Returns the card (null when nothing could be bought).
+func buy_card_draw() -> CardConfig:
+	if not can_buy_card_draw():
+		return null
+	var card := draw_card_for_deck(_get_current_deck())
+	if card:
+		current_player_battler.spend_ap(get_draw_ap_cost())
+	return card
 
 ## Preload projectile scene in background to avoid lag spike
 func _preload_projectile_scene(scene_path: String) -> void:
@@ -146,40 +194,6 @@ func _complete_preload(scene_path: String) -> PackedScene:
 			_preload_task.erase(scene_path)
 
 	return null
-
-## Initialize projectile object pool
-func _initialize_projectile_pool() -> void:
-	for i in _POOL_SIZE:
-		var proj = BattleProjectile.new()
-		proj.process_mode = Node.PROCESS_MODE_INHERIT
-		_projectile_pool.append(proj)
-
-## Get a projectile from pool (creates new if pool exhausted)
-func _get_pooled_projectile() -> BattleProjectile:
-	if _projectile_pool.size() > 0:
-		return _projectile_pool.pop_back()
-	# Fallback: create new if pool exhausted
-	return BattleProjectile.new()
-
-## Return projectile to pool for reuse
-func _return_projectile_to_pool(proj: BattleProjectile) -> void:
-	# Remove from scene tree first (before accessing transform properties)
-	if proj.get_parent():
-		proj.get_parent().remove_child(proj)
-	
-	# Reset projectile state (only if still valid)
-	if is_instance_valid(proj):
-		proj._traveling = false
-		proj.position = Vector3.ZERO  # Use position instead of global_position
-		proj.rotation = Vector3.ZERO
-		proj.scale = Vector3.ONE
-		proj.damage_data.clear()
-		
-		# Add back to pool if not full
-		if _projectile_pool.size() < _POOL_SIZE:
-			_projectile_pool.append(proj)
-		else:
-			proj.queue_free()
 
 var is_executing_card: bool = false
 ## >0 while replay_card_resolution re-runs card effects (e.g. for a hit-echo
@@ -229,6 +243,7 @@ func replay_card_resolution(info: Dictionary) -> void:
 		"camera": battle_manager.battle_camera if battle_manager else null,
 		"parent_node": self,
 		"qte_multiplier": float(info.get("qte_multiplier", 1.0)),
+		"skip_primary_effect": bool(info.get("skip_primary_effect", false)),
 	}
 	_replay_depth += 1
 	match str(info.get("kind", "")):
@@ -246,35 +261,25 @@ func replay_card_resolution(info: Dictionary) -> void:
 			var dmg_mult := float(info.get("damage_multiplier", 1.0))
 			var aoe_targets: Array = info.get("aoe_targets", [])
 			if card_cfg.projectile_enabled and not card_cfg.projectile_scene.is_empty():
-				if card_cfg.get("projectile_aoe") and not aoe_targets.is_empty() and battle_manager:
-					var ctx := BattleManager.ProjectileExecutionContext.new()
-					var center := Vector3.ZERO
-					var n := 0
-					for t in aoe_targets:
-						if is_instance_valid(t):
-							center += (t as Node3D).global_position
-							n += 1
-					if n > 0:
-						center /= n
-						center.y = 1.0
-						ctx.center_position = center
-						ctx.targets = aoe_targets.duplicate()
-						_aoe_execution_context[card_cfg] = ctx
-				_travel_projectile(card_cfg, actor, target, dmg_mult, [], [], true, true)
-				_aoe_execution_context.erase(card_cfg)
+				var ctx: BattleManager.AoeContext = null
+				if card_cfg.projectile_aoe and not aoe_targets.is_empty():
+					ctx = BattleManager.AoeContext.from_targets(aoe_targets)
+					if ctx.targets.is_empty():
+						ctx = null
+				_travel_projectile(card_cfg, actor, target, dmg_mult, [], null, true, true, ctx)
 			else:
 				_apply_projectile_damage(card_cfg, actor, target, dmg_mult, aoe_targets, true)
 	_replay_depth -= 1
 
-func play_card(card: CardConfig, target: Battler = null) -> bool:
+## [param aoe]: an AOE cast's targets (every AOE card): the card resolves once,
+## on all of them.
+func play_card(card: CardConfig, target: Battler = null, aoe: BattleManager.AoeContext = null) -> bool:
 	if is_executing_card or not can_play_card(card):
 		return false
 	
-	# Trigger vestige hooks for ON_CARD_PLAY on the active battler
-	if current_player_battler and current_player_battler.has_method("trigger_vestige_hooks"):
-		current_player_battler.trigger_vestige_hooks(TriggerHook.TriggerType.ON_CARD_PLAY, {"card": card, "target": target, "battle_manager": battle_manager})
-	if current_player_battler and current_player_battler.weapon_system:
-		current_player_battler.weapon_system.notify_card_play(card)
+	if current_player_battler:
+		var targets: Array = aoe.targets.duplicate() if aoe else [target]
+		current_player_battler.notify_battle_event(BattleEvents.CARD_PLAYED, {"card": card, "target": target, "targets": targets, "battle_manager": battle_manager})
 	
 	is_executing_card = true
 	if battle_manager:
@@ -282,33 +287,43 @@ func play_card(card: CardConfig, target: Battler = null) -> bool:
 		if battle_manager.hud and battle_manager.hud.has_method("set_ui_state"):
 			battle_manager.hud.set_ui_state(3) # CARD_EXECUTION_STATE
 	
-	# Camera choreography: wider view for player attack cards only
-	var card_tags = card.card_tags
-	var is_attack_card = "attack" in card_tags or "skill" in card_tags
-	if is_attack_card and battle_manager and battle_manager.battle_camera:
-		battle_manager.battle_camera.set_default_camera()
+	# Camera choreography, by who the card is aimed at (not its tags, which
+	# also drive QTEs and visuals): a card on an enemy gets the wide shot, so
+	# a melee attacker walking in stays in frame; a card on an ally or the
+	# caster gets a close-up on them. Outranks targeting, so it shows as soon
+	# as the card starts.
+	var rig: BattleCamera = battle_manager.battle_camera if battle_manager else null
+	if rig:
+		var shot_target: Battler = target if is_instance_valid(target) else null
+		var aims_at_enemy: bool
+		if shot_target:
+			aims_at_enemy = battle_manager.enemies.has(shot_target)
+		else:
+			aims_at_enemy = card.target_type in [CardConfig.TargetScope.SINGLE_ENEMY,
+					CardConfig.TargetScope.ALL_ENEMIES, CardConfig.TargetScope.ALL_UNITS]
+			# No target picked (e.g. a self card): frame the caster
+			shot_target = current_player_battler if is_instance_valid(current_player_battler) else null
+		# An AOE card (on any side) also gets the wide shot, framing every target
+		if aims_at_enemy or aoe:
+			rig.request_shot(&"execution", BattleCamera.ShotPriority.EXECUTION, BattleCamera.CameraMode.DEFAULT)
+		elif shot_target:
+			rig.request_shot(&"execution", BattleCamera.ShotPriority.EXECUTION, BattleCamera.CameraMode.TARGET_FOCUS, shot_target)
 	
 	# Execute card effect
-	await execute_card_effect(card, target)
+	await execute_card_effect(card, target, aoe)
 	
-	# Spend AP from battler systematically only AFTER effect resolves
+	# Spend AP only AFTER the effect resolves
 	if current_player_battler:
-		current_player_battler.spend_ap(card.ap_cost)
-		if ap_system:
-			ap_system.current_ap = current_player_battler.current_ap
-			ap_system.max_ap = current_player_battler.max_ap
-		ap_changed.emit(current_player_battler.current_ap, current_player_battler.max_ap)
-	elif ap_system:
-		ap_system.spend_ap(card.ap_cost)
+		current_player_battler.spend_ap(get_card_ap_cost(card))
 	
 	# Remove from hand (move to graveyard through deck system)
 	var deck = _get_current_deck()
 	if deck:
 		deck.discard_card(card)
 	
-	# Restore over-the-shoulder camera on the acting player after attack finishes
-	if is_attack_card and battle_manager and battle_manager.battle_camera and is_instance_valid(current_player_battler):
-		battle_manager.battle_camera.set_over_the_shoulder(current_player_battler)
+	# Back to the turn's shot
+	if rig:
+		rig.release_shot(&"execution")
 	
 	is_executing_card = false
 	if battle_manager:
@@ -318,33 +333,17 @@ func play_card(card: CardConfig, target: Battler = null) -> bool:
 	
 	return true
 
-func execute_queued_cards() -> void:
-	for card_action in queued_cards:
-		var card: CardConfig = card_action["card"]
-		var target: Battler = card_action["target"]
-		await execute_card_effect(card, target)
-	
-	# Clear queued cards
-	queued_cards.clear()
-	
-	# End turn
-	turn_ended.emit()
-
-func execute_card_effect(card: CardConfig, target: Battler) -> void:
+func execute_card_effect(card: CardConfig, target: Battler, aoe: BattleManager.AoeContext = null) -> void:
 	if not target:
 		return
 	
 	if not current_player_battler:
 		return
 	
-	# Apply state effects BEFORE execution (to avoid target being freed)
-	apply_card_states(card, target)
-	
-	# Execute using CardConfig directly
-	await execute_card_with_config(card, target)
+	await execute_card_with_config(card, target, aoe)
 
 ## Execute card using the CardConfig system
-func execute_card_with_config(card: CardConfig, target: Battler) -> void:
+func execute_card_with_config(card: CardConfig, target: Battler, aoe: BattleManager.AoeContext = null) -> void:
 	var card_cfg = card
 	if not card_cfg:
 		push_error("CardConfig is null")
@@ -366,6 +365,9 @@ func execute_card_with_config(card: CardConfig, target: Battler) -> void:
 	if current_player_battler:
 		current_player_battler.current_target = target
 
+	# Spawn points this cast has used, shared by every strike/projectile of
+	# it (strike contexts are shallow copies) so spread spawns stay apart
+	var spawn_history: Array[Vector3] = []
 	var context = {
 		"card_config": card_cfg,
 		"actor": current_player_battler,
@@ -375,27 +377,27 @@ func execute_card_with_config(card: CardConfig, target: Battler) -> void:
 		"effect_manager": battle_manager.effect_manager if battle_manager else null,
 		"qte_manager": qte_manager,
 		"camera": battle_manager.battle_camera if battle_manager else null,
-		"parent_node": self
+		"parent_node": self,
+		"aoe": aoe,
+		"spawn_history": spawn_history,
 	}
 	
 	# Determine if this is an AOE effect
 	var is_aoe = card_cfg.target_type in [CardConfig.TargetScope.ALL_ENEMIES, CardConfig.TargetScope.ALL_ALLIES, CardConfig.TargetScope.ALL_UNITS, CardConfig.TargetScope.ALL_ALLIES_SELF]
 	
 	# Phase 0: Movement Phase (for non-AOE enemy melee targeting)
-	var movement_time := 0.0
 	var should_return_to_position = false
 	var is_ranged = card_cfg.projectile_enabled or "ranged" in card_cfg.card_tags
 	if not is_aoe and not is_ranged and card_cfg.target_type == CardConfig.TargetScope.SINGLE_ENEMY and target:
-		# Store original position before movement so we can return later
-		var original_pos_before_move = current_player_battler.global_position
 		should_return_to_position = true  # Store decision before target might die
 		if await current_player_battler.advance_to_target(target):
 			current_player_battler._try_animation("walk")
-			var movement_start = Time.get_ticks_msec() / 1000.0
 			while current_player_battler.is_advancing:
-				await get_tree().create_timer(0.016).timeout
-			movement_time = (Time.get_ticks_msec() / 1000.0) - movement_start
-	
+				await get_tree().process_frame
+
+	# The cast begins: cast sound, VFX on the caster
+	_play_cast_feedback(card_cfg, context)
+
 	# Phase 0.5: Check if multi-strike or single-strike
 	if card_cfg.is_multi_strike:
 		# Multi-strike execution: every strike applies its own damage at its own hit frame.
@@ -404,15 +406,10 @@ func execute_card_with_config(card: CardConfig, target: Battler) -> void:
 	else:
 		# Single-strike execution (original flow)
 		await execute_single_strike_sequence(card_cfg, context)
-	
-	# Phase 2: Get QTE result if it was running
-	var qte_success = false
-	var qte_multiplier = 1.0
-	if context.get("qte_success_set", false):
-		qte_success = context.get("qte_success", false)
-		qte_multiplier = qte_manager.get_damage_multiplier("CARD_ATTACK", qte_success)
-		# Store multiplier in context for effect phase
-		context["qte_multiplier"] = qte_multiplier
+
+	# Fire-and-continue projectiles (e.g. multi-strike barrages) may still be in
+	# the air: the card only resolves once every one has landed
+	await _await_projectiles_landed()
 	
 	# Phase 3: Effect Phase (applies damage with QTE multiplier).
 	# Single-strike cards run their effects from the hit callback and set
@@ -420,36 +417,20 @@ func execute_card_with_config(card: CardConfig, target: Battler) -> void:
 	# primary damage is never applied twice here. Secondary effects / states still resolve.
 	await execute_effect_phase(card_cfg, context)
 	
-	# Phase 5: VFX Phase
-	if card_cfg.vfx_on_actor or card_cfg.vfx_on_target or card_cfg.vfx_on_projectile:
-		execute_vfx_phase(card_cfg, context)
-	
 	# Phase 6: Return Movement (for non-AOE enemy targeting)
 	# Use stored decision instead of checking target (target may have died)
 	if should_return_to_position:
 		if current_player_battler.has_method("return_to_original_position"):
 			current_player_battler.return_to_original_position()
 			while current_player_battler.is_advancing:
-				await get_tree().create_timer(0.016).timeout
-	
-	# Phase 7: Camera Phase
-	if card_cfg.camera_effects:
-		execute_camera_phase(card_cfg, context)
-	
-	# Phase 8: Screen Phase
-	if card_cfg.screen_effects:
-		execute_screen_phase(card_cfg, context)
-	
-	# Phase 9: Audio Phase
-	if card_cfg.cast_sound or card_cfg.hit_sound or card_cfg.impact_sound:
-		execute_audio_phase(card_cfg, context)
-	
+				await get_tree().process_frame
+
 	# Phase 10: Return the actor to its battle idle once the card fully resolves.
 	if current_player_battler and current_player_battler.has_method("battle_idle"):
 		current_player_battler.battle_idle()
 
 ## Execute animation phase with hit moment damage application
-func execute_animation_phase_with_hit_timing(card_cfg: CardConfig, context: Dictionary, qte_start_time: float = 0.0) -> void:
+func execute_animation_phase_with_hit_timing(card_cfg: CardConfig, context: Dictionary) -> void:
 	var actor = context["actor"]
 	if not actor:
 		return
@@ -462,191 +443,80 @@ func execute_animation_phase_with_hit_timing(card_cfg: CardConfig, context: Dict
 			animation_name = actor.get_resolved_animation(animation_name)
 		
 		# Start the animation
+		var animation_start := Time.get_ticks_msec() / 1000.0
 		if actor.has_method("_try_animation"):
 			actor._try_animation(animation_name)
+		var anim_duration: float = 0.0
+		if actor.has_method("_get_animation_duration"):
+			anim_duration = actor._get_animation_duration(animation_name)
 
 		# Wait a few frames for the state machine to process the transition
 		await get_tree().process_frame
 		await get_tree().process_frame
 
 		# For projectile cards, launch projectile at hit moment (damage applied on impact)
-		# For non-projectile cards, apply damage at hit moment
-		if actor.has_signal("hit_moment"):
-			var hit_time = Time.get_ticks_msec() / 1000.0
-			await actor.hit_moment
-			var time_until_hit = (Time.get_ticks_msec() / 1000.0) - hit_time
+		# For non-projectile cards, apply damage at hit moment. A clip without
+		# a hit frame times out: the card then resolves after the animation
+		# (execute_effect_phase), instead of hanging.
+		if await _await_hit_moment(actor, anim_duration):
+			_play_hit_frame_feedback(card_cfg, context)
 
-			# Calculate QTE duration if QTE was started early
-			if card_cfg.should_trigger_qte() and qte_start_time > 0:
-				var qte_duration = (Time.get_ticks_msec() / 1000.0) - qte_start_time
-
-			# Capture QTE result at hit moment
-			if card_cfg.should_trigger_qte() and qte_manager:
-				var qte_result = qte_manager.last_qte_result
+			# The hit settles this card's QTE (still running = no press in time)
+			if context.get("qte_started", false) and qte_manager:
+				var qte_result := qte_manager.resolve_qte()
 				context["qte_success"] = qte_result
 				context["qte_success_set"] = true
+				context["qte_multiplier"] = qte_manager.get_card_multiplier(card_cfg, qte_result)
 
 			if card_cfg.projectile_enabled:
 				await launch_projectile_and_await_impact(card_cfg, context)
+				# The projectiles dealt the primary damage; the card's states and
+				# secondary effects resolve now that they've landed
+				_apply_projectile_followup_effects(card_cfg, context)
 			else:
 				await execute_effect_phase(card_cfg, context, true)
 			context["damage_applied_at_hit"] = true
+			_play_impact_feedback(card_cfg, context)
 
-			# Stop animation if target died
-			var hit_target = context.get("target")
-			if hit_target and hit_target.has_method("is_defeated") and hit_target.is_defeated():
+			# Stop the animation if everyone the cast hit died
+			if _cast_targets(context).is_empty():
 				return
 
-		# Wait for remaining animation duration
-		var anim_duration: float = 0.0
-		if actor.has_method("_get_animation_duration"):
-			anim_duration = actor._get_animation_duration(animation_name)
-
-		if anim_duration > 0.0:
-			await get_tree().create_timer(anim_duration).timeout
+		# Wait out what is left of the clip (it started at animation_start)
+		var remaining := anim_duration - (Time.get_ticks_msec() / 1000.0 - animation_start)
+		if remaining > 0.0:
+			await get_tree().create_timer(remaining).timeout
 
 
-## Run QTE asynchronously in background with delay
-func _run_qte_async(card_cfg: CardConfig, context: Dictionary, delay: float = 0.0) -> void:
-	var qte_mgr = context["qte_manager"]
-	if not qte_mgr:
-		return
-	
-	# Wait for delay before starting QTE
-	if delay > 0:
-		await get_tree().create_timer(delay).timeout
-	
-	# Use the configured QTE type from CardConfig
-	match card_cfg.qte_type:
-		CardConfig.QTEType.TIMING:
-			await _execute_timing_qte_async(card_cfg, context)
-		CardConfig.QTEType.BUTTON_MASH:
-			await _execute_button_mash_qte_async(card_cfg, context)
-		CardConfig.QTEType.SEQUENCE:
-			await _execute_sequence_qte_async(card_cfg, context)
+## Waits for [param actor]'s next hit_moment, giving up after its clip
+## ([param clip_length] seconds, plus a margin): a clip without a hit frame
+## must not hang the card. Resumes right at the hit (inside its emission), like
+## awaiting the signal itself. Returns whether the hit came.
+func _await_hit_moment(actor: Node, clip_length: float) -> bool:
+	if actor == null or not actor.has_signal("hit_moment"):
+		return false
+	var race := _HitRace.new()
+	var on_hit := func(_attacker): race.finish(true)
+	actor.hit_moment.connect(on_hit, CONNECT_ONE_SHOT)
+	var timeout := (clip_length if clip_length > 0.05 else 4.0) + 1.0
+	get_tree().create_timer(timeout).timeout.connect(race.finish.bind(false))
+	var hit: bool = await race.finished
+	if not hit and is_instance_valid(actor) and actor.hit_moment.is_connected(on_hit):
+		actor.hit_moment.disconnect(on_hit)
+	return hit
 
-## Get QTE result (should be called after animation completes)
-func _get_qte_result() -> bool:
-	return qte_manager.last_qte_result if qte_manager else false
 
-## Execute timing-based QTE (synchronous - waits for completion)
-func _execute_timing_qte_async(card_cfg: CardConfig, context: Dictionary) -> void:
-	var qte_mgr = context["qte_manager"]
-	if not qte_mgr:
-		return
-	
-	# Check if QTE is actually enabled for this card
-	if card_cfg.qte_type == CardConfig.QTEType.NONE:
-		return
-	
-	var _difficulty = card_cfg.qte_difficulty
-	var _time_limit = card_cfg.qte_window_duration
-	qte_mgr.start_qte(QTEManager.QTEType.CARD_ATTACK, _difficulty)
-	
-	# Wait for QTE window duration
-	await get_tree().create_timer(_time_limit).timeout
-	
-	# Get and store result
-	var qte_result = qte_manager.last_qte_result
-	context["qte_success"] = qte_result
-	context["qte_success_set"] = true
+## First of two outcomes (the hit, or the timeout) wins; later ones are ignored.
+class _HitRace extends RefCounted:
+	signal finished(hit: bool)
+	var _done := false
 
-## Execute button mash QTE (synchronous - waits for completion)
-func _execute_button_mash_qte_async(card_cfg: CardConfig, context: Dictionary) -> void:
-	var qte_mgr = context["qte_manager"]
-	if not qte_mgr:
-		return
-	# For now, use timing QTE as fallback
-	await _execute_timing_qte_async(card_cfg, context)
-
-## Execute sequence QTE (synchronous - waits for completion)
-func _execute_sequence_qte_async(card_cfg: CardConfig, context: Dictionary) -> void:
-	var qte_mgr = context["qte_manager"]
-	if not qte_mgr:
-		return
-	# For now, use timing QTE as fallback
-	await _execute_timing_qte_async(card_cfg, context)
-
-## Execute QTE phase (legacy, kept for compatibility)
-func execute_qte_phase(card_cfg: CardConfig, context: Dictionary) -> void:
-	var qte_mgr = context["qte_manager"]
-	if not qte_mgr:
-		return
-	
-	# Use the configured QTE type from CardConfig
-	match card_cfg.qte_type:
-		CardConfig.QTEType.TIMING:
-			await execute_timing_qte(card_cfg, context)
-		CardConfig.QTEType.BUTTON_MASH:
-			await execute_button_mash_qte(card_cfg, context)
-		CardConfig.QTEType.SEQUENCE:
-			await execute_sequence_qte(card_cfg, context)
-
-## Execute timing-based QTE
-func execute_timing_qte(card_cfg: CardConfig, context: Dictionary) -> void:
-	var qte_mgr = context["qte_manager"]
-	if not qte_mgr:
-		return
-	
-	var _difficulty = card_cfg.qte_difficulty
-	var _time_limit = card_cfg.qte_window_duration
-	
-	# Use the QTEManager's card attack method
-	var qte_started = qte_mgr.start_card_qte(context["card_config"])
-	if qte_started:
-		var qte_success = await await_qte_completion()
-		var multiplier = card_cfg.qte_success_multiplier if qte_success else card_cfg.qte_failure_multiplier
-		context["qte_multiplier"] = multiplier
-
-## Execute button mash QTE
-func execute_button_mash_qte(card_cfg: CardConfig, context: Dictionary) -> void:
-	var required_presses = card_cfg.qte_mash_count
-	var time_window = card_cfg.qte_window_duration
-	var current_presses = 0
-	var start_time = Time.get_ticks_msec() / 1000.0
-	
-	while current_presses < required_presses:
-		var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
-		if elapsed >= time_window:
-			context["qte_multiplier"] = card_cfg.qte_failure_multiplier
+	func finish(hit: bool) -> void:
+		if _done:
 			return
-		
-		# Check for button press (would need input system integration)
-		if Input.is_action_just_pressed("ui_accept"):
-			current_presses += 1
-		
-		await get_tree().process_frame
-	
-	context["qte_multiplier"] = card_cfg.qte_success_multiplier
+		_done = true
+		finished.emit(hit)
 
-## Execute sequence QTE
-func execute_sequence_qte(card_cfg: CardConfig, context: Dictionary) -> void:
-	var sequence = card_cfg.qte_sequence
-	if sequence.is_empty():
-		return
-	
-	var time_window = card_cfg.qte_window_duration
-	var current_index = 0
-	var start_time = Time.get_ticks_msec() / 1000.0
-	
-	while current_index < sequence.size():
-		var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
-		if elapsed >= time_window:
-			context["qte_multiplier"] = card_cfg.qte_failure_multiplier
-			return
-		
-		var required_button = sequence[current_index]
-		
-		# Check for correct button input (would need input system integration)
-		if Input.is_action_just_pressed(required_button):
-			current_index += 1
-		elif Input.is_action_just_pressed("ui_accept"):
-			context["qte_multiplier"] = card_cfg.qte_failure_multiplier
-			return
-		
-		await get_tree().process_frame
-	
-	context["qte_multiplier"] = card_cfg.qte_success_multiplier
 
 ## Execute effect phase
 func execute_effect_phase(card_cfg: CardConfig, context: Dictionary, from_animation_callback: bool = false) -> void:
@@ -659,35 +529,15 @@ func execute_effect_phase(card_cfg: CardConfig, context: Dictionary, from_animat
 	if context.get("damage_applied_at_hit", false):
 		return
 	
-	# Check all conditions before executing effects
-	if not check_card_conditions(card_cfg, context):
-		return
-	
-	# Apply QTE multiplier if present
+# Apply QTE multiplier if present
 	var qte_multiplier = context.get("qte_multiplier", 1.0)
 	
-	# If called from animation callback, apply effects immediately regardless of effect_timing
-	if from_animation_callback:
-		_execute_effects_immediate(card_cfg, context, qte_multiplier)
-		return
-	
-	# Handle effect timing
-	match card_cfg.effect_timing:
-		CardConfig.EffectTiming.IMMEDIATE:
-			_execute_effects_immediate(card_cfg, context, qte_multiplier)
-		CardConfig.EffectTiming.AFTER_ANIMATION:
-			_execute_effects_immediate(card_cfg, context, qte_multiplier)
-		CardConfig.EffectTiming.ON_HIT:
-			await _execute_effects_on_hit(card_cfg, context, qte_multiplier)
-		CardConfig.EffectTiming.ON_IMPACT:
-			await _execute_effects_on_impact(card_cfg, context, qte_multiplier)
-		CardConfig.EffectTiming.CHANNEL_START:
-			_execute_effects_channel_start(card_cfg, context, qte_multiplier)
-		CardConfig.EffectTiming.CHANNEL_END:
-			await _execute_effects_channel_end(card_cfg, context, qte_multiplier)
-		_:
-			# Default to immediate
-			_execute_effects_immediate(card_cfg, context, qte_multiplier)
+	# The card resolves now: at its hit frame (the animation callback), after
+	# its strikes (their states and secondary effects), or once its animation
+	# ended without a hit frame
+	_resolve_on_cast_targets(card_cfg, context, qte_multiplier)
+	if not from_animation_callback and not context.get("skip_primary_effect", false):
+		_play_impact_feedback(card_cfg, context)
 
 ## Check all conditions for card execution
 func check_card_conditions(card_cfg: CardConfig, context: Dictionary) -> bool:
@@ -711,45 +561,16 @@ func check_card_conditions(card_cfg: CardConfig, context: Dictionary) -> bool:
 			if not condition.evaluate(actor, target):
 				return false
 	
-	# Check state application conditions
-	for state_cfg in card_cfg.applies_states:
-		if not check_state_conditions(state_cfg, actor, target):
-			return false
-	
+	# States roll their own chance (and check immunity) when applied: a missed
+	# state never stops the rest of the card
 	return true
-
-## Check conditions for state application
-func check_state_conditions(state_config: StateConfig, _actor: Node, target: Node) -> bool:
-	# Check application chance
-	if randf() > state_config.chance:
-		return false
-	
-	# Check if target is immune
-	if _is_immune_to_state(target, state_config.state_id):
-		return false
-	
-	return true
-
-## Check if target is immune to a specific state
-func _is_immune_to_state(target: Node, state_id: String) -> bool:
-	if not target:
-		return false
-	
-	if target.has_method("has_state_immunity"):
-		return target.has_state_immunity(state_id)
-	
-	if target.has_method("has_state"):
-		return target.has_state("immunity_" + state_id)
-	
-	return false
 
 ## Execute single-strike sequence (original flow)
 func execute_single_strike_sequence(card_cfg: CardConfig, context: Dictionary) -> void:
 	var actor = context["actor"]
-	var qte_start_time := 0.0
-	
+
 	# Phase 0.5: Start QTE early (before animation) if card has QTE
-	if card_cfg.should_trigger_qte():
+	if qte_manager and qte_manager.wants_card_qte(card_cfg):
 		var hit_moment_time = 0.0
 		if actor.has_method("_get_hit_moment_time"):
 			hit_moment_time = actor._get_hit_moment_time(card_cfg.animation_name)
@@ -763,18 +584,14 @@ func execute_single_strike_sequence(card_cfg: CardConfig, context: Dictionary) -
 			anim_delay = qte_window - hit_moment_time
 		
 		# Start QTE immediately
-		qte_start_time = Time.get_ticks_msec() / 1000.0
-		
-		var qte_mgr = context["qte_manager"]
-		if qte_mgr:
-			qte_mgr.start_qte(QTEManager.QTEType.CARD_ATTACK, card_cfg.qte_difficulty, qte_window)
+		context["qte_started"] = qte_manager.start_card_qte(card_cfg, qte_window)
 		
 		# Delay animation start if needed
 		if anim_delay > 0:
 			await get_tree().create_timer(anim_delay).timeout
 	
 	# Phase 1: Animation Phase with hit timing
-	await execute_animation_phase_with_hit_timing(card_cfg, context, qte_start_time)
+	await execute_animation_phase_with_hit_timing(card_cfg, context)
 
 ## Execute multi-strike sequence
 func execute_multi_strike_sequence(card_cfg: CardConfig, context: Dictionary) -> void:
@@ -795,9 +612,8 @@ func execute_multi_strike_sequence(card_cfg: CardConfig, context: Dictionary) ->
 		actor.set_animation_condition("allow_combat_to_idle", false)
 	
 	for strike_index in range(strike_count):
-		# Abort the combo if the target was destroyed mid-sequence (defeated, faded
-		# out and freed by an earlier strike).
-		if not is_instance_valid(context.get("target")):
+		# Abort the combo once an earlier strike defeated every target
+		if _cast_targets(context).is_empty():
 			break
 		
 		var animation_name = card_cfg.strike_animations[strike_index]
@@ -833,10 +649,10 @@ func execute_multi_strike_sequence(card_cfg: CardConfig, context: Dictionary) ->
 			var strike_qte_success = strike_context.get("qte_success", false)
 			if not strike_qte_success:
 				total_qte_success = false
-			# Use the project's configured QTE multipliers (database/qte_config.tres)
+			# The card's own QTE multipliers, else the QTE config's
 			var strike_multiplier := 1.0
 			if qte_manager:
-				strike_multiplier = qte_manager.get_damage_multiplier("CARD_ATTACK", strike_qte_success)
+				strike_multiplier = qte_manager.get_card_multiplier(card_cfg, strike_qte_success)
 			cumulative_qte_multiplier *= strike_multiplier
 	
 	# Every strike already applied its own damage - tell the effect phase to skip this
@@ -870,14 +686,14 @@ func execute_single_strike_inline(context: Dictionary) -> void:
 	var damage_multiplier = context["damage_multiplier"]
 	var qte_difficulty = context["qte_difficulty"]
 	var qte_window = context["qte_window"]
-	var qte_start_time := 0.0
-	
+	var qte_started := false
+
 	# Seconds trimmed from this strike's clip so the NEXT strike chains in early.
 	# Only used when another strike follows (set by execute_multi_strike_sequence).
 	var chain_lead = context.get("chain_lead", 0.0) if context.get("has_next_strike", false) else 0.0
 	
-	# Start QTE for this strike
-	if qte_window > 0:
+	# Start QTE for this strike (if card QTEs are enabled)
+	if qte_window > 0 and qte_manager and qte_manager.is_enabled():
 		var hit_moment_time = 0.0
 		if actor.has_method("_get_hit_moment_time"):
 			hit_moment_time = actor._get_hit_moment_time(animation_name)
@@ -889,11 +705,7 @@ func execute_single_strike_inline(context: Dictionary) -> void:
 			anim_delay = qte_window - hit_moment_time
 		
 		# Start QTE immediately
-		qte_start_time = Time.get_ticks_msec() / 1000.0
-		
-		var qte_mgr = context["qte_manager"]
-		if qte_mgr:
-			qte_mgr.start_qte(QTEManager.QTEType.CARD_ATTACK, qte_difficulty, qte_window)
+		qte_started = qte_manager.start_qte(QTEManager.QTEType.CARD_ATTACK, qte_difficulty, qte_window)
 		
 		# Delay animation start if needed
 		if anim_delay > 0:
@@ -903,41 +715,48 @@ func execute_single_strike_inline(context: Dictionary) -> void:
 	var animation_start_time := Time.get_ticks_msec() / 1000.0
 	if actor.has_method("_try_animation"):
 		actor._try_animation(animation_name)
-	
-	# Wait for hit moment signal
-	if actor.has_signal("hit_moment"):
-		var hit_time = Time.get_ticks_msec() / 1000.0
-		await actor.hit_moment
-		var time_until_hit = (Time.get_ticks_msec() / 1000.0) - hit_time
-		
-		# Calculate QTE duration if QTE was started
-		if qte_window > 0 and qte_start_time > 0:
-			var qte_duration = (Time.get_ticks_msec() / 1000.0) - qte_start_time
-		
-		# Capture QTE result at hit moment
-		if qte_window > 0 and qte_manager:
-			var qte_result = qte_manager.last_qte_result
+	var clip_length = _get_strike_clip_length(actor, animation_name)
+	var strike_card: CardConfig = context.get("card_config")
+
+	# Wait for hit moment signal (a strike clip without one times out)
+	if await _await_hit_moment(actor, clip_length):
+		_play_hit_frame_feedback(strike_card, context)
+
+		# The hit settles this strike's QTE (still running = no press in time).
+		# Its multiplier comes from the project's QTE config; no QTE on this
+		# strike = no modifier
+		var strike_multiplier := 1.0
+		if qte_started:
+			var qte_result := qte_manager.resolve_qte()
 			context["qte_success"] = qte_result
 			context["qte_success_set"] = true
-		
-		# Apply damage for this strike with strike-specific multiplier
-		var strike_multiplier = 1.2 if context.get("qte_success", false) else 0.8
+			strike_multiplier = qte_manager.get_card_multiplier(context.get("card_config"), qte_result)
 
 		var _strike_card_cfg: CardConfig = context.get("card_config")
 		if _strike_card_cfg and _strike_card_cfg.projectile_enabled:
 			# Projectile handles its own damage on impact
 			var wait_for_impact: bool = _strike_card_cfg.projectile_wait_for_impact if "projectile_wait_for_impact" in _strike_card_cfg else true
-			await _travel_projectile(_strike_card_cfg, actor, context["target"], damage_multiplier * strike_multiplier, [], [], wait_for_impact)
+			var spawn_history: Array[Vector3] = []
+			if context.get("spawn_history") is Array:
+				spawn_history = context["spawn_history"]
+			var aims := _projectile_aims(_strike_card_cfg, context)
+			# All but the last fly on their own; the last one is waited on
+			for i in aims.size() - 1:
+				_travel_projectile(_strike_card_cfg, actor, aims[i], damage_multiplier * strike_multiplier,
+						spawn_history, null, wait_for_impact, false, context.get("aoe"))
+			if not aims.is_empty():
+				await _travel_projectile(_strike_card_cfg, actor, aims[-1], damage_multiplier * strike_multiplier,
+						spawn_history, null, wait_for_impact, false, context.get("aoe"))
 		else:
 			apply_strike_damage_inline(context, damage_multiplier, strike_multiplier)
 		context["damage_applied_at_hit"] = true
+		_play_impact_feedback(strike_card, context)
 	
 	# Wait out the remainder of this strike's clip before the next strike (or the
 	# post-combat transition) begins. Timing is anchored to animation_start_time so
 	# the wait is always correct regardless of how long damage_calculation takes.
 	# `chain_lead` shortens the wait for mid-combo strikes so the next travel() is
 	# issued while this clip is still playing, keeping the actor inside combat_actions.
-	var clip_length = _get_strike_clip_length(actor, animation_name)
 	var clip_end_time = animation_start_time + clip_length
 	var clip_remaining = clip_end_time - (Time.get_ticks_msec() / 1000.0)
 	var wait_time = maxf(0.0, clip_remaining - chain_lead)
@@ -956,84 +775,105 @@ func _get_strike_clip_length(actor, animation_name: String) -> float:
 ## Apply damage for a single strike using inline config
 func apply_strike_damage_inline(context: Dictionary, damage_multiplier: float, qte_multiplier: float) -> void:
 	var actor = context["actor"]
-	var target = context["target"]
 	var card_cfg = context["card_config"]
-	
+
 	# Calculate damage from primary effect
-	if card_cfg.primary_effect:
+	if card_cfg.primary_effect and battle_manager:
 		var base_value = card_cfg.primary_effect._calculate_value(actor)
 		var strike_damage = int(base_value * damage_multiplier * qte_multiplier)
-		
-		# Apply damage to target (guard against the target being freed mid-combo)
-		if battle_manager and is_instance_valid(target):
-			var dmg_type = card_cfg.primary_effect.damage_type if "damage_type" in card_cfg.primary_effect else "physical"
-			var elem = card_cfg.primary_effect.element if "element" in card_cfg.primary_effect else "none"
-			await battle_manager.damage_calculation(actor, target, strike_damage, null, dmg_type, elem)
+		var dmg_type = card_cfg.primary_effect.damage_type if "damage_type" in card_cfg.primary_effect else "physical"
+		var elem = card_cfg.primary_effect.element if "element" in card_cfg.primary_effect else "none"
+		# Every living target of the cast (none freed mid-combo) is hit at once;
+		# the last one's hit reaction is waited out
+		var targets := _cast_targets(context)
+		for i in targets.size():
+			var t = targets[i]
 			# Generic combat event — listeners (echo weapons, etc.) may replay it.
-			_emit_card_hit_resolved(actor, target, {
+			# Sent at the hit frame, before the damage await (which waits out the
+			# hit reaction): listeners pair it with this hit's hit_moment, and a
+			# replay is still inside replay_card_resolution so it gets tagged.
+			_emit_card_hit_resolved(actor, t, {
 				"kind": "strike",
 				"card": card_cfg,
 				"strike_index": int(context.get("strike_index", 0)),
 				"damage_multiplier": damage_multiplier,
 				"qte_multiplier": qte_multiplier,
 			})
+			var crit: float = card_cfg.primary_effect.roll_crit_multiplier(actor)
+			if i == targets.size() - 1:
+				await battle_manager.damage_calculation(actor, t, strike_damage, null, dmg_type, elem, true, crit)
+			else:
+				battle_manager.damage_calculation(actor, t, strike_damage, null, dmg_type, elem, true, crit)
 
-## Execute effects immediately
+## Every living battler the cast resolves on: all of an AOE cast's targets,
+## else its one target.
+func _cast_targets(context: Dictionary) -> Array:
+	var aoe: BattleManager.AoeContext = context.get("aoe")
+	var list: Array = aoe.targets if aoe else [context.get("target")]
+	return list.filter(func(t): return is_instance_valid(t) and not (t is Battler and (t as Battler).is_defeated()))
+
+
+## Resolves the card's effects and states on every target of the cast, each
+## gated by the card's conditions for that target. Self states land once.
+func _resolve_on_cast_targets(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
+	var per_target := context.duplicate()
+	var self_states_done := bool(context.get("skip_self_states", false))
+	for t in _cast_targets(context):
+		per_target["target"] = t
+		if not check_card_conditions(card_cfg, per_target):
+			continue
+		per_target["skip_self_states"] = self_states_done
+		_execute_effects_immediate(card_cfg, per_target, qte_multiplier)
+		self_states_done = true
+
+
+## The cast's projectile aims: its target, or, for an AOE card whose
+## projectile hits one battler (not projectile_aoe), each of its targets.
+## (A projectile_aoe projectile flies to the AOE center and hits them all.)
+func _projectile_aims(card_cfg: CardConfig, context: Dictionary) -> Array:
+	if context.get("aoe") and not card_cfg.projectile_aoe:
+		return _cast_targets(context)
+	return [context.get("target")]
+
+
+## Applies [param effect] from [param actor] (on [param target], or the actor
+## for an ACTOR effect) with its scaled value times [param multiplier]. Not
+## awaited: the effect resolves on its own, like a hit landing.
+func _apply_card_effect(effect: CardEffect, actor, target, multiplier: float) -> void:
+	if battle_manager == null:
+		return
+	var recipient = effect.get_recipient(actor, target)
+	if recipient is Battler:
+		effect.apply_to(actor, recipient, int(effect._calculate_value(actor) * multiplier), battle_manager)
+
+
+## Applies the card's effects to the context's target (one target: see
+## [method _resolve_on_cast_targets])
 func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
 	var actor = context["actor"]
 	var target = context["target"]
 	var enemies = context["enemies"]
 	var allies = context["allies"]
 	
-	# Execute primary effect. Multi-strike cards deal their damage per strike and set
-	# skip_primary_effect, so the card's primary damage can never land twice.
+	# Execute primary effect (scaled by the QTE). Multi-strike cards deal their
+	# damage per strike and set skip_primary_effect, so it never lands twice.
 	if card_cfg.primary_effect and not context.get("skip_primary_effect", false):
-		var final_multiplier = qte_multiplier
-		
-		# For DAMAGE and HEAL types, route through BattleManager if possible
-		if battle_manager:
-			var calculated_val = card_cfg.primary_effect._calculate_value(actor)
-			var final_val = int(calculated_val * final_multiplier)
-			
-			if card_cfg.primary_effect.effect_type == CardEffect.EffectType.DAMAGE:
-				var dmg_type = card_cfg.primary_effect.damage_type if "damage_type" in card_cfg.primary_effect else "physical"
-				var elem = card_cfg.primary_effect.element if "element" in card_cfg.primary_effect else "none"
-				battle_manager.damage_calculation(actor, target, final_val, null, dmg_type, elem)
-			elif card_cfg.primary_effect.effect_type == CardEffect.EffectType.HEAL:
-				battle_manager.heal_calculation(actor, target, final_val)
-			else:
-				card_cfg.primary_effect.apply_effect(actor, target, enemies, allies)
-		else:
-			card_cfg.primary_effect.apply_effect(actor, target, enemies, allies)
-	
+		_apply_card_effect(card_cfg.primary_effect, actor, target, qte_multiplier)
+
 	# Execute secondary effects
 	for effect in card_cfg.secondary_effects:
-		# Check individual effect conditions
-		var conditions_met = true
-		for condition in effect.conditions:
-			if not condition.evaluate(actor, target):
-				conditions_met = false
-				break
-		
-		if conditions_met:
-			if battle_manager and effect.effect_type == CardEffect.EffectType.DAMAGE:
-				var dmg_type = effect.damage_type if "damage_type" in effect else "physical"
-				var elem = effect.element if "element" in effect else "none"
-				battle_manager.damage_calculation(actor, target, effect._calculate_value(actor), null, dmg_type, elem)
-			elif battle_manager and effect.effect_type == CardEffect.EffectType.HEAL:
-				battle_manager.heal_calculation(actor, target, effect._calculate_value(actor))
-			else:
-				effect.apply_effect(actor, target, enemies, allies)
+		if effect and effect._check_conditions(actor, target):
+			_apply_card_effect(effect, actor, target, 1.0)
 	
-	# Apply states
+	# Apply states (each rolls its chance and checks immunity once, in apply_state)
 	for state_cfg in card_cfg.applies_states:
-		if check_state_conditions(state_cfg, actor, target):
-			state_cfg.apply_state(target, actor)
+		state_cfg.apply_state(target, actor)
 	
 	# Apply self states
 	for self_state_cfg in card_cfg.applies_self_states:
-		if check_state_conditions(self_state_cfg, actor, actor):
-			self_state_cfg.apply_state(actor, actor)
+		if context.get("skip_self_states", false):
+			break
+		self_state_cfg.apply_state(actor, actor)
 			
 	# Update health bars only (don't call update_hud during card execution)
 	if battle_manager and battle_manager.hud:
@@ -1044,215 +884,46 @@ func _execute_effects_immediate(card_cfg: CardConfig, context: Dictionary, qte_m
 		"kind": "effects",
 		"card": card_cfg,
 		"qte_multiplier": qte_multiplier,
+		"skip_primary_effect": context.get("skip_primary_effect", false),
 	})
 
-## Execute effects on hit frame
-func _execute_effects_on_hit(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
-	var actor = context["actor"]
-	if not actor or not actor.has_method("_get_animation_duration"):
-		# Fallback to immediate execution
-		_execute_effects_immediate(card_cfg, context, qte_multiplier)
+## The cast begins: cast sound and VFX on the caster.
+func _play_cast_feedback(card_cfg: CardConfig, context: Dictionary) -> void:
+	var actor = context.get("actor")
+	if not is_instance_valid(actor):
 		return
-	
-	# Resolve animation name through character's animation mapping if available
-	var animation_name = card_cfg.animation_name
-	if actor.has_method("get_resolved_animation"):
-		animation_name = actor.get_resolved_animation(animation_name)
-	
-	var animation_duration = actor._get_animation_duration(animation_name)
-	var hit_frame_delay = animation_duration * 0.55 # Typical hit frame at 55%
-	
-	await get_tree().create_timer(hit_frame_delay).timeout
-	
-	_execute_effects_immediate(card_cfg, context, qte_multiplier)
-
-## Execute effects on impact
-func _execute_effects_on_impact(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
-	# Wait slightly longer than hit frame for impact
-	var actor = context["actor"]
-	if not actor or not actor.has_method("_get_animation_duration"):
-		_execute_effects_immediate(card_cfg, context, qte_multiplier)
-		return
-	
-	# Resolve animation name through character's animation mapping if available
-	var animation_name = card_cfg.animation_name
-	if actor.has_method("get_resolved_animation"):
-		animation_name = actor.get_resolved_animation(animation_name)
-	
-	var animation_duration = actor._get_animation_duration(animation_name)
-	var impact_delay = animation_duration * 0.65 # Impact at 65%
-	
-	await get_tree().create_timer(impact_delay).timeout
-	
-	_execute_effects_immediate(card_cfg, context, qte_multiplier)
-
-## Execute effects at channel start
-func _execute_effects_channel_start(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
-	# Apply channeling effects immediately
-	_execute_effects_immediate(card_cfg, context, qte_multiplier)
-	
-	# Store channel end time for later execution
-	var channel_duration = 2.0 if card_cfg.effect_conditions.size() > 0 else 1.0 # Default channel duration
-	context["channel_end_time"] = Time.get_ticks_msec() / 1000.0 + channel_duration
-
-## Execute effects at channel end
-func _execute_effects_channel_end(card_cfg: CardConfig, context: Dictionary, qte_multiplier: float) -> void:
-	var channel_end_time = context.get("channel_end_time", 0.0)
-	var current_time = Time.get_ticks_msec() / 1000.0
-	
-	if channel_end_time > current_time:
-		var wait_time = channel_end_time - current_time
-		await get_tree().create_timer(wait_time).timeout
-	
-	_execute_effects_immediate(card_cfg, context, qte_multiplier)
-
-## Execute VFX phase
-func execute_vfx_phase(card_cfg: CardConfig, context: Dictionary) -> void:
-	var effect_manager = context["effect_manager"]
-	if not effect_manager:
-		return
-	
-	var actor = context["actor"]
-	var target = context["target"]
-	
-	# Spawn VFX on actor
-	if card_cfg.vfx_on_actor:
-		var vfx_instance = card_cfg.vfx_on_actor.spawn_vfx(actor.global_position, actor)
-		if vfx_instance:
-			get_tree().current_scene.add_child(vfx_instance)
-	
-	# Spawn VFX on target
-	if card_cfg.vfx_on_target and target:
-		var vfx_instance = card_cfg.vfx_on_target.spawn_vfx(target.global_position, target)
-		if vfx_instance:
-			get_tree().current_scene.add_child(vfx_instance)
-
-## Execute camera phase
-func execute_camera_phase(card_cfg: CardConfig, context: Dictionary) -> void:
-	var camera = context["camera"]
-	if not camera or not card_cfg.camera_effects:
-		return
-	
-	card_cfg.camera_effects.apply_camera_effects(camera, context["actor"], context["target"])
-
-## Execute screen phase
-func execute_screen_phase(card_cfg: CardConfig, context: Dictionary) -> void:
-	var effect_manager = context["effect_manager"]
-	if not effect_manager or not card_cfg.screen_effects:
-		return
-	
-	card_cfg.screen_effects.apply_screen_effect(effect_manager)
-
-## Execute audio phase
-func execute_audio_phase(card_cfg: CardConfig, context: Dictionary) -> void:
-	var actor = context["actor"]
-	var target = context["target"]
-	
-	# Play cast sound
 	if card_cfg.cast_sound:
 		card_cfg.cast_sound.play_audio(self, actor.global_position)
-	
-	# Play hit sound
-	if card_cfg.hit_sound and target:
+	if card_cfg.vfx_on_actor:
+		var vfx = card_cfg.vfx_on_actor.spawn_vfx(actor.global_position, actor)
+		if vfx:
+			get_tree().current_scene.add_child(vfx)
+
+
+## The animation's hit frame (a swing connecting, a projectile leaving).
+func _play_hit_frame_feedback(card_cfg: CardConfig, context: Dictionary) -> void:
+	var target = context.get("target")
+	if card_cfg.hit_sound and is_instance_valid(target):
 		card_cfg.hit_sound.play_audio(self, target.global_position)
-	
-	# Play impact sound
-	if card_cfg.impact_sound and target:
-		await get_tree().create_timer(0.3).timeout # Delay for impact
-		card_cfg.impact_sound.play_audio(self, target.global_position)
 
-func execute_attack_card(card: CardConfig, target: Battler, is_aoe: bool = false) -> void:
-	if not current_player_battler or not target:
-		return
-	
-	# Calculate damage based on card stats and battler stats
-	var base_damage = card.attack
-	var attacker_stat = current_player_battler.attack if current_player_battler else 0
-	var total_damage = base_damage + attacker_stat
-	
-	# Apply config multiplier if available
-	if card_battle_config:
-		total_damage = int(total_damage * card_battle_config.attack_damage_multiplier)
-	
-	# For AOE, skip movement animation - just play attack animation from current position
-	if not is_aoe:
-		# Move to target and attack
-		if await current_player_battler.advance_to_target(target):
-			current_player_battler._try_animation("walk")
-			while current_player_battler.is_advancing:
-				await get_tree().create_timer(0.016).timeout
-	
-	# Play attack animation (standardised melee slot — resolves through the character's
-	# animation mapping / combat_actions sub-machine automatically).
-	current_player_battler._try_animation(AnimationMapping.MELEE_COMBO_1)
-	
-	# Simple QTE system: start QTE, get result, apply damage with multiplier
-	var damage_multiplier = 1.0
-	
-	if qte_manager and qte_manager.start_card_qte(card):
-		var qte_success = await await_qte_completion()
-		damage_multiplier = qte_manager.get_damage_multiplier("CARD_ATTACK", qte_success)
-	
-	# Wait for attack animation to reach hit point
-	await get_tree().create_timer(0.5).timeout
-	
-	# Apply damage with the calculated multiplier
-	var final_damage = int(total_damage * damage_multiplier)
-	
-	# Trigger AOE effect if applicable
-	if is_aoe and battle_manager and battle_manager.effect_manager:
-		battle_manager.effect_manager.trigger_aoe_attack()
-	
-	if battle_manager:
-		await battle_manager.damage_calculation(current_player_battler, target, final_damage)
-	
-	# Wait for attack animation to complete
-	await get_tree().create_timer(0.5).timeout
-	
-	# Return to position (only for single target)
-	if not is_aoe:
-		current_player_battler.return_to_original_position()
-		if current_player_battler.is_advancing:
-			while current_player_battler.is_advancing:
-				await get_tree().create_timer(0.1).timeout
-	
-	current_player_battler.battle_idle()
 
-func execute_skill_card(card: CardConfig, target: Battler, is_aoe: bool = false) -> void:
-	await execute_attack_card(card, target, is_aoe)
-
-func execute_defense_card(card: CardConfig) -> void:
-	current_player_battler.defend()
-	# Defense boost would be handled through stat_modifiers in CardConfig
-
-func execute_heal_card(card: CardConfig, target: Battler, _is_aoe: bool = false) -> void:
-	# Heal is now handled through CardEffect in the effect phase
-	# This function is kept for compatibility but the actual healing happens in _execute_effects_immediate
-	pass
-
-func execute_buff_card(card: CardConfig, _target: Battler, _is_aoe: bool = false) -> void:
-	# Handle buff effects like damage multipliers, speed boosts, etc.
-	if card.metadata.has("damage_multiplier"):
-		var _multiplier = card.metadata["damage_multiplier"]
-		# This would need a buff system integration
-	
-	if card.metadata.has("speed_multiplier"):
-		var _multiplier2 = card.metadata["speed_multiplier"]
-		# This would need a buff system integration
-	
-	if card.metadata.has("damage_reduction"):
-		var _reduction = card.metadata["damage_reduction"]
-		# This would need a buff system integration
-
-func execute_debuff_card(card: CardConfig, target: Battler, is_aoe: bool = false) -> void:
-	# Deal initial damage if primary effect is a damage effect
-	if card.primary_effect and card.primary_effect.effect_type == CardEffect.EffectType.DAMAGE:
-		await execute_attack_card(card, target, is_aoe)
-	
-func apply_card_states(card: CardConfig, target: Battler) -> void:
-	# States are applied through CardConfig.applies_states array
-	# This is handled in the effect phase, so this function is now a no-op
-	pass
+## The card's effect landed (at the hit frame, or when its projectiles hit):
+## impact sound and VFX on every target, camera and screen effects.
+func _play_impact_feedback(card_cfg: CardConfig, context: Dictionary) -> void:
+	var targets := _cast_targets(context)
+	if card_cfg.impact_sound and not targets.is_empty():
+		card_cfg.impact_sound.play_audio(self, targets[0].global_position)
+	if card_cfg.vfx_on_target:
+		for t in targets:
+			var vfx = card_cfg.vfx_on_target.spawn_vfx(t.global_position, t)
+			if vfx:
+				get_tree().current_scene.add_child(vfx)
+	var camera = context.get("camera")
+	if card_cfg.camera_effects and camera:
+		card_cfg.camera_effects.apply_camera_effects(camera, context.get("actor"), context.get("target"))
+	var effect_manager = context.get("effect_manager")
+	if card_cfg.screen_effects and effect_manager:
+		card_cfg.screen_effects.apply_screen_effect(effect_manager)
 
 func draw_card_for_deck(deck: SimplifiedDeck) -> CardConfig:
 	if not deck:
@@ -1266,9 +937,6 @@ func draw_card_for_deck(deck: SimplifiedDeck) -> CardConfig:
 	var drawn_card = deck.draw_card()
 	return drawn_card
 
-func _on_card_drawn(_card: CardConfig):
-	pass
-
 func start_player_turn() -> void:
 	# Always sync to the currently acting player from battle_manager
 	if battle_manager and is_instance_valid(battle_manager.current_character):
@@ -1277,12 +945,6 @@ func start_player_turn() -> void:
 	# Refresh AP on active player battler
 	if current_player_battler:
 		current_player_battler.regen_ap()
-		if ap_system:
-			ap_system.current_ap = current_player_battler.current_ap
-			ap_system.max_ap = current_player_battler.max_ap
-		ap_changed.emit(current_player_battler.current_ap, current_player_battler.max_ap)
-	elif ap_system:
-		ap_system.regen_ap()
 	
 	# --- Step 1: Play discard animation for any leftover hand cards in the UI ---
 	var card_ui: CardUI = null
@@ -1302,15 +964,17 @@ func start_player_turn() -> void:
 		for card in old_hand:
 			deck.discard_card(card)
 		
-		# Draw a fresh hand up to initial_hand_size
-		var hand_size = card_battle_config.initial_hand_size if card_battle_config else 3
+		# Draw a fresh hand: initial_hand_size plus passive bonuses
+		var hand_size: int = card_battle_config.initial_hand_size if card_battle_config else 3
+		if current_player_battler:
+			hand_size += current_player_battler.get_bonus(&"cards_drawn_per_turn")
+			if _opening_hand_pending.get(current_player_battler, false):
+				_opening_hand_pending.erase(current_player_battler)
+				hand_size += current_player_battler.get_bonus(&"starting_hand_size")
 		for _i in range(hand_size):
 			draw_card_for_deck(deck)
 	
-	# Clear queued cards from previous turn
-	queued_cards.clear()
-	
-	# --- Step 3: Update CardUI display for the new hand and notify HUD ---
+# --- Step 3: Update CardUI display for the new hand and notify HUD ---
 	if battle_manager and battle_manager.hud:
 		if card_ui:
 			# The old hand was discarded (discard_hand_to_pile), so the whole new hand draws in
@@ -1332,16 +996,11 @@ func end_player_turn() -> void:
 	while is_executing_card:
 		await get_tree().process_frame
 	
-	# Execute all queued cards
-	if not queued_cards.is_empty():
-		await execute_queued_cards()
-	
 	turn_ended.emit()
 	if battle_manager:
 		battle_manager.end_turn()
 
-func _on_ap_changed(current_ap: int, max_ap: int) -> void:
-	# Forward AP changes to UI
+func _relay_ap_changed(current_ap: int, max_ap: int) -> void:
 	ap_changed.emit(current_ap, max_ap)
 
 func get_ap_info() -> Dictionary:
@@ -1354,61 +1013,24 @@ func get_ap_info() -> Dictionary:
 			"max_ap": mx,
 			"ap_percentage": pct
 		}
-	elif ap_system:
-		return {
-			"current_ap": ap_system.get_current_ap(),
-			"max_ap": ap_system.get_max_ap(),
-			"ap_percentage": ap_system.get_ap_percentage()
-		}
 	return {
 		"current_ap": 0,
 		"max_ap": 0,
 		"ap_percentage": 0.0
 	}
 
-func await_qte_completion() -> bool:
-	# Helper function to wait for QTE completion with robust safety mechanisms
-	var state = {"completed": false, "success": false}
-	
-	if qte_manager:
-		# Use a single handler that catches both success and failure
-		var completion_handler = func(s: bool, _type = ""):
-			state["completed"] = true
-			state["success"] = s
-		
-		if not qte_manager.qte_completed.is_connected(completion_handler):
-			qte_manager.qte_completed.connect(completion_handler)
-		
-		var timeout = 5.0 # 5 seconds max safety guard
-		var start_time = Time.get_ticks_msec() / 1000.0
-		
-		# Wait for completion or timeout
-		while not state["completed"]:
-			var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
-			if elapsed > timeout:
-				state["completed"] = true
-				state["success"] = false # Default to failure on timeout
-				# Force cancel the QTE if it's still active
-				if qte_manager.is_active():
-					qte_manager.cancel_qte()
-				break
-			await get_tree().process_frame
-		
-		if qte_manager.qte_completed.is_connected(completion_handler):
-			qte_manager.qte_completed.disconnect(completion_handler)
-
-		return state["success"]
-	else:
-		return false
-
 ## Travel a single projectile scene from [param actor] to [param target] and await arrival.
 ## Applies damage on impact. Handles multi-strike and multi-projectile correctly.
-## [param used_spawn_positions] tracks already-used spawn positions to prevent overlap
-## [param used_target_positions] tracks already-used target positions to prevent path overlap
+## [param used_spawn_positions] the spawn points already used this cast (a
+##   spread spawn is picked away from them, then added)
+## [param spawn_at] a precomputed spawn point (simultaneous volleys), or null
 ## [param wait_for_impact] if true, waits for projectile to hit; if false, returns after launch
-func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float = 1.0, used_spawn_positions: Array[Vector3] = [], used_target_positions: Array[Vector3] = [], wait_for_impact: bool = true, is_replay: bool = false) -> void:
+## [param aoe] the cast's AOE context: aim at its center and hit all its targets
+func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float = 1.0, used_spawn_positions: Array[Vector3] = [], spawn_at: Variant = null, wait_for_impact: bool = true, is_replay: bool = false, aoe: BattleManager.AoeContext = null) -> void:
 	if card_cfg.projectile_scene.is_empty() or not ResourceLoader.exists(card_cfg.projectile_scene):
 		push_error("BattleProjectile: projectile_scene not found — " + card_cfg.projectile_scene)
+		return
+	if not is_instance_valid(actor) or not is_instance_valid(target):
 		return
 
 	# Check background preload first
@@ -1423,34 +1045,29 @@ func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, dam
 	if not proj_res is PackedScene:
 		return
 
-	# Spawn projectile in front of the actor (using their forward direction)
-	var actor_forward = -actor.global_transform.basis.z.normalized()  # -Z is forward in Godot
-	var base_spawn_pos = actor.global_position + (actor_forward * 0.5) + Vector3(0, 1.2, 0)
-	
-	# Add random spread to spawn position for variety (ring facing forward from actor)
-	var spawn_spread: float = card_cfg.projectile_spawn_spread if "projectile_spawn_spread" in card_cfg else 0.0
-	var spawn_pos = base_spawn_pos
-	if spawn_spread > 0.0:
-		# Create local grid for sequential mode (each projectile fired separately)
-		var occupied_cells: Dictionary = {}
-		# Pass actor_forward to create ring facing outward from actor
-		spawn_pos = _calculate_spread_position(base_spawn_pos, spawn_spread, occupied_cells, used_spawn_positions, 10, actor_forward)
-	
+	# Spawn in front of the actor (toward the other side of the battle axis),
+	# spread over a disc facing that way if the card asks for it
+	var spawn_pos: Vector3
+	if spawn_at is Vector3:
+		spawn_pos = spawn_at
+	else:
+		spawn_pos = _spread_spawn_position(card_cfg, actor, used_spawn_positions)
+
 	# Determine target position - use center for AOE projectiles
 	var base_hit_pos: Vector3
-	var is_aoe_projectile = card_cfg.get("projectile_aoe") if "projectile_aoe" in card_cfg else false
-	if is_aoe_projectile and _aoe_execution_context.has(card_cfg):
-		base_hit_pos = _aoe_execution_context[card_cfg].center_position
+	var is_aoe_projectile: bool = card_cfg.projectile_aoe and aoe != null and not aoe.targets.is_empty()
+	if is_aoe_projectile:
+		base_hit_pos = _aoe_pierce_end(spawn_pos, _projectile_forward(actor), aoe)
 	else:
 		base_hit_pos = target.global_position + Vector3(0, 1.0, 0)
-	
+
 	# Trajectory spread randomizes the PATH, not the target position
 	# Projectiles always reach the target but take slightly different curved paths
 	var trajectory_spread: float = card_cfg.projectile_trajectory_spread if "projectile_trajectory_spread" in card_cfg else 0.0
 	var hit_pos = base_hit_pos
 
-	# Create BattleProjectile container (from pool for performance)
-	var battle_proj := _get_pooled_projectile()
+	# A fresh container per shot (freed once its impact resolves)
+	var battle_proj := BattleProjectile.new()
 	get_tree().current_scene.add_child(battle_proj)
 	battle_proj.global_position = spawn_pos
 
@@ -1460,53 +1077,17 @@ func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, dam
 	proj_vfx.position = Vector3.ZERO  # Relative to container
 	proj_vfx.scale = card_cfg.projectile_scale if "projectile_scale" in card_cfg else Vector3.ONE
 
-	# Set damage data for this projectile
-	var damage_data = {
+	# AOE projectile: one projectile hits every target of the cast
+	var aoe_targets: Array = aoe.targets.duplicate() if is_aoe_projectile else []
+	battle_proj.damage_data = {
 		"actor": actor,
 		"target": target,
 		"card_cfg": card_cfg,
 		"damage_multiplier": damage_multiplier,
-		"battle_manager": battle_manager,
-		"is_replay": is_replay
+		"aoe_targets": aoe_targets,
+		"is_replay": is_replay,
 	}
-	
-	# Check if this is an AOE projectile (single projectile hitting multiple targets)
-	if is_aoe_projectile:
-		# Check execution context
-		var aoe_targets = []
-		if _aoe_execution_context.has(card_cfg):
-			aoe_targets = _aoe_execution_context[card_cfg].targets
-		
-		if not aoe_targets.is_empty():
-			damage_data["aoe_targets"] = aoe_targets
-	
-	battle_proj.damage_data = damage_data
 
-	# Connect to arrived signal to apply damage on impact and cleanup
-	# Only connect callback if we're NOT waiting for impact (otherwise we handle it synchronously)
-	if not wait_for_impact:
-		var aoe_targets = damage_data.get("aoe_targets", [])
-		# Store callback data in damage_data instead of binding arguments
-		damage_data["callback_data"] = {
-			"proj_vfx": proj_vfx,
-			"card_cfg": card_cfg,
-			"target": target,
-			"actor": actor,
-			"damage_multiplier": damage_multiplier,
-			"aoe_targets": aoe_targets
-		}
-		# Also store a direct reference to card_cfg at top level for safety
-		damage_data["card_cfg"] = card_cfg
-		damage_data["target"] = target
-		damage_data["actor"] = actor
-		damage_data["damage_multiplier"] = damage_multiplier
-		damage_data["aoe_targets"] = aoe_targets
-		# Disconnect any existing connection first to prevent errors from pooled projectiles
-		if battle_proj.arrived.get_connections().size() > 0:
-			for connection in battle_proj.arrived.get_connections():
-				battle_proj.arrived.disconnect(connection.callable)
-		battle_proj.arrived.connect(_on_projectile_arrived_with_data.bind(battle_proj))
-	
 	# Apply trajectory spread: randomize the arc height for path variety
 	# Projectiles always reach the target but take different curved paths
 	if trajectory_spread > 0.0:
@@ -1521,76 +1102,160 @@ func _travel_projectile(card_cfg: CardConfig, actor: Node3D, target: Node3D, dam
 	battle_proj.speed_curve = card_cfg.projectile_speed_curve
 	battle_proj.arc_curve = card_cfg.projectile_arc_curve
 	battle_proj.curve_influence = card_cfg.projectile_curve_influence
-	battle_proj.launch(spawn_pos, hit_pos)
+	battle_proj.lifetime = card_cfg.projectile_lifetime
+	battle_proj.battle_manager = battle_manager
+	battle_proj.launch(spawn_pos, hit_pos, battle_proj.speed, battle_proj.arc_height)
+	if is_aoe_projectile:
+		# Sweeps through every target, hitting each as it reaches them
+		battle_proj.set_pierce_targets(aoe_targets, _projectile_forward(actor))
 
 	# If VFX child has play method, play open animation on spawn
 	if proj_vfx.has_method("play"):
 		proj_vfx.play()
 
-	# Wait for arrival if configured
-	if wait_for_impact:
-		await battle_proj.arrived
-		
-		# Play close animation on impact
-		if is_instance_valid(proj_vfx) and proj_vfx.has_method("stop"):
-			proj_vfx.stop()
+	# The one impact path, whether or not the caller waits for it
+	_projectiles_in_flight += 1
+	_resolve_projectile_on_arrival(battle_proj, proj_vfx)
 
-		# Clean up VFX child
-		if is_instance_valid(proj_vfx):
-			proj_vfx.queue_free()
-		
-		# Apply damage for projectiles BEFORE returning to pool
-		var aoe_targets = battle_proj.damage_data.get("aoe_targets", []) if battle_proj.damage_data else []
-		await _apply_projectile_damage(card_cfg, actor, target, damage_multiplier, aoe_targets, is_replay)
-		
-		# Return container to pool AFTER damage is applied
-		if is_instance_valid(battle_proj):
-			_return_projectile_to_pool(battle_proj)
+	if wait_for_impact:
+		await battle_proj.resolved
 	else:
-		# Apply strike delay if not waiting for impact
+		# Fire-and-continue (multi-strike): pace the next strike instead
 		var strike_delay: float = card_cfg.projectile_strike_delay if "projectile_strike_delay" in card_cfg else 0.3
 		if strike_delay > 0:
-			await get_tree().create_timer(strike_delay).timeout
-		
-		# Projectile will handle its own damage and cleanup via arrived signal callback
-		# Don't apply damage here since projectile callback will handle it on impact
+			await get_tree().create_timer(strike_delay / _battle_speed()).timeout
 
-	# Spawn impact VFX at target if configured
-	if card_cfg.vfx_on_target and is_instance_valid(target):
+
+## Waits for [param battle_proj] to arrive, then resolves its impact exactly
+## once: stop the VFX, apply damage, spawn the target impact VFX, mark it
+## landed, then let the VFX play out before freeing it. Every projectile
+## goes through here.
+func _resolve_projectile_on_arrival(battle_proj: BattleProjectile, proj_vfx: Node3D) -> void:
+	var data: Dictionary = battle_proj.damage_data
+	var card_cfg: CardConfig = data.get("card_cfg")
+	var pierce: Array = data.get("aoe_targets", [])
+	if card_cfg and not pierce.is_empty():
+		# AOE: each target is hit as the projectile passes it (all are passed
+		# by the time it arrives)
+		battle_proj.passed_target.connect(func(t): _projectile_hit(data, t))
+	await battle_proj.arrived
+
+	if is_instance_valid(proj_vfx) and proj_vfx.has_method("stop"):
+		proj_vfx.stop()
+
+	if card_cfg and pierce.is_empty():
+		_projectile_hit(data, data.get("target"))
+
+	_projectiles_in_flight = maxi(0, _projectiles_in_flight - 1)
+	if is_instance_valid(battle_proj):
+		battle_proj.resolved.emit()
+		_free_after_fade(battle_proj, proj_vfx)
+
+
+## One target struck by a projectile: damage plus the card's impact VFX.
+func _projectile_hit(data: Dictionary, target) -> void:
+	var card_cfg: CardConfig = data.get("card_cfg")
+	if not card_cfg or not is_instance_valid(target):
+		return
+	_apply_projectile_damage(card_cfg, data.get("actor"), target,
+			float(data.get("damage_multiplier", 1.0)), [], bool(data.get("is_replay", false)))
+	if card_cfg.vfx_on_target:
 		var vfx = card_cfg.vfx_on_target.spawn_vfx(target.global_position, target)
 		if vfx:
 			get_tree().current_scene.add_child(vfx)
 
-## Called when a projectile with BattleProjectile component arrives at target
-## Only used when NOT waiting for impact (cleanup is handled synchronously when waiting)
-## Reads callback data from damage_data to avoid bind() type issues
-func _on_projectile_arrived_with_data(battle_proj: BattleProjectile) -> void:
-	if not battle_proj or not battle_proj.damage_data:
-		return
-	
-	# Read from top-level damage_data first (more reliable), fallback to callback_data
-	var proj_vfx = battle_proj.damage_data.get("callback_data", {}).get("proj_vfx")
-	var card_cfg = battle_proj.damage_data.get("card_cfg")
-	var target = battle_proj.damage_data.get("target")
-	var actor = battle_proj.damage_data.get("actor")
-	var damage_multiplier = battle_proj.damage_data.get("damage_multiplier", 1.0)
-	var aoe_targets = battle_proj.damage_data.get("aoe_targets", [])
-	var is_replay: bool = battle_proj.damage_data.get("is_replay", false)
-	
-	# Apply damage on impact
-	await _apply_projectile_damage(card_cfg, actor, target, damage_multiplier, aoe_targets, is_replay)
-	
-	# Play close animation
-	if is_instance_valid(proj_vfx) and proj_vfx.has_method("stop"):
-		proj_vfx.stop()
-	
-	# Clean up VFX child
+
+## Where an AOE projectile from [param from] ends: heading for the targets'
+## center, carried on until it is a metre past the deepest target along
+## [param forward] (the attack's direction across the battle axis), at the
+## center's height, so it sweeps across all of them.
+func _aoe_pierce_end(from: Vector3, forward: Vector3, aoe: BattleManager.AoeContext) -> Vector3:
+	forward.y = 0.0
+	forward = forward.normalized()
+	var dir := aoe.center_position - from
+	dir.y = 0.0
+	dir = dir.normalized() if dir.length_squared() > 0.0001 else forward
+	var depth := 0.0
+	for t in aoe.targets:
+		if is_instance_valid(t):
+			var offset: Vector3 = t.global_position - from
+			offset.y = 0.0
+			depth = maxf(depth, offset.dot(forward))
+	# Flight length whose forward component reaches depth + 1 (a steep sideways
+	# heading is capped so the slash can't fly off for miles)
+	var length := (depth + 1.0) / maxf(dir.dot(forward), 0.3)
+	var end := from + dir * length
+	end.y = aoe.center_position.y
+	return end
+
+
+## Longest a spent projectile may linger to finish its VFX (seconds at 1x).
+const _MAX_PROJECTILE_FADE := 3.0
+
+## Frees [param battle_proj] once its stopped VFX has played out: the close
+## animation, the particles already emitted, and trails shrinking away. The
+## card doesn't wait for this (its impact has already resolved).
+func _free_after_fade(battle_proj: BattleProjectile, proj_vfx: Node3D) -> void:
+	var linger := 0.0
 	if is_instance_valid(proj_vfx):
-		proj_vfx.queue_free()
-	
-	# Return container to pool
+		var anim: AnimationPlayer = proj_vfx.get("anim") as AnimationPlayer
+		if anim and anim.has_animation("close"):
+			linger = anim.get_animation("close").length
+		for p in proj_vfx.find_children("*", "GPUParticles3D", true, false):
+			linger = maxf(linger, (p as GPUParticles3D).lifetime)
+		for trail in proj_vfx.find_children("*", "MeshInstance3D", true, false):
+			if "points" in trail and "lifetime" in trail:
+				linger = maxf(linger, float(trail.lifetime))
+	linger = minf(linger, _MAX_PROJECTILE_FADE)
+	var waited := 0.0
+	while waited < linger and is_instance_valid(battle_proj):
+		await get_tree().process_frame
+		waited += get_process_delta_time() * _battle_speed()
 	if is_instance_valid(battle_proj):
-		_return_projectile_to_pool(battle_proj)
+		battle_proj.queue_free()
+
+
+## Battle speed (hold Space), for scaling waits.
+func _battle_speed() -> float:
+	if battle_manager and battle_manager.speed_multiplier > 0.0:
+		return battle_manager.speed_multiplier
+	return 1.0
+
+
+## Waits until every launched projectile has resolved its impact. The
+## projectiles' own lifetime forces arrival, so this only times out if a
+## projectile node was freed mid-flight; then the count is reset.
+func _await_projectiles_landed(timeout: float = 10.0) -> void:
+	var waited := 0.0
+	while _projectiles_in_flight > 0:
+		if waited >= timeout:
+			push_warning("CardBattleManager: %d projectile(s) never resolved; continuing" % _projectiles_in_flight)
+			_projectiles_in_flight = 0
+			return
+		await get_tree().process_frame
+		waited += get_process_delta_time()
+
+
+## Direction projectiles leave [param actor] in: toward the other side along
+## the battle axis (battlers face +Z), falling back to the actor's own +Z.
+func _projectile_forward(actor: Node3D) -> Vector3:
+	var rig: BattleCamera = battle_manager.battle_camera if battle_manager else null
+	if rig and actor is Battler:
+		return rig.get_side_basis(actor).z
+	var z := actor.global_transform.basis.z
+	z.y = 0.0
+	return z.normalized() if z.length_squared() > 0.0001 else Vector3.BACK
+
+## States and secondary effects of a single-strike projectile card, once its
+## projectiles have landed (they only deal the primary damage). Runs for the
+## card's target, or every target of an AOE projectile.
+func _apply_projectile_followup_effects(card_cfg: CardConfig, context: Dictionary) -> void:
+	if card_cfg.secondary_effects.is_empty() and card_cfg.applies_states.is_empty() \
+			and card_cfg.applies_self_states.is_empty():
+		return
+	var followup := context.duplicate()
+	followup["skip_primary_effect"] = true
+	_resolve_on_cast_targets(card_cfg, followup, float(context.get("qte_multiplier", 1.0)))
 
 ## Apply damage from projectile impact
 func _apply_projectile_damage(card_cfg: CardConfig, actor: Node3D, target: Node3D, damage_multiplier: float, aoe_targets: Array = [], is_replay: bool = false) -> void:
@@ -1622,7 +1287,7 @@ func _apply_projectile_damage(card_cfg: CardConfig, actor: Node3D, target: Node3
 			if "damage_type" in card_cfg.primary_effect else "physical"
 		var elem: String = card_cfg.primary_effect.element \
 			if "element" in card_cfg.primary_effect else "none"
-		battle_manager.damage_calculation(actor, t, final_val, null, dmg_type, elem)
+		battle_manager.damage_calculation(actor, t, final_val, null, dmg_type, elem, true, card_cfg.primary_effect.roll_crit_multiplier(actor))
 		# Generic combat event — listeners (echo weapons, etc.) may replay it.
 		_emit_card_hit_resolved(actor, t, {
 			"kind": "projectile",
@@ -1631,91 +1296,43 @@ func _apply_projectile_damage(card_cfg: CardConfig, actor: Node3D, target: Node3
 			"is_replay": is_replay,
 		})
 
-## Calculate a spread position with collision detection
-## [param base_pos] Center position to spread around
-## [param spread_radius] Maximum spread distance in world units (meters)
-## [param occupied_cells] Dictionary tracking used grid cells for collision avoidance
-## [param used_positions] Array tracking all used positions for this volley
-## [param max_attempts] Maximum retry attempts before fallback
-## [param forward_direction] Optional forward direction for oriented ring spread (if provided, creates ring facing this direction)
-## Returns a valid spread position
-func _calculate_spread_position(base_pos: Vector3, spread_radius: float, occupied_cells: Dictionary, used_positions: Array[Vector3], max_attempts: int = 10, forward_direction: Vector3 = Vector3.ZERO) -> Vector3:
-	if spread_radius <= 0.0:
-		return base_pos
-	
-	var attempt = 0
-	var found_unique = false
-	var candidate_pos = base_pos
-	
-	while attempt < max_attempts and not found_unique:
-		# Use sqrt(randf()) for uniform area distribution (prevents center bias)
-		var angle = randf() * TAU
-		var radius = sqrt(randf()) * spread_radius
-		
-		var spread_offset: Vector3
-		if forward_direction.length_squared() > 0.01:
-			# Create ring facing forward direction (perpendicular to forward)
-			# Ring is in the plane perpendicular to forward direction
-			var right = forward_direction.cross(Vector3.UP).normalized()
-			var up = right.cross(forward_direction).normalized()
-			spread_offset = (right * cos(angle) + up * sin(angle)) * radius
-		else:
-			# Circular spread on horizontal plane (default behavior)
-			spread_offset = Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
-		
-		candidate_pos = base_pos + spread_offset
-		
-		# Check collision using spatial grid
-		var grid_x = floor(candidate_pos.x / _GRID_CELL_SIZE)
-		var grid_z = floor(candidate_pos.z / _GRID_CELL_SIZE)
-		var grid_key = Vector2i(grid_x, grid_z)
-		
-		var too_close = false
-		if grid_key in occupied_cells:
-			too_close = true
-		else:
-			# Check adjacent cells for minimum distance
-			for dx in range(-1, 2):
-				for dz in range(-1, 2):
-					var neighbor_key = Vector2i(grid_x + dx, grid_z + dz)
-					if neighbor_key in occupied_cells:
-						too_close = true
-						break
-				if too_close:
-					break
-		
-		if not too_close:
-			used_positions.append(candidate_pos)
-			occupied_cells[grid_key] = 1
-			found_unique = true
-		
-		attempt += 1
-	
-	# If we couldn't find a unique position after max attempts, just use the last candidate
-	# This ensures the projectile still fires even if slightly overlapping
-	return candidate_pos
-
-## Pre-calculate spread positions for simultaneous fire
-## Uses random distribution matching sequential mode for consistency
-func _precalculate_spread_positions(card_cfg: CardConfig, actor: Node3D, target: Node3D, count: int, out_spawn_positions: Array[Vector3], out_target_positions: Array[Vector3]) -> void:
-	var actor_forward = -actor.global_transform.basis.z.normalized()
-	var base_spawn_pos = actor.global_position + (actor_forward * 0.5) + Vector3(0, 1.2, 0)
-	var base_hit_pos = target.global_position + Vector3(0, 1.0, 0)
-	
-	var spawn_spread: float = card_cfg.projectile_spawn_spread if "projectile_spawn_spread" in card_cfg else 0.0
-	
-	# Use global spatial grid for the entire volley to prevent overlap
-	var occupied_spawn_cells: Dictionary = {}
-	var used_spawn_positions: Array[Vector3] = []
-	
-	for i in count:
-		# Calculate spawn position with collision detection (ring facing forward from actor)
-		var spawn_pos = _calculate_spread_position(base_spawn_pos, spawn_spread, occupied_spawn_cells, used_spawn_positions, 10, actor_forward)
-		
-		# Target position is always the actual target (no spread)
-		# Trajectory spread will be applied to arc height, not target position
-		out_spawn_positions.append(spawn_pos)
-		out_target_positions.append(base_hit_pos)
+## Spawn point for one projectile of [param card_cfg]: 0.5 m in front of the
+## actor at chest height, offset across a disc of radius projectile_spawn_spread
+## that faces the other side. Among a dozen random candidates it takes the one
+## farthest from [param used_positions] (the cast's earlier spawns), so a
+## volley fans out instead of clumping, then records it there. Spawns never
+## dip below 0.3 m above the actor's feet.
+func _spread_spawn_position(card_cfg: CardConfig, actor: Node3D, used_positions: Array[Vector3]) -> Vector3:
+	var forward := _projectile_forward(actor)
+	var base := actor.global_position + forward * 0.5 + Vector3(0, 1.2, 0)
+	var radius := card_cfg.projectile_spawn_spread
+	if radius <= 0.0:
+		return base
+	var right := forward.cross(Vector3.UP).normalized()
+	var up := right.cross(forward).normalized()
+	var floor_y := actor.global_position.y + 0.3
+	var min_sep := maxf(_MIN_SPAWN_SEPARATION, radius * 0.2)
+	var best := base
+	var best_gap := -1.0
+	for attempt in 12:
+		# sqrt(randf()) spreads candidates evenly over the disc's area
+		var angle := randf() * TAU
+		var r := sqrt(randf()) * radius
+		var offset := (right * cos(angle) + up * sin(angle)) * r
+		var candidate := base + offset
+		if candidate.y < floor_y:
+			# Mirror below-floor points up (keeps the spread, loses no area)
+			candidate.y = floor_y + (floor_y - candidate.y)
+		var gap := INF
+		for used in used_positions:
+			gap = minf(gap, candidate.distance_to(used))
+		if gap > best_gap:
+			best = candidate
+			best_gap = gap
+		if gap >= min_sep * 2.0:
+			break  # comfortably clear; no need to keep looking
+	used_positions.append(best)
+	return best
 
 ## Preload all projectile scenes at combat start
 func preload_all_projectile_scenes() -> void:
@@ -1731,7 +1348,6 @@ func preload_all_projectile_scenes() -> void:
 ## Handles [code]consume_hand_cards[/code] multi-projectile stagger internally.
 func launch_projectile_and_await_impact(card_cfg: CardConfig, context: Dictionary) -> void:
 	var actor: Node3D  = context["actor"]
-	var target: Node3D = context["target"]
 	var qte_multiplier := context.get("qte_multiplier", 1.0) as float
 
 	# --- Determine projectile count and discard hand cards if needed -------
@@ -1741,7 +1357,8 @@ func launch_projectile_and_await_impact(card_cfg: CardConfig, context: Dictionar
 		if deck:
 			var other_cards: Array[CardConfig] = []
 			for c in deck.get_hand():
-				# Exclude the playing card by object identity to handle multiple Card Salvo cards
+				# Every other card in hand: only this copy is excluded (deck
+				# copies are distinct instances, so a second Salvo is consumed)
 				if c != card_cfg:
 					other_cards.append(c)
 			hand_multiplier = max(1, other_cards.size())
@@ -1751,22 +1368,31 @@ func launch_projectile_and_await_impact(card_cfg: CardConfig, context: Dictionar
 	# --- Fire projectiles (configurable stagger or simultaneous) -------------
 	var fire_simultaneously: bool = card_cfg.projectile_fire_simultaneously if "projectile_fire_simultaneously" in card_cfg else false
 	
-	# Track used positions to prevent overlap
+	# Spawn points already used this cast, so spread spawns stay apart
 	var used_spawn_positions: Array[Vector3] = []
-	var used_target_positions: Array[Vector3] = []
-	
+	if context.get("spawn_history") is Array:
+		used_spawn_positions = context["spawn_history"]
+	var aoe: BattleManager.AoeContext = context.get("aoe")
+
+	# Every projectile of the cast: hand_multiplier per aim
+	var shots: Array = []
+	for i in hand_multiplier:
+		shots.append_array(_projectile_aims(card_cfg, context))
+
 	if fire_simultaneously:
-		# Pre-calculate positions for simultaneous fire to eliminate retry loop
-		_precalculate_spread_positions(card_cfg, actor, target, hand_multiplier, used_spawn_positions, used_target_positions)
-		
+		# Pick every spawn point first (each away from the ones before it)
+		var spawns: Array[Vector3] = []
+		for i in shots.size():
+			spawns.append(_spread_spawn_position(card_cfg, actor, used_spawn_positions))
+
 		# Fire all at once, no waiting between projectiles
-		for i in hand_multiplier:
-			_travel_projectile(card_cfg, actor, target, qte_multiplier, used_spawn_positions, used_target_positions)
-		# Wait for all to finish (short delay to ensure all launched)
-		await get_tree().create_timer(0.5).timeout
+		for i in shots.size():
+			_travel_projectile(card_cfg, actor, shots[i], qte_multiplier, used_spawn_positions, spawns[i], true, false, aoe)
+		# Wait for every projectile of the volley to land
+		await _await_projectiles_landed()
 	else:
 		# Fire with staggered delays
-		for i in hand_multiplier:
+		for i in shots.size():
 			if i > 0:
-				await get_tree().create_timer(0.15).timeout
-			await _travel_projectile(card_cfg, actor, target, qte_multiplier, used_spawn_positions, used_target_positions)
+				await get_tree().create_timer(0.15 / _battle_speed()).timeout
+			await _travel_projectile(card_cfg, actor, shots[i], qte_multiplier, used_spawn_positions, null, true, false, aoe)

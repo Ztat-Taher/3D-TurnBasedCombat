@@ -1,19 +1,19 @@
 [gd_scene format=4 uid="uid://wxuxctidimwu"]
 
 [ext_resource type="Script" uid="uid://grs8x8ujsmun" path="res://scripts/systems/battle/battlers/main/battler.gd" id="2_jumoh"]
-[ext_resource type="Script" uid="uid://d2mintfjxyqei" path="res://scripts/systems/battle/battlers/stats/BattlerStats.gd" id="4_0v1ay"]
 [ext_resource type="Texture2D" uid="uid://n0e72skevc4m" path="res://assets/images/ui/character_portrait.png" id="3_8a2bo"]
+[ext_resource type="Script" uid="uid://d2mintfjxyqei" path="res://scripts/systems/battle/battlers/stats/BattlerStats.gd" id="4_0v1ay"]
 [ext_resource type="Script" uid="uid://m02b4cy78or" path="res://database/items/items_template.gd" id="6_le7fx"]
 [ext_resource type="Resource" uid="uid://pple" path="res://database/items/apple.tres" id="7_f2yvd"]
 [ext_resource type="Resource" uid="uid://bkvl0r7qkjv5r" path="res://database/items/expired_milk.tres" id="8_4wiiv"]
-[ext_resource type="Resource" uid="uid://b60blyfi55as7" path="res://database/weapons/items/elf_leaf_blade.tres" id="9_8a2bo"]
 [ext_resource type="Resource" uid="uid://wucmfbwbmh7u" path="res://database/items/throwabledamageitem.tres" id="9_sfj56"]
+[ext_resource type="Resource" uid="uid://bsxwx4nw5jo32" path="res://database/weapons/items/soldiers_blade.tres" id="9_sua1r"]
 [ext_resource type="Texture2D" uid="uid://b7q6ded2uoj7j" path="res://assets/models/player/Urban_Warrior_body_mat_BaseColor.png" id="10_sua1r"]
 [ext_resource type="Script" uid="uid://c2j4t3rigq4gk" path="res://scripts/systems/inventory/main/inventory.gd" id="10_v3w1h"]
 [ext_resource type="Texture2D" uid="uid://bao4fhbwffbld" path="res://assets/models/player/Urban_Warrior_eye_mat_BaseColor.png" id="11_gy114"]
 [ext_resource type="AnimationNodeBlendTree" uid="uid://c7waot7s0me6v" path="res://scenes/battle/core/allies/resources/animations/battle_tree_node.tres" id="12_6h4fh"]
 [ext_resource type="Texture2D" uid="uid://ikcu1ub268xq" path="res://assets/models/player/Urban_Warrior_hair_mat_BaseColor.png" id="12_6lbhk"]
-[ext_resource type="Script" path="res://scripts/juice/animation/stepped_anim_player.gd" id="12_8a2bo"]
+[ext_resource type="Script" uid="uid://b6em3pa0ygdkj" path="res://scripts/juice/animation/stepped_anim_player.gd" id="12_8a2bo"]
 [ext_resource type="Script" uid="uid://bkn5nmotdgut1" path="res://scripts/systems/battle/effects/number_indicator/number_indicator_3d.gd" id="13_number_indicator_3d"]
 
 [sub_resource type="Resource" id="Resource_bh2ey"]
@@ -5647,7 +5647,7 @@ size = Vector3(1, 1.80408, 1)
 script = ExtResource("2_jumoh")
 stats = SubResource("Resource_bh2ey")
 inventory = SubResource("Resource_3mkgq")
-weapon = ExtResource("9_8a2bo")
+weapon = ExtResource("9_sua1r")
 weapon_socket_path = NodePath("Armature/GeneralSkeleton/WeaponAttachement")
 number_indicator = NodePath("NumberIndicator")
 counter_stun_duration = 0.5

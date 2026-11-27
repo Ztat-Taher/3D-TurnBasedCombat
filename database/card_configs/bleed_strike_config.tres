@@ -9,7 +9,6 @@ script = ExtResource("1")
 animation_name = "ranged_cast_1"
 primary_effect = ExtResource("3")
 applies_states = Array[Resource]([ExtResource("2")])
-state_duration = -1
 card_name = "Bleed Strike"
 card_tags = Array[String](["status", "bleed", "single_target"])
 card_description = "Causes the target to accumulate bleed from damage taken. Triggers massive damage when full."

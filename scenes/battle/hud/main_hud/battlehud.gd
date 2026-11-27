@@ -470,14 +470,24 @@ func show_action_buttons(character: Node):
 	if card_battle_manager and card_battle_manager.is_executing_card:
 		return
 	
+	# Same player already in one of their menus (base, card hand, items): keep
+	# it. update_hud() lands here after every hit, and hits can land after
+	# their card has finished (e.g. a weapon echo's projectile) - that must not
+	# close the hand the player went back to.
+	var in_player_menu := current_ui_state in [UIState.BASE_STATE, UIState.CARD_SELECT_STATE, UIState.ITEMS_MENU_STATE]
+	if character == activeBattler and in_player_menu and action_buttons.visible:
+		update_party_status()
+		return
+
 	activeBattler = character
 	update_party_status()
-	
+
 	# Orbit the menu around the active battler
 	if activeBattler and is_instance_valid(activeBattler):
 		action_buttons.set_owner_battler(activeBattler)
-	
-	# Only set BASE_STATE if we didn't just restore from card execution
+
+	# A new turn, or coming back from execution/targeting: start at the base
+	# menu - unless a card just restored the menu it was played from
 	if not _just_restored_from_card:
 		set_ui_state(UIState.BASE_STATE)
 	else:

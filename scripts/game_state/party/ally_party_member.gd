@@ -117,23 +117,25 @@ func get_display_name() -> String:
 @export var vestige_stacks: Dictionary = {}
 
 
-## Add a vestige to this ally
-func add_vestige(vestige: Vestige, stacks: int = 1) -> void:
-	if vestige == null:
-		return
-	
-	# Check if already owned
-	for existing in vestiges:
-		if existing and existing.vestige_id == vestige.vestige_id:
-			# Update stack count if stacking is allowed
-			if vestige.can_stack_with(get_vestige_stack_count(vestige.vestige_id)):
-				vestige_stacks[vestige.vestige_id] = \
-					mini(get_vestige_stack_count(vestige.vestige_id) + stacks, vestige.max_stacks)
-			return
-	
-	# Add new vestige
-	vestiges.append(vestige)
-	vestige_stacks[vestige.vestige_id] = stacks
+## Gives this ally [param stacks] more of a per-character [param vestige],
+## up to its [member Vestige.max_stacks]. Returns false (and changes nothing)
+## for a party-wide vestige (see [method GameState.grant_vestige]) or when this
+## ally can't take another stack.
+func add_vestige(vestige: Vestige, stacks: int = 1) -> bool:
+	if vestige == null or not can_gain_vestige(vestige):
+		return false
+	var current := get_vestige_stack_count(vestige.vestige_id)
+	if current == 0:
+		vestiges.append(vestige)
+	var total := current + stacks
+	vestige_stacks[vestige.vestige_id] = total if vestige.max_stacks <= 0 else mini(total, vestige.max_stacks)
+	return true
+
+
+## True if this ally can take (another stack of) the per-character [param vestige].
+func can_gain_vestige(vestige: Vestige) -> bool:
+	return vestige != null and vestige.scope == Vestige.Scope.PER_CHARACTER \
+		and vestige.can_gain_stack(get_vestige_stack_count(vestige.vestige_id))
 
 
 ## Remove a vestige from this ally
@@ -159,15 +161,6 @@ func get_vestige_stack_count(vestige_id: String) -> int:
 	if vestige_id in vestige_stacks:
 		return vestige_stacks[vestige_id]
 	return 0
-
-
-## Get all vestiges of a specific scope
-func get_vestiges_by_scope(scope: Vestige.Scope) -> Array[Vestige]:
-	var matching: Array[Vestige] = []
-	for vestige in vestiges:
-		if vestige and vestige.scope == scope:
-			matching.append(vestige)
-	return matching
 
 
 ## HP as a 0..1 ratio, for progress bars.

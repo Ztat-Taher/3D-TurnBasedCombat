@@ -43,6 +43,8 @@ enum WType {
 @export var attack_bonus: int = 0
 @export var defense_bonus: int = 0
 @export var agility_bonus: int = 0
+@export var magic_bonus: int = 0
+@export var crit_chance_bonus: int = 0  ## Percent points
 @export var max_ap_bonus: int = 0
 @export var ap_regen_bonus: int = 0
 
@@ -50,6 +52,7 @@ enum WType {
 @export var attack_percent: float = 0.0
 @export var defense_percent: float = 0.0
 @export var agility_percent: float = 0.0
+@export var magic_percent: float = 0.0
 
 @export_group("Combat")
 ## Scales all damage this battler deals (consumed by damage_calculation).
@@ -100,3 +103,23 @@ func add_weapon_xp(amount: int) -> bool:
 		weapon_level += 1
 		leveled = true
 	return leveled
+
+
+## Stat deltas this weapon gives a battler whose stats before modifiers are
+## [param base] (flat bonuses plus percent of base). A stat modifier source
+## for [method Battler.refresh_stats].
+func get_stat_modifiers(base: Dictionary) -> Dictionary:
+	var mods := {
+		"max_health": max_health_bonus + roundi(float(base.get("max_health", 0)) * max_health_percent),
+		"attack": attack_bonus + roundi(float(base.get("attack", 0)) * attack_percent),
+		"defense": defense_bonus + roundi(float(base.get("defense", 0)) * defense_percent),
+		"agility": agility_bonus + roundi(float(base.get("agility", 0)) * agility_percent),
+		"magic": magic_bonus + roundi(float(base.get("magic", 0)) * magic_percent),
+		"crit_chance": crit_chance_bonus,
+		"max_ap": max_ap_bonus,
+		"ap_regen_per_turn": ap_regen_bonus,
+	}
+	for stat in mods.keys():
+		if mods[stat] == 0:
+			mods.erase(stat)
+	return mods

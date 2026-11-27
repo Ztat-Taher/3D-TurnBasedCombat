@@ -10,5 +10,3 @@ overlay_material = ExtResource("2_4kqxw")
 state_name = "Burning"
 state_description = "Takes fire damage each turn. Damage increases with more stacks."
 icon_texture = ExtResource("2_icon")
-damage_per_turn = 3
-turns_active = 3

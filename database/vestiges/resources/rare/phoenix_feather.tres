@@ -3,11 +3,17 @@
 [ext_resource type="Texture2D" uid="uid://2pod2rk60po1" path="res://assets/images/ui/vestiges/phoenix_feather.png" id="1_4wqu0"]
 [ext_resource type="Script" uid="uid://oocfttt2cfkr" path="res://database/vestiges/vestige_template.gd" id="1_vest"]
 [ext_resource type="Script" uid="uid://b0tyiimb82sae" path="res://database/vestiges/trigger_hook.gd" id="3_hook"]
+[ext_resource type="Script" uid="uid://diovup0y23nv4" path="res://database/vestiges/effects/heal_on_death.gd" id="4_effect"]
+
+[sub_resource type="Resource" id="Effect_1"]
+script = ExtResource("4_effect")
+heal_percentage = 0.5
 
 [sub_resource type="Resource" id="TriggerHook_lizard"]
 script = ExtResource("3_hook")
-trigger_type = 6
-effect_script_path = "res://database/vestiges/effects/heal_on_death.gd"
+trigger_type = 13
+effect = SubResource("Effect_1")
+trigger_limit = 1
 
 [resource]
 script = ExtResource("1_vest")
@@ -17,4 +23,4 @@ description = "When you would die, heal to 50% Max HP once per combat."
 icon = ExtResource("1_4wqu0")
 rarity = 2
 base_price = 250
-trigger_hooks = Array[Resource]([SubResource("TriggerHook_lizard")])
+trigger_hooks = Array[ExtResource("3_hook")]([SubResource("TriggerHook_lizard")])

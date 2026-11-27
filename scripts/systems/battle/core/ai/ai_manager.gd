@@ -32,8 +32,8 @@ func aggressive_action(character:Battler, players: Array, battle_manager:BattleM
 		
 		# STEP 1: Enemy Overview Camera
 		if battle_manager.battle_camera and not all_enemies.is_empty():
-			battle_manager.battle_camera.set_enemy_overview(all_enemies)
-			await battle_manager.get_tree().create_timer(0.45).timeout
+			battle_manager.battle_camera.request_shot(&"turn", BattleCamera.ShotPriority.TURN, BattleCamera.CameraMode.ENEMY_OVERVIEW, all_enemies)
+			await battle_manager.get_tree().create_timer(0.45 / battle_manager.speed_multiplier).timeout
 		
 		# STEP 2: Move to Target Focus Camera on acting enemy & Announce Move
 		var chosen_attack: EnemyAttackConfig = null
@@ -63,21 +63,21 @@ func aggressive_action(character:Battler, players: Array, battle_manager:BattleM
 			move_name = "%s's Attack" % character.character_name
 		
 		if battle_manager.battle_camera:
-			battle_manager.battle_camera.set_target_focus(character)
+			battle_manager.battle_camera.request_shot(&"turn", BattleCamera.ShotPriority.TURN, BattleCamera.CameraMode.TARGET_FOCUS, character)
 		
 		if battle_manager.hud and battle_manager.hud.has_method("show_move_announcement"):
 			battle_manager.hud.show_move_announcement(character.character_name, move_name, announcement_type)
 		
 		# Dramatic pause for announcement display
-		await battle_manager.get_tree().create_timer(0.85).timeout
+		await battle_manager.get_tree().create_timer(0.85 / battle_manager.speed_multiplier).timeout
 		
 		# STEP 3: Transition to Over-the-Shoulder Camera of attacked player ally
 		if battle_manager.hud and battle_manager.hud.has_method("hide_move_announcement"):
 			battle_manager.hud.hide_move_announcement()
 		
 		if battle_manager.battle_camera and target in players:
-			battle_manager.battle_camera.set_over_the_shoulder(target)
-			await battle_manager.get_tree().create_timer(0.35).timeout
+			battle_manager.battle_camera.request_shot(&"turn", BattleCamera.ShotPriority.TURN, BattleCamera.CameraMode.OVER_THE_SHOULDER, target)
+			await battle_manager.get_tree().create_timer(0.35 / battle_manager.speed_multiplier).timeout
 		
 		# STEP 4: Execution
 		# attack_anim handles movement, turns, contact-frame damage at hit_moment, and return-to-origin
@@ -98,17 +98,17 @@ func defensive_action(character:Battler, players: Array, battle_manager:BattleMa
 			
 			# STEP 1: Enemy Overview Camera
 			if battle_manager.battle_camera and not all_enemies.is_empty():
-				battle_manager.battle_camera.set_enemy_overview(all_enemies)
-				await battle_manager.get_tree().create_timer(0.45).timeout
+				battle_manager.battle_camera.request_shot(&"turn", BattleCamera.ShotPriority.TURN, BattleCamera.CameraMode.ENEMY_OVERVIEW, all_enemies)
+				await battle_manager.get_tree().create_timer(0.45 / battle_manager.speed_multiplier).timeout
 			
 			# STEP 2: Target Focus Camera on acting enemy & Announce Item / Buff
 			if battle_manager.battle_camera:
-				battle_manager.battle_camera.set_target_focus(character)
+				battle_manager.battle_camera.request_shot(&"turn", BattleCamera.ShotPriority.TURN, BattleCamera.CameraMode.TARGET_FOCUS, character)
 			
 			if battle_manager.hud and battle_manager.hud.has_method("show_move_announcement"):
 				battle_manager.hud.show_move_announcement(character.character_name, healing_item.item_name, "heal")
 			
-			await battle_manager.get_tree().create_timer(0.9).timeout
+			await battle_manager.get_tree().create_timer(0.9 / battle_manager.speed_multiplier).timeout
 			
 			if battle_manager.hud and battle_manager.hud.has_method("hide_move_announcement"):
 				battle_manager.hud.hide_move_announcement()
@@ -132,10 +132,8 @@ func choose_target(character:Battler, targets: Array) -> Node:
 	# Check for Taunt state - prioritize taunting targets
 	var taunting_targets = []
 	for target:Battler in valid_targets:
-		if target.active_states.has("Taunt"):
-			var taunt_state = target.active_states["Taunt"] as TauntState
-			if taunt_state and taunt_state.is_taunting:
-				taunting_targets.append(target)
+		if target.active_states.values().any(func(s): return s is State and s.is_taunting):
+			taunting_targets.append(target)
 	
 	# If there are taunting targets, prioritize them
 	if not taunting_targets.is_empty():

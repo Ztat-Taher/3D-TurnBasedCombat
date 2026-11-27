@@ -10,18 +10,6 @@ func add_card(card: CardConfig):
 	if card:
 		cards.append(card)
 
-## Remove a card from the deck
-func remove_card(card: CardConfig):
-	cards.erase(card)
-
-## Get card count
-func get_card_count() -> int:
-	return cards.size()
-
-## Clear the deck
-func clear_deck():
-	cards.clear()
-
 ## Shuffle the deck
 func shuffle() -> void:
 	for i in range(cards.size() - 1, 0, -1):

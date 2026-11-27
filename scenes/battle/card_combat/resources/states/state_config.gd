@@ -1,23 +1,21 @@
 class_name StateConfig
 extends Resource
-## State/debuff configuration for card effects
-## Controls which states are applied and how they behave
+## How a card applies a state: which [State] (its effect, icon and name live
+## on that resource), for how long, with what chance and how it stacks.
 
 enum StackingBehavior {
-	NONE,               # No stacking allowed
-	REFRESH,            # Refresh duration on reapply
-	ADDITIVE,           # Add to existing duration
-	MULTIPLICATIVE,     # Multiply existing effect
-	INDEPENDENT         # Multiple instances can exist independently
+	NONE,               # Fails if the target already has the state
+	REFRESH,            # Reapplying refreshes the duration
+	ADDITIVE,           # Adds stacks_per_application stacks, up to the state's stack_max
+	MULTIPLICATIVE,     # Doubles the current stacks, up to the state's stack_max
+	INDEPENDENT         # Not supported yet (battlers hold one instance per state): behaves as REFRESH
 }
 
-@export var state_id: String = ""                   ## Reference to state resource
-@export var state_name: String = ""                  ## Display name of the state
-@export var duration: int = 1                        ## Duration in turns
+@export var state: State                             ## The state to apply
+@export var duration: int = 1                        ## Duration in turns (-1 = until cured)
 @export var chance: float = 1.0                      ## Application chance (0.0-1.0)
 @export var stacking_behavior: StackingBehavior = StackingBehavior.REFRESH
-@export var max_stacks: int = 1                      ## Maximum number of stacks
-@export var stacks_per_application: int = 1          ## How many stacks to add per application (for ADDITIVE stacking)
+@export var stacks_per_application: int = 1          ## How many stacks to add per application (ADDITIVE; first application of MULTIPLICATIVE)
 @export var can_dispel: bool = true                  ## Whether state can be dispelled
 @export var is_purgeable: bool = true                ## Whether state can be purged
 @export var applies_to_actor: bool = false           ## Whether state applies to actor instead of target
@@ -31,162 +29,65 @@ enum StackingBehavior {
 @export var remove_on_move: bool = false             ## Whether state removes when moving
 @export var immunity_duration: int = 0                ## Immunity duration after state ends
 
-## Apply this state to a target
+## Name the state is tracked under on battlers ([member Battler.active_states]).
+func get_state_name() -> String:
+	return state.state_name if state else ""
+
+## Rolls [member chance] and, on success, puts a configured copy of
+## [member state] on [param target] (or on [param actor] when
+## [member applies_to_actor]). Stacking is resolved against the stacks the
+## recipient already has.
 func apply_state(target: Node, actor: Node = null) -> Dictionary:
 	var result = {
 		"success": false,
 		"state_applied": false,
 		"duration": duration,
-		"stacks": 1,
+		"stacks": 0,
 		"message": ""
 	}
-	
-	# Check chance
+	if state == null:
+		result["message"] = "No state set"
+		return result
+
 	if randf() > chance:
 		result["message"] = "State application failed (chance check)"
 		return result
-	
-	# Determine actual target
+
 	var actual_target = actor if applies_to_actor else target
-	if not actual_target:
+	if not actual_target or not actual_target.has_method("apply_state"):
 		result["message"] = "No valid target for state"
 		return result
-	
-	# Check if target is immune
-	if _is_immune(actual_target):
-		result["message"] = "Target is immune to this state"
-		return result
-	
-	# Load the state resource based on state_id
-	var state_resource = _load_state_resource()
-	if not state_resource:
-		result["message"] = "Could not load state resource: " + state_id
-		return result
-	
-	# Handle stacking
-	var current_stacks = _get_current_stacks(actual_target)
-	var new_stacks = _calculate_new_stacks(current_stacks)
-	
-	# For ADDITIVE stacking (like Burning), calculate how many stacks to ADD
-	var stacks_to_add = 0
-	if stacking_behavior == StackingBehavior.ADDITIVE:
-		stacks_to_add = stacks_per_application
-		# Calculate what the new total would be
-		new_stacks = current_stacks + stacks_to_add
-		if new_stacks > max_stacks:
-			new_stacks = max_stacks
-			# Adjust stacks_to_add if we're at cap
-			stacks_to_add = max_stacks - current_stacks
-	
-	# Handle Bleed accumulation - set initial accumulation for new states
-	if state_id == "Bleed" and not actual_target.active_states.has("Bleed"):
-		# New bleed state starts at 0 accumulation
-		var initial_accum = 0
-	
-	if new_stacks == 0 and stacking_behavior == StackingBehavior.NONE:
+
+	var existing: State = null
+	if "active_states" in actual_target:
+		existing = actual_target.active_states.get(state.state_name) as State
+	if existing and stacking_behavior == StackingBehavior.NONE:
 		result["message"] = "State already applied and no stacking allowed"
 		return result
-	
-	# Apply the state using the new status effect system
-	if actual_target.has_method("apply_state"):
-		# Create a copy of the state resource
-		var state_instance = state_resource.duplicate()
-		
-		# Configure the state instance with our config values
-		if state_instance.has_method("set"):
-			state_instance.turns_active = duration
-		
-		# Handle stacking for Burning state
-		# For ADDITIVE stacking, set stack_count to the AMOUNT TO ADD (not total)
-		if stacking_behavior == StackingBehavior.ADDITIVE and "stack_count" in state_instance:
-			state_instance.stack_count = stacks_to_add
-		elif state_id == "Burning" and state_instance.has_method("apply_stacks"):
-			# Legacy fallback
-			state_instance.apply_stacks(stacks_to_add)
-		
-		# Handle Protected state - set shield hits
-		if state_id == "Protected" and "shield_hits" in state_instance:
-			state_instance.shield_hits = 1  # Default 1 shield hit
-		
-		# Handle Bleed state - set initial accumulation
-		if state_id == "Bleed" and "accumulation_value" in state_instance:
-			state_instance.accumulation_value = 0  # Start at 0, accumulates from damage
-		
-		# Ensure icon_texture is preserved (duplicate() may not preserve exported resources)
-		if state_resource.icon_texture and not state_instance.icon_texture:
-			state_instance.icon_texture = state_resource.icon_texture
-		
-		# Apply the state to the target
-		actual_target.apply_state(state_instance)
-		result["success"] = true
-		result["state_applied"] = true
-		result["stacks"] = new_stacks
-		result["message"] = "State applied successfully"
-	else:
-		# Fallback: try to use existing state system
-		result["message"] = "Target does not support state application"
-	
+
+	var current_stacks := existing.stack_count if existing else 0
+	# The battler adds an incoming stack_count onto an existing state's stacks
+	var added := _stacks_to_add(current_stacks, existing != null)
+	actual_target.apply_state(state.make_instance(duration, added), actor)
+	result["success"] = true
+	result["state_applied"] = true
+	result["stacks"] = current_stacks + maxi(added, 0)
+	result["message"] = "State applied successfully"
 	return result
 
-## Load the state resource based on state_id
-func _load_state_resource() -> State:
-	# Map state_id to resource paths
-	var state_paths = {
-		"Burning": "res://database/states/resources/burning_state.tres",
-		"Electrocuted": "res://database/states/resources/electrocuted_state.tres",
-		"Bleed": "res://database/states/resources/bleed_state.tres",
-		"Chilled": "res://database/states/resources/chilled_state.tres",
-		"Berserk": "res://database/states/resources/berserk_state.tres",
-		"Taunt": "res://database/states/resources/taunt_state.tres",
-		"Marked": "res://database/states/resources/marked_state.tres",
-		"Protected": "res://database/states/resources/protected_state.tres"
-	}
-	
-	var state_path = state_paths.get(state_id, "")
-	if state_path.is_empty():
-		return null
-	
-	if ResourceLoader.exists(state_path):
-		return ResourceLoader.load(state_path) as State
-	
-	return null
-
-## Check if target is immune to this state
-func _is_immune(target: Node) -> bool:
-	if target.has_method("has_state_immunity"):
-		return target.has_state_immunity(state_id)
-	
-	# Check for immunity state
-	if target.has_method("has_state"):
-		return target.has_state("immunity_" + state_id)
-	
-	return false
-
-## Get current stacks of this state on target
-func _get_current_stacks(target: Node) -> int:
-	if target.has_method("get_state_stacks"):
-		return target.get_state_stacks(state_id)
-	
-	if target.has_method("has_state") and target.has_state(state_id):
-		return 1
-	
-	return 0
-
-## Calculate new stack count based on stacking behavior
-func _calculate_new_stacks(current_stacks: int) -> int:
+## Stacks this application adds on top of [param current_stacks], or -1 to
+## keep the state's own stack_count. (A state that doesn't stack ignores it.)
+func _stacks_to_add(current_stacks: int, has_state: bool) -> int:
+	# The state owns its cap ([member State.stack_max])
+	var room := maxi(0, state.stack_max - current_stacks)
 	match stacking_behavior:
-		StackingBehavior.NONE:
-			return 0 if current_stacks > 0 else 1
-		StackingBehavior.REFRESH:
-			return 1 # Duration will be refreshed
 		StackingBehavior.ADDITIVE:
-			return min(current_stacks + 1, max_stacks)
+			return mini(stacks_per_application, room)
 		StackingBehavior.MULTIPLICATIVE:
-			return min(current_stacks * 2, max_stacks)
-		StackingBehavior.INDEPENDENT:
-			return current_stacks + 1
+			return mini(current_stacks if has_state and current_stacks > 0 else stacks_per_application, room)
 		_:
-			return 1
+			# REFRESH: a re-application only refreshes; a first one is as authored
+			return 0 if has_state else -1
 
 ## Handle tick-based effects (DoT, HoT, etc.)
 func process_tick(target: Node):
@@ -218,7 +119,7 @@ func _is_in_range(source: Node, target: Node) -> bool:
 
 ## Get state description for UI
 func get_description() -> String:
-	var description = state_name.capitalize()
+	var description = get_state_name()
 	
 	if duration > 0:
 		description += " (%d turns)" % duration
@@ -229,76 +130,22 @@ func get_description() -> String:
 	if tick_damage > 0:
 		description += " - %d damage/tick" % tick_damage
 	
-	if max_stacks > 1:
-		description += " (max %d stacks)" % max_stacks
+	if stacking_behavior in [StackingBehavior.ADDITIVE, StackingBehavior.MULTIPLICATIVE] and state and state.stack_max > 1:
+		description += " (max %d stacks)" % state.stack_max
 	
 	return description
-
-## Create preset state configurations
-static func create_burn_state() -> StateConfig:
-	var config = StateConfig.new()
-	config.state_id = "burn"
-	config.state_name = "Burn"
-	config.duration = 3
-	config.chance = 0.5
-	config.stacking_behavior = StackingBehavior.ADDITIVE
-	config.max_stacks = 3
-	config.tick_damage = 5
-	config.tick_interval = 1.0
-	config.tick_count = 3
-	return config
-
-static func create_poison_state() -> StateConfig:
-	var config = StateConfig.new()
-	config.state_id = "poison"
-	config.state_name = "Poison"
-	config.duration = 4
-	config.chance = 0.75
-	config.stacking_behavior = StackingBehavior.REFRESH
-	config.max_stacks = 1
-	config.tick_damage = 8
-	config.tick_interval = 1.0
-	config.tick_count = 4
-	return config
-
-static func create_stun_state() -> StateConfig:
-	var config = StateConfig.new()
-	config.state_id = "stun"
-	config.state_name = "Stun"
-	config.duration = 1
-	config.chance = 0.3
-	config.stacking_behavior = StackingBehavior.NONE
-	config.max_stacks = 1
-	config.remove_on_damage = true
-	return config
-
-static func create_slow_state() -> StateConfig:
-	var config = StateConfig.new()
-	config.state_id = "slow"
-	config.state_name = "Slow"
-	config.duration = 2
-	config.chance = 1.0
-	config.stacking_behavior = StackingBehavior.REFRESH
-	config.max_stacks = 1
-	return config
 
 ## Validate configuration
 func validate() -> Array[String]:
 	var issues: Array[String] = []
 	
-	if state_id.is_empty():
-		issues.append("No state ID specified")
+	if state == null:
+		issues.append("No state specified")
 	
-	if state_name.is_empty():
-		issues.append("No state name specified")
-	
-	if duration <= 0:
-		issues.append("Invalid duration (must be > 0)")
+	if duration == 0 or duration < -1:
+		issues.append("Invalid duration (must be > 0, or -1 until cured)")
 	
 	if chance <= 0 or chance > 1:
 		issues.append("Invalid chance (must be 0.0-1.0)")
-	
-	if max_stacks <= 0:
-		issues.append("Invalid max stacks (must be > 0)")
 	
 	return issues

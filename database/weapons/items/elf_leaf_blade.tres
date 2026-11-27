@@ -17,7 +17,7 @@ state_accumulation = 20
 [sub_resource type="Resource" id="2_leaf_damage"]
 script = ExtResource("2_fx")
 kind = 0
-value = 6.0
+value = 30.0
 value_is_attack_percent = true
 
 [sub_resource type="Image" id="Image_wmvwk"]

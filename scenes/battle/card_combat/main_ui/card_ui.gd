@@ -96,6 +96,7 @@ func _deferred_ready():
 	# Connect signals
 	card_battle_manager.ap_changed.connect(_on_ap_changed)
 	card_battle_manager.card_played.connect(_on_card_played)
+	card_battle_manager.card_overdrawn.connect(_on_card_overdrawn)
 	
 	
 	# Initial UI update
@@ -320,40 +321,11 @@ func _pulse_draw_pile_badge() -> void:
 	tween.tween_property(badge, "scale", Vector2.ONE, 0.15)
 
 func _on_draw_pile_pressed() -> void:
-	if not card_battle_manager or card_battle_manager.is_executing_card:
+	# The manager decides (room in hand, something to draw, AP) and only
+	# charges AP for a card that was actually drawn
+	if not card_battle_manager:
 		return
-	
-	# Check if player has enough AP
-	var draw_cost = 1
-	if card_battle_manager.card_battle_config:
-		draw_cost = card_battle_manager.card_battle_config.draw_card_ap_cost
-	
-	var ap_info = card_battle_manager.get_ap_info()
-	if ap_info.get("current_ap", 0) < draw_cost:
-		return
-	
-	# Check if hand is not full (max_hand_size check)
-	var deck = card_battle_manager._get_current_deck()
-	if not deck:
-		return
-	
-	var hand = deck.get_hand()
-	var max_hand_size = card_battle_manager.card_battle_config.max_hand_size if card_battle_manager.card_battle_config else 5
-	if hand.size() >= max_hand_size:
-		return
-	
-	# Spend AP
-	if card_battle_manager.current_player_battler:
-		card_battle_manager.current_player_battler.spend_ap(draw_cost)
-		if card_battle_manager.ap_system:
-			card_battle_manager.ap_system.current_ap = card_battle_manager.current_player_battler.current_ap
-			card_battle_manager.ap_system.max_ap = card_battle_manager.current_player_battler.max_ap
-		card_battle_manager.ap_changed.emit(card_battle_manager.current_player_battler.current_ap, card_battle_manager.current_player_battler.max_ap)
-	elif card_battle_manager.ap_system:
-		card_battle_manager.ap_system.spend_ap(draw_cost)
-	
-	# Draw a card from the deck
-	var drawn_card = card_battle_manager.draw_card_for_deck(deck)
+	var drawn_card = card_battle_manager.buy_card_draw()
 	if drawn_card:
 		# Only the drawn card is added; the rest of the hand slides to its new fan slots
 		update_hand_display()
@@ -666,17 +638,24 @@ func apply_card_fanning() -> void:
 		if child.has_method("set_fan_parameters"):
 			child.set_fan_parameters(rotation_deg, y_offset, z_idx)
 
+## AP the active battler pays for [param card] (base cost outside battle).
+func _card_cost(card: CardConfig) -> int:
+	return card_battle_manager.get_card_ap_cost(card) if card_battle_manager else card.ap_cost
+
+
 func create_card_button(card: CardConfig) -> Control:
 	if not card_button_scene:
 		var button = Button.new()
 		button.focus_mode = Control.FOCUS_NONE
-		button.text = card.card_name + " (Cost: " + str(card.ap_cost) + ")"
+		button.text = card.card_name + " (Cost: " + str(_card_cost(card)) + ")"
 		button.pressed.connect(func(): _on_card_button_pressed(card))
 		return button
 	
 	var card_button = card_button_scene.instantiate()
 	if card_button is CardButton:
 		card_button.hand_bounds_provider = Callable(self, "get_hand_zone_rect")
+	if card_button is CardButton:
+		card_button.display_ap_cost = _card_cost(card)
 	if card_button.has_method("setup"):
 		card_button.setup(card)
 		card_button.card_played.connect(_on_card_button_pressed)
@@ -828,12 +807,9 @@ func update_ap_display():
 
 func _on_card_button_pressed(card: CardConfig) -> bool:
 	if card_battle_manager:
-		if card_battle_manager.is_executing_card:
+		if card_battle_manager.is_executing_card or not card_battle_manager.can_play_card(card):
 			return false
-		var ap_info = card_battle_manager.get_ap_info()
-		if ap_info.get("current_ap", 0) < card.ap_cost:
-			return false
-	
+
 	# Track which button is being played so _on_card_played can animate it to the discard pile
 	_pending_discard_button = null
 	for cb in card_buttons:
@@ -843,9 +819,6 @@ func _on_card_button_pressed(card: CardConfig) -> bool:
 	
 	card_selected.emit(card)
 	return true
-
-func set_end_turn_button_visible(_p_visible: bool) -> void:
-	pass
 
 func _on_end_turn_pressed():
 	end_turn_pressed.emit()
@@ -872,7 +845,7 @@ func update_card_playability():
 			continue
 		
 		# Check if card is playable based on AP cost
-		var is_playable = current_ap >= card_config.ap_cost
+		var is_playable = current_ap >= _card_cost(card_config)
 		
 		# Update visual indication
 		var card_content = card_button.get_node_or_null("Card3DContainer/CardViewport/CardContent")
@@ -886,6 +859,24 @@ func update_card_playability():
 				card_button.modulate = Color.WHITE
 			else:
 				card_button.modulate = Color(0.4, 0.4, 0.4, 0.8)
+
+## A card drawn into a full hand: show it flying from the draw pile straight
+## to the discard pile, so the burned card isn't lost silently.
+func _on_card_overdrawn(battler: Battler, card: CardConfig) -> void:
+	update_pile_counts()
+	if not visible or not card_battle_manager or battler != card_battle_manager.current_player_battler or not draw_pile:
+		return
+	var ghost := create_card_button(card)
+	if not ghost is CardButton:
+		if ghost:
+			ghost.queue_free()
+		return
+	add_child(ghost)
+	ghost.z_index = 250
+	ghost.scale = Vector2(0.6, 0.6)
+	var pile_center := draw_pile.global_position + draw_pile.size * 0.5
+	ghost.position = get_global_transform().affine_inverse() * pile_center - ghost.size * 0.5 * ghost.scale
+	animate_discard_card(ghost, Callable(), 0.15)
 
 func return_pending_card_to_hand():
 	# Return the pending card to hand when targeting is cancelled
@@ -905,7 +896,3 @@ func _on_card_played(_card = null, _target = null):
 	# ── 2. Close the gap: remaining cards slide to their new fan slots ──
 	update_hand_display()
 	update_pile_counts()
-
-func set_card_targeting_mode(_enabled: bool):
-	pass
-	# Enable/disable card targeting UI

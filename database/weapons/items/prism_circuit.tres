@@ -12,7 +12,7 @@
 [sub_resource type="Resource" id="0_attuned_dmg"]
 script = ExtResource("4_fx")
 kind = 0
-value = 3.0
+value = 15.0
 value_is_attack_percent = true
 
 [sub_resource type="Resource" id="1_ember"]
@@ -22,7 +22,7 @@ color = Color(1, 0.35, 0.1, 1)
 emission_energy = 2.0
 state = ExtResource("6_burning")
 stack_count = 2
-damage = 6
+damage = 40
 damage_is_attack_percent = true
 chance = 0.9
 element = "fire"
@@ -35,7 +35,7 @@ color = Color(0.2, 0.6, 1, 1)
 emission_energy = 1.6
 state = ExtResource("7_chilled")
 stack_count = 1
-damage = 4
+damage = 30
 damage_is_attack_percent = true
 chance = 0.9
 element = "water"
@@ -48,7 +48,7 @@ color = Color(0.7, 0.4, 1, 1)
 emission_energy = 2.4
 state = ExtResource("8_electro")
 stack_count = 1
-damage = 8
+damage = 50
 damage_is_attack_percent = true
 chance = 0.8
 element = "lightning"
@@ -63,4 +63,4 @@ script = ExtResource("1_weapon")
 model_scene = ExtResource("5_visual")
 modules = Array[ExtResource("3_orb_mod")]([SubResource("4_orb_module")])
 item_name = "Prism Circuit"
-description = "Three orbiting orbs cycle on every hit: Ember burns, Tide chills, Volt shocks. Each detonation empowers the next orb with Overcharge."
+description = "Three orbiting orbs cycle on every hit: Ember burns, Tide chills, Volt shocks. Each successful detonation overcharges the next orb; a fizzle breaks the chain."

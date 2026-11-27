@@ -1,89 +1,78 @@
 @tool
 class_name TriggerHook
 extends Resource
-## Defines when a vestige effect should trigger
+## One reaction of a vestige: when [member trigger_type] fires for the battler
+## carrying it (and the optional [member condition] passes), run [member effect].
+##
+## Vestige resources, and so their hooks, effects and conditions, are shared by
+## every battler carrying the vestige. Nothing here or in an effect/condition
+## keeps state: per-battler, per-combat state lives in the battler's
+## [VestigeHolder] (see [method VestigeHolder.get_combat_memory]).
 
+## When a hook fires (for the battler carrying the vestige). New values go at
+## the end: resources store them as numbers.
 enum TriggerType {
 	ON_COMBAT_START,
 	ON_COMBAT_END,
 	ON_TURN_START,
 	ON_TURN_END,
 	ON_CARD_PLAY,
+	## Its hit made a target lose HP
 	ON_DAMAGE_DEALT,
+	## It lost HP to a hit (blocked or dodged hits don't count)
 	ON_DAMAGE_TAKEN,
+	## It regained HP
 	ON_HEAL,
+	## A state was put on it
 	ON_STATE_APPLIED,
 	ON_STATE_REMOVED,
+	## A battler of the opposing team was defeated
 	ON_ENEMY_DEFEAT,
+	## Its HP dropped to or below [member hp_threshold] of max
 	ON_LOW_HP,
-	ON_HIGH_HP
+	## Its HP rose to or above [member hp_threshold] of max
+	ON_HIGH_HP,
+	## A hit is about to defeat it (the effect may save it)
+	ON_LETHAL_DAMAGE,
+	## It put a state on another battler
+	ON_STATE_INFLICTED,
 }
 
 @export var trigger_type: TriggerType
-@export var effect_script_path: String = ""  # Path to effect script
-@export var condition_script_path: String = ""  # Path to condition script
-@export var parameters: Dictionary = {}  # Parameters to pass to effect script
-
-var effect_script: Object = null
-var condition_script: Object = null
-
-func _ensure_scripts_loaded():
-	# Load and instantiate scripts from paths when needed (Resources don't have _ready)
-	if effect_script == null and not effect_script_path.is_empty():
-		var script_resource = load(effect_script_path)
-		if script_resource:
-			# Try to instantiate the script
-			if script_resource is Script:
-				effect_script = script_resource.new()
-			else:
-				effect_script = script_resource
-	if condition_script == null and not condition_script_path.is_empty():
-		var script_resource = load(condition_script_path)
-		if script_resource:
-			if script_resource is Script:
-				condition_script = script_resource.new()
-			else:
-				condition_script = script_resource
+## What happens.
+@export var effect: VestigeEffect
+## Optional extra requirement; empty = always.
+@export var condition: VestigeCondition
+## Times the effect may happen per combat for each battler (-1 = unlimited).
+@export var trigger_limit: int = -1
+## HP fraction crossed by ON_LOW_HP / ON_HIGH_HP (ignored by other triggers).
+@export_range(0.0, 1.0, 0.05) var hp_threshold: float = 0.5
 
 
-## Check if this hook should trigger based on condition
+## True when the hook may run now for [param battler]: its trigger limit for
+## this combat isn't used up and its condition (if any) passes.
 func should_trigger(vestige: Vestige, battler: Battler, context: Dictionary) -> bool:
-	_ensure_scripts_loaded()
-	if condition_script == null:
-		return true
-	
-	if condition_script.has_method("should_trigger"):
-		return condition_script.should_trigger(vestige, battler, context)
-	
-	return true
+	if effect == null:
+		return false
+	if trigger_limit >= 0 and int(_memory(context).get("count", 0)) >= trigger_limit:
+		return false
+	return condition == null or condition.should_trigger(vestige, battler, context)
 
 
-## Execute the effect for this hook
+## Runs the effect. Counts toward the trigger limit only when the effect
+## reports that it actually happened.
 func execute(vestige: Vestige, battler: Battler, context: Dictionary) -> void:
-	_ensure_scripts_loaded()
-	if effect_script == null:
-		return
-	
-	# Build parameters dictionary from both the parameters dict and direct fields
-	var combined_params = parameters.duplicate()
-	
-	# Add direct fields from the hook if they exist
-	if has_method("get_property_list"):
-		for prop in get_property_list():
-			var prop_name = prop.name
-			if prop_name in ["script", "trigger_type", "effect_script_path", "condition_script_path", "parameters", "effect_script", "condition_script"]:
-				continue
-			if prop.usage & PROPERTY_USAGE_STORAGE:
-				combined_params[prop_name] = get(prop_name)
-	
-	# Merge hook parameters into context
-	if not combined_params.is_empty():
-		context["hook_parameters"] = combined_params
-	
-	if effect_script.has_method("execute"):
-		effect_script.execute(vestige, battler, context)
+	if effect and effect.execute(vestige, battler, context):
+		var memory := _memory(context)
+		memory["count"] = int(memory.get("count", 0)) + 1
 
 
 ## Get the trigger type name as a string
 func get_trigger_name() -> String:
 	return TriggerType.keys()[trigger_type]
+
+
+## This hook's per-combat state for the battler being handled.
+func _memory(context: Dictionary) -> Dictionary:
+	var holder: VestigeHolder = context.get("vestige_holder")
+	return holder.get_combat_memory(self) if holder else {}
